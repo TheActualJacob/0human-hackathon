@@ -54,6 +54,11 @@ const useLandlordStore = create<LandlordState>()(
 
       // Fetch all landlord data
       fetchLandlordData: async (landlordId: string) => {
+        if (!landlordId || landlordId === 'undefined') {
+          console.warn('fetchLandlordData called with invalid landlordId:', landlordId);
+          set({ loading: false });
+          return;
+        }
         set({ loading: true, error: null });
         const supabase = createClient();
 

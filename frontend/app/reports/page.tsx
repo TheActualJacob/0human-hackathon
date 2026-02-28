@@ -22,12 +22,12 @@ import {
 } from 'recharts';
 
 export default function ReportsPage() {
-  const { rentPayments, tickets, tenants, vendors } = useStore();
+  const { payments, maintenanceRequests, tenants, contractors, agentActions } = useStore();
 
   // Calculate monthly cash flow data from actual payments
   const currentMonth = new Date().toLocaleString('default', { month: 'short' });
-  const totalExpected = rentPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalCollected = rentPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+  const totalExpected = payments.reduce((sum: number, p) => sum + p.amount_due, 0);
+  const totalCollected = payments.filter(p => p.status === 'paid').reduce((sum: number, p) => sum + (p.amount_paid ?? 0), 0);
   
   const monthlyData = [
     { month: currentMonth, collected: totalCollected, expected: totalExpected }
@@ -35,9 +35,10 @@ export default function ReportsPage() {
 
   // Calculate maintenance spend by category
   const maintenanceByCategory = Object.entries(
-    tickets.reduce((acc, ticket) => {
-      if (ticket.estimated_cost) {
-        acc[ticket.category || 'general'] = (acc[ticket.category || 'general'] || 0) + ticket.estimated_cost;
+    maintenanceRequests.reduce((acc: Record<string, number>, ticket) => {
+      if ((ticket as any).cost) {
+        const cat = ticket.category || 'general';
+        acc[cat] = (acc[cat] || 0) + ((ticket as any).cost as number);
       }
       return acc;
     }, {} as Record<string, number>)
@@ -45,21 +46,21 @@ export default function ReportsPage() {
 
   // Payment status distribution
   const paymentStatusData = [
-    { name: 'On Time', value: rentPayments.filter(p => p.status === 'paid').length, color: '#22c55e' },
-    { name: 'Late', value: rentPayments.filter(p => p.status === 'late').length, color: '#ef4444' },
-    { name: 'Pending', value: rentPayments.filter(p => p.status === 'pending').length, color: '#eab308' },
+    { name: 'On Time', value: payments.filter(p => p.status === 'paid').length, color: '#22c55e' },
+    { name: 'Late', value: payments.filter(p => p.status === 'late').length, color: '#ef4444' },
+    { name: 'Pending', value: payments.filter(p => p.status === 'pending').length, color: '#eab308' },
   ];
 
   // AI efficiency metrics
-  const totalTickets = tickets.length;
-  const aiClassifiedTickets = tickets.filter(t => t.ai_classified).length;
-  const aiAssignedVendors = tickets.filter(t => t.vendor_id && t.ai_classified).length;
-  const avgResponseTime = vendors.length > 0 ? vendors.reduce((sum, v) => sum + v.avg_response_time, 0) / vendors.length : 0;
+  const totalRequests = maintenanceRequests.length;
+  const aiDiagnosedRequests = maintenanceRequests.filter(t => (t as any).ai_diagnosed).length;
+  const aiAssignedRequests = maintenanceRequests.filter(t => t.contractor_id && (t as any).ai_diagnosed).length;
+  const totalAgentActions = agentActions.length;
 
   const aiEfficiencyData = [
-    { metric: 'Tickets Classified', value: Math.round((aiClassifiedTickets / totalTickets) * 100) },
-    { metric: 'Vendors Auto-Assigned', value: Math.round((aiAssignedVendors / totalTickets) * 100) },
-    { metric: 'Avg Response Time', value: Math.round(avgResponseTime * 10) / 10 },
+    { metric: 'Issues AI Diagnosed', value: totalRequests > 0 ? Math.round((aiDiagnosedRequests / totalRequests) * 100) : 0 },
+    { metric: 'Auto Contractor Assigned', value: totalRequests > 0 ? Math.round((aiAssignedRequests / totalRequests) * 100) : 0 },
+    { metric: 'Agent Actions Logged', value: totalAgentActions },
   ];
 
   return (
@@ -197,19 +198,19 @@ export default function ReportsPage() {
               <h3 className="font-semibold mb-4">Ticket Summary</h3>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Tickets</p>
-                  <p className="text-2xl font-bold">{tickets.length}</p>
+                  <p className="text-sm text-muted-foreground">Total Requests</p>
+                  <p className="text-2xl font-bold">{maintenanceRequests.length}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Open Tickets</p>
+                  <p className="text-sm text-muted-foreground">Open Requests</p>
                   <p className="text-2xl font-bold text-yellow-500">
-                    {tickets.filter(t => ['open', 'assigned', 'in_progress'].includes(t.status || '')).length}
+                    {maintenanceRequests.filter(t => ['open', 'assigned', 'in_progress'].includes(t.status ?? '')).length}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Completed</p>
                   <p className="text-2xl font-bold text-green-500">
-                    {tickets.filter(t => t.status === 'completed').length}
+                    {maintenanceRequests.filter(t => t.status === 'completed').length}
                   </p>
                 </div>
               </div>

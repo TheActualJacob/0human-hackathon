@@ -13,12 +13,24 @@ def _normalize_to(number: str) -> str:
 
 
 async def send_whatsapp_message(to_number: str, body: str) -> str:
-    """Send a WhatsApp message via Twilio. Returns the message SID."""
+    """Send a WhatsApp text message via Twilio. Returns the message SID."""
     client = _get_client()
     message = client.messages.create(
         from_=settings.TWILIO_WHATSAPP_NUMBER,
         to=_normalize_to(to_number),
         body=body,
+    )
+    return message.sid
+
+
+async def send_whatsapp_media(to_number: str, body: str, media_url: str) -> str:
+    """Send a WhatsApp message with a media attachment (e.g. PDF) via Twilio."""
+    client = _get_client()
+    message = client.messages.create(
+        from_=settings.TWILIO_WHATSAPP_NUMBER,
+        to=_normalize_to(to_number),
+        body=body,
+        media_url=[media_url],
     )
     return message.sid
 

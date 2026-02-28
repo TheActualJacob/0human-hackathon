@@ -143,34 +143,8 @@ export default function MaintenancePage() {
 
       // AI Contractor Assignment
       const vendorSelection = selectOptimalVendor(
-        { 
-          id: newRequest.id,
-          title: formData.description.slice(0, 50),
-          description: formData.description,
-          category: classification.category,
-          urgency: classification.urgency,
-          status: 'open',
-          vendorId: null,
-          vendorName: null,
-          tenantId: '',
-          tenantName: '',
-          unit: '',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          aiClassified: true,
-          aiDecisions: [],
-          estimatedCost: null
-        },
-        contractors.map(c => ({
-          id: c.id,
-          name: c.name,
-          specialty: c.trades || [],
-          avgResponseTime: 24,
-          avgCost: 150,
-          rating: 4.5,
-          isAvailable: c.emergency_available || true,
-          aiPerformanceScore: 0.85
-        }))
+        { category: classification.category, urgency: classification.urgency },
+        contractors
       );
 
       if (vendorSelection) {
@@ -522,7 +496,7 @@ export default function MaintenancePage() {
                 <SelectContent>
                   {activeLeasesWithTenants.map(({ lease, tenant, unit }) => (
                     <SelectItem key={lease.id} value={lease.id}>
-                      {unit.unit_identifier} - {tenant.full_name}
+                      {unit?.unit_identifier ?? lease.unit_id} - {tenant?.full_name ?? 'Unknown'}
                     </SelectItem>
                   ))}
                 </SelectContent>

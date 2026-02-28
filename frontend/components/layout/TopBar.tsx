@@ -1,17 +1,36 @@
 'use client';
 
-import { Bell, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Bell, AlertCircle, CheckCircle2, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useStore from "@/lib/store/useStore";
+import { useRouter } from 'next/navigation';
+import { signOut } from '@/lib/auth/client';
+import { useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-export default function TopBar() {
+type TopBarProps = {
+  userRole: 'landlord' | 'tenant';
+};
+
+export default function TopBar({ userRole }: TopBarProps) {
   const { agentMode, autonomyLevel } = useStore();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
   
   return (
     <div className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
       {/* Page Title - will be filled by individual pages */}
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-semibold">Property Management</h1>
+        <h1 className="text-xl font-semibold">
+          {userRole === 'landlord' ? 'Landlord Dashboard' : 'Tenant Portal'}
+        </h1>
       </div>
       
       {/* Right Section */}
@@ -45,6 +64,34 @@ export default function TopBar() {
           
           {/* Escalations can be added later when you have escalation logic */}
         </div>
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center gap-2 p-2 hover:bg-secondary rounded-lg transition-colors">
+            <User className="h-5 w-5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => router.push(userRole === 'landlord' ? '/landlord/settings' : '/tenant/profile')}
+            >
+              {userRole === 'landlord' ? 'Settings' : 'Profile'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={async () => {
+                setLoading(true);
+                await signOut();
+                router.push('/');
+              }}
+              className="text-destructive"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

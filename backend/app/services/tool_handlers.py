@@ -112,6 +112,31 @@ AGENT_TOOLS = [
         },
     },
     {
+        "name": "record_renewal_decision",
+        "description": (
+            "Records the tenant's decision on whether they will renew their lease. "
+            "Call this immediately when the tenant clearly states they will or will not renew. "
+            "If the decision is 'not_renewing', this will automatically trigger the property "
+            "listing process — generating a listing image and posting to Instagram."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
+                "decision": {
+                    "type": "string",
+                    "enum": ["renewing", "not_renewing"],
+                    "description": "The tenant's renewal decision.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional context from the conversation (e.g. tenant's reason for leaving).",
+                },
+            },
+            "required": ["lease_id", "decision"],
+        },
+    },
+    {
         "name": "update_escalation_level",
         "description": (
             "Updates the escalation level for this tenancy (1=Conversational, 2=Formal Written, "
@@ -151,6 +176,8 @@ async def execute_tool(tool_name: str, tool_input: dict[str, Any], ctx: TenantCo
         return await _issue_legal_notice(tool_input, ctx)
     elif tool_name == "update_escalation_level":
         return await _update_escalation_level(tool_input, ctx)
+    elif tool_name == "record_renewal_decision":
+        return await _record_renewal_decision(tool_input, ctx)
     else:
         return ToolResult(success=False, error=f"Unknown tool: {tool_name}")
 
@@ -471,6 +498,46 @@ def _compute_deadline_days(notice_type: str, jurisdiction: str) -> int:
     if notice_type == "payment_demand":
         return 7
     return 14
+
+
+async def _record_renewal_decision(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
+    sb = _sb()
+    lease_id = inp.get("lease_id") or ctx.lease.id
+    decision = inp["decision"]
+    notes = inp.get("notes", "")
+
+    sb.table("leases").update({"renewal_status": decision}).eq("id", lease_id).execute()
+
+    await log_agent_action(
+        lease_id=lease_id,
+        action_category="renewal",
+        action_description=f"Tenant renewal decision recorded: {decision}. {notes}".strip(),
+        tools_called=[{"tool": "record_renewal_decision", "input": inp}],
+        output_summary=f"renewal_status set to {decision}",
+        confidence_score=1.0,
+    )
+
+    if decision == "renewing":
+        return ToolResult(
+            success=True,
+            data={
+                "decision": "renewing",
+                "message": "Renewal confirmed. The lease will be extended — landlord will be in touch with updated terms.",
+            },
+        )
+
+    return ToolResult(
+        success=True,
+        is_high_severity=True,
+        landlord_notification_message=(
+            f"Tenant {ctx.tenant.full_name} at {ctx.unit.unit_identifier}, {ctx.unit.address} "
+            f"has confirmed they will NOT be renewing. Property listing is being prepared."
+        ),
+        data={
+            "decision": "not_renewing",
+            "message": "Move-out noted. We'll be in touch regarding the end of tenancy process.",
+        },
+    )
 
 
 _NOTICE_DESCRIPTIONS: dict[str, str] = {

@@ -27,14 +27,23 @@ async def run_agent_loop(user_message: str, ctx: TenantContext) -> AgentResult:
 
     system_prompt = build_system_prompt(ctx)
 
-    # Seed conversation history from DB (last 10 messages, chronological)
-    messages: list[dict] = [
+    # Seed conversation history from DB — loaded newest-first (desc), so reverse for chronological order
+    raw_history: list[dict] = [
         {
             "role": "user" if conv.direction == "inbound" else "assistant",
             "content": conv.message_body,
         }
-        for conv in ctx.recent_conversations
+        for conv in reversed(ctx.recent_conversations)
     ]
+
+    # Collapse consecutive same-role messages (Anthropic requires alternating roles)
+    messages: list[dict] = []
+    for msg in raw_history:
+        if messages and messages[-1]["role"] == msg["role"]:
+            messages[-1]["content"] += "\n" + msg["content"]
+        else:
+            messages.append(msg)
+
     messages.append({"role": "user", "content": user_message})
 
     tools_used: list[str] = []

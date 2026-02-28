@@ -201,7 +201,7 @@ def _notify_landlord_signed(token_row: dict, pdf_url: str | None) -> None:
 
 
 async def _send_signed_confirmation(token_row: dict, pdf_url: str | None) -> None:
-    from app.services.twilio_service import send_whatsapp_message
+    from app.services.twilio_service import send_whatsapp_message, send_whatsapp_media
 
     prospect_phone = token_row.get("prospect_phone", "")
     if not prospect_phone:
@@ -209,21 +209,80 @@ async def _send_signed_confirmation(token_row: dict, pdf_url: str | None) -> Non
 
     prospect_name = token_row.get("prospect_name", "there")
     unit_str = f" for {token_row['unit_address']}" if token_row.get("unit_address") else ""
+    wa_number = f"whatsapp:{prospect_phone}" if not prospect_phone.startswith("whatsapp:") else prospect_phone
 
-    if pdf_url:
-        message = (
-            f"Hi {prospect_name}, your tenancy agreement{unit_str} has been signed successfully!\n\n"
-            f"Download your signed copy here:\n{pdf_url}\n\n"
-            f"Welcome — the team will be in touch shortly with next steps."
-        )
-    else:
-        message = (
-            f"Hi {prospect_name}, your tenancy agreement{unit_str} has been signed successfully! "
-            f"Welcome — the team will be in touch shortly with next steps."
-        )
+    body = (
+        f"Hi {prospect_name}, your tenancy agreement{unit_str} has been signed successfully! "
+        f"Your signed copy is attached below. Welcome — the team will be in touch with next steps."
+    )
 
     try:
-        wa_number = f"whatsapp:{prospect_phone}" if not prospect_phone.startswith("whatsapp:") else prospect_phone
-        await send_whatsapp_message(wa_number, message)
+        if pdf_url:
+            await send_whatsapp_media(wa_number, body, pdf_url)
+        else:
+            await send_whatsapp_message(wa_number, body)
     except Exception as exc:
         print(f"Failed to send signed confirmation via WhatsApp: {exc}")
+
+
+def generate_lease_preview_pdf(
+    applicant_name: str,
+    unit_address: str,
+    monthly_rent: float | None,
+    lease_content: str,
+) -> bytes:
+    """Generate an unsigned lease agreement PDF for sending as a preview."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20 * mm, rightMargin=20 * mm,
+        topMargin=20 * mm, bottomMargin=20 * mm,
+    )
+    styles = getSampleStyleSheet()
+
+    header_style = ParagraphStyle("header", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#666666"), alignment=2)
+    title_style = ParagraphStyle("title", parent=styles["Normal"], fontSize=16, fontName="Helvetica-Bold", textColor=colors.black, alignment=1, spaceAfter=8)
+    body_style = ParagraphStyle("body", parent=styles["Normal"], fontSize=11, leading=16, spaceAfter=6)
+    note_style = ParagraphStyle("note", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=4)
+
+    story = [
+        Paragraph("PropAI Property Management — Tenancy Agreement (For Review)", header_style),
+        Spacer(1, 8 * mm),
+        Paragraph("TENANCY AGREEMENT", title_style),
+        Paragraph("Please review this agreement carefully before signing.", note_style),
+        Spacer(1, 2 * mm),
+        Paragraph(f"Tenant: {applicant_name}", body_style),
+    ]
+    if unit_address:
+        story.append(Paragraph(f"Property: {unit_address}", body_style))
+    if monthly_rent:
+        story.append(Paragraph(f"Monthly Rent: £{float(monthly_rent):.2f}", body_style))
+
+    story += [
+        Spacer(1, 4 * mm),
+        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
+        Spacer(1, 4 * mm),
+    ]
+
+    for para in lease_content.split("\n\n"):
+        text = para.replace("\n", "<br/>").strip()
+        if text:
+            story.append(Paragraph(text, body_style))
+            story.append(Spacer(1, 2 * mm))
+
+    story += [
+        Spacer(1, 8 * mm),
+        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
+        Spacer(1, 4 * mm),
+        Paragraph("AWAITING SIGNATURE", title_style),
+        Paragraph("This document has not yet been signed. Please use the signing link sent to you to review and sign digitally.", note_style),
+    ]
+
+    doc.build(story)
+    return buf.getvalue()

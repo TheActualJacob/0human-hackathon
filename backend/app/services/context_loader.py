@@ -138,8 +138,8 @@ async def load_tenant_context(whatsapp_number: str) -> TenantContext | None:
     # Strip whatsapp: prefix if present
     phone = whatsapp_number.removeprefix("whatsapp:")
 
-    tenant_res = sb.table("tenants").select("*").eq("whatsapp_number", phone).single().execute()
-    if not tenant_res.data:
+    tenant_res = sb.table("tenants").select("*").eq("whatsapp_number", phone).maybe_single().execute()
+    if not tenant_res or not tenant_res.data:
         return None
     t = tenant_res.data
     tenant = Tenant(

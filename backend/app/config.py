@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_WHATSAPP_NUMBER: str = ""
-    APP_URL: str = ""  # public URL for Twilio signature validation
+    APP_URL: str = ""  # public URL for Twilio signature validation (backend)
+    FRONTEND_URL: str = "http://localhost:3000"  # public URL for the Next.js frontend
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

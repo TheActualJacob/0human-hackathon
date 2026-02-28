@@ -14,6 +14,12 @@ from app.services.context_loader import (
     log_conversation,
     update_conversation_context,
 )
+from app.services.prospect_context_loader import (
+    load_or_create_prospect,
+    log_prospect_conversation,
+    update_prospect,
+)
+from app.services.prospect_agent_loop import run_prospect_agent_loop
 from app.services.twilio_service import send_whatsapp_message, validate_twilio_signature
 
 router = APIRouter(tags=["whatsapp"])
@@ -55,13 +61,17 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
     ctx = await load_tenant_context(phone_number)
 
     if ctx is None:
-        try:
-            await send_whatsapp_message(
-                from_number,
-                "Hello! I was unable to find your tenancy details. Please contact your property manager directly.",
-            )
-        except Exception as exc:
-            print(f"Could not send unknown-tenant reply: {exc}")
+        # Unknown number — route through the prospect agent
+        prospect_ctx = await load_or_create_prospect(phone_number)
+        await log_prospect_conversation(
+            prospect_id=prospect_ctx.prospect_id,
+            direction="inbound",
+            message_body=message_body,
+            whatsapp_message_id=message_sid or None,
+        )
+        background_tasks.add_task(
+            _process_and_reply_prospect, prospect_ctx, from_number, message_body, num_media
+        )
         return Response(status_code=200)
 
     # Log inbound message before any processing
@@ -126,6 +136,47 @@ async def _process_and_reply(
         message_body=reply_message,
         intent_classification=intent,
     )
+    await send_whatsapp_message(to, reply_message)
+
+
+async def _process_and_reply_prospect(
+    prospect_ctx,
+    to: str,
+    user_message: str,
+    num_media: int,
+) -> None:
+    if num_media > 0:
+        ack = "Thanks for sending that! Could you describe what you're looking for in a message so I can help you better?"
+        await log_prospect_conversation(prospect_ctx.prospect_id, "outbound", ack)
+        await send_whatsapp_message(to, ack)
+        return
+
+    reply_message = ""
+    try:
+        result = await run_prospect_agent_loop(user_message, prospect_ctx)
+        reply_message = result.final_message
+
+        if result.application_link_sent and result.application_link:
+            reply_message = f"{reply_message}\n\nApplication link: {result.application_link}"
+
+        from datetime import date
+        prev = prospect_ctx.conversation_summary or ""
+        new_entry = (
+            f"[{date.today().isoformat()}] "
+            f'Prospect: "{user_message[:100]}". '
+            f'Agent: "{reply_message[:100]}".'
+        )
+        updated = (prev + "\n" + new_entry).strip()[-1000:]
+        await update_prospect(prospect_ctx.prospect_id, {"conversation_summary": updated})
+
+    except Exception as exc:
+        print(f"Prospect agent loop error: {exc}")
+        reply_message = (
+            "Thanks for your message! One of our team will be in touch shortly. "
+            "You can also reach us by calling the office directly."
+        )
+
+    await log_prospect_conversation(prospect_ctx.prospect_id, "outbound", reply_message)
     await send_whatsapp_message(to, reply_message)
 
 

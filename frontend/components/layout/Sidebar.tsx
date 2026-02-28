@@ -3,7 +3,8 @@
 import { cn } from "@/lib/utils";
 import { 
   Brain, LayoutDashboard, Building2, Users, FileText, 
-  DollarSign, Wrench, UserCircle, Settings, Home, FolderOpen, User
+  DollarSign, Wrench, UserCircle, Settings, Home, FolderOpen, User,
+  ClipboardList
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,6 +30,11 @@ const landlordNavItems: NavItem[] = [
     title: "Properties",
     href: "/landlord/properties",
     icon: Building2,
+  },
+  {
+    title: "Applications",
+    href: "/landlord/applications",
+    icon: ClipboardList,
   },
   {
     title: "Tenants",
@@ -67,6 +73,16 @@ const tenantNavItems: NavItem[] = [
     title: "Dashboard",
     href: "/tenant/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Browse Properties",
+    href: "/properties",
+    icon: Home,
+  },
+  {
+    title: "My Applications",
+    href: "/tenant/applications",
+    icon: ClipboardList,
   },
   {
     title: "My Lease",

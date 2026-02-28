@@ -6,8 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { 
   Plus, Key, MapPin, Home, FileText, Wrench, AlertCircle, 
   CheckCircle, Clock, Filter, ChevronRight, Calendar, Shield,
-  Zap, Flame, FileCheck, Building2, DollarSign 
+  Zap, Flame, FileCheck, Building2, DollarSign, Edit, Trash2
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import useLandlordStore from '@/lib/store/landlord';
 import useStore from '@/lib/store/useStore';
 import useAuthStore from '@/lib/store/auth';
@@ -20,42 +21,41 @@ export default function PropertiesPage() {
   const { 
     units,
     loading,
+    error,
     createUnit,
-    landlord,
     fetchLandlordData
   } = useLandlordStore();
   
   const { user } = useAuthStore();
 
   const {
-    unitAttributes,
-    unitStatus,
-    unitDocuments,
-    unitAppliances,
     getUnitWithDetails
   } = useStore();
 
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
+  // const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'appliances'>('details');
   
-  // Load landlord data on mount
+  // Load landlord data on mount — always get a fresh user from the server
+  // to avoid stale/corrupt entityId values from persisted localStorage
   useEffect(() => {
     async function loadUserData() {
-      if (!user) {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          useAuthStore.getState().setUser(currentUser);
+      const freshUser = await getCurrentUser();
+      if (freshUser) {
+        useAuthStore.getState().setUser(freshUser);
+        // Validate entityId looks like a UUID before using it
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (freshUser.entityId && uuidPattern.test(freshUser.entityId)) {
+          fetchLandlordData(freshUser.entityId);
+        } else {
+          console.error('Invalid entityId in user session:', freshUser.entityId);
         }
-      }
-      
-      if (user?.entityId && !landlord) {
-        fetchLandlordData(user.entityId);
       }
     }
     
     loadUserData();
-  }, [user, landlord, fetchLandlordData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Get selected unit details
   const selectedUnitData = selectedUnit ? getUnitWithDetails(selectedUnit) : null;
@@ -93,6 +93,20 @@ export default function PropertiesPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex-1 p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-red-400 font-medium mb-2">Failed to load properties</p>
+            <p className="text-muted-foreground text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 p-8">
       {/* Header */}
@@ -104,13 +118,13 @@ export default function PropertiesPage() {
               Manage your properties, documents, and compliance
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+          <Link
+            href="/landlord/properties/new"
+            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors inline-flex"
           >
             <Plus className="h-5 w-5" />
             Add Property
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -132,12 +146,12 @@ export default function PropertiesPage() {
             <div className="bg-card border border-border rounded-lg p-8 text-center">
               <Home className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground mb-4">No properties found</p>
-              <button
-                onClick={() => setShowAddModal(true)}
+              <Link
+                href="/landlord/properties/new"
                 className="text-primary hover:underline"
               >
                 Add your first property
-              </button>
+              </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -157,7 +171,7 @@ export default function PropertiesPage() {
                     )}
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div>
+                      <div className="flex-1">
                         <h3 className="text-lg font-semibold mb-1">
                           {unit.unit_identifier || unit.name}
                         </h3>
@@ -166,12 +180,14 @@ export default function PropertiesPage() {
                           {unit.city || unit.address}
                         </p>
                       </div>
-                      <span className={cn(
-                        "text-xs font-medium px-2 py-1 rounded",
-                        getOccupancyColor(unitDetails?.status?.occupancy_status)
-                      )}>
-                        {unitDetails?.status?.occupancy_status?.replace(/_/g, ' ') || 'Unknown'}
-                      </span>
+                      <div className="flex items-start gap-2">
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded",
+                          getOccupancyColor(unitDetails?.status?.occupancy_status)
+                        )}>
+                          {unitDetails?.status?.occupancy_status?.replace(/_/g, ' ') || 'Unknown'}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-2 text-sm">
@@ -218,9 +234,42 @@ export default function PropertiesPage() {
                       {unit.rent_amount && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <DollarSign className="h-3 w-3" />
-                          <span>${unit.rent_amount}/month</span>
+                          <span>£{unit.rent_amount}/month</span>
                         </div>
                       )}
+                      
+                      {/* Listing Status */}
+                      {unit.listing_status && unit.listing_status !== 'not_listed' && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant={unit.listing_status === 'public' ? 'default' : 'secondary'} className="text-xs">
+                            {unit.listing_status === 'public' ? 'Listed Publicly' : 'Private Listing'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 pt-3 mt-3 border-t border-border">
+                      <Link
+                        href={`/landlord/properties/${unit.id}`}
+                        className="flex-1 flex items-center justify-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Edit className="h-3 w-3" />
+                        Edit
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Are you sure you want to delete this property?')) {
+                            useLandlordStore.getState().deleteUnit(unit.id);
+                          }
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
                     </div>
                   </div>
                 );
@@ -458,142 +507,7 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* Add Property Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4">Add New Property</h2>
-            <form 
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                
-                try {
-                  // The createUnit function now handles all the auth logic
-                  await createUnit({
-                    unit_identifier: formData.get('unit_identifier') as string,
-                    address: formData.get('address') as string,
-                    city: formData.get('city') as string,
-                    country: formData.get('country') as string || 'UK',
-                    jurisdiction: formData.get('jurisdiction') as string || 'england_wales'
-                  });
-                  
-                  setShowAddModal(false);
-                  // Reset form
-                  (e.target as HTMLFormElement).reset();
-                } catch (error) {
-                  console.error('Full error object:', error);
-                  const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-                  alert(errorMessage);
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Unit Identifier *
-                </label>
-                <input
-                  type="text"
-                  name="unit_identifier"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="e.g., Apartment 4A, Unit 101"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  A unique name or number for this property unit
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Full Address *
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="123 Main Street"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    name="city"
-                    required
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="London"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Country
-                  </label>
-                  <select
-                    name="country"
-                    defaultValue="UK"
-                    className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="UK">United Kingdom</option>
-                    <option value="US">United States</option>
-                    <option value="CA">Canada</option>
-                    <option value="AU">Australia</option>
-                    <option value="IE">Ireland</option>
-                    <option value="NZ">New Zealand</option>
-                    <option value="">Other</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Jurisdiction
-                </label>
-                <select
-                  name="jurisdiction"
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Select jurisdiction (optional)</option>
-                  <option value="england">England</option>
-                  <option value="wales">Wales</option>
-                  <option value="scotland">Scotland</option>
-                  <option value="northern_ireland">Northern Ireland</option>
-                  <option value="california">California</option>
-                  <option value="new_york">New York</option>
-                  <option value="texas">Texas</option>
-                  <option value="florida">Florida</option>
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Legal jurisdiction for tenant-landlord laws
-                </p>
-              </div>
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium">Note:</span> Additional property details like bedrooms, bathrooms, and rent amount can be added after creating the property.
-                </p>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  Add Property
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add Property Modal - Replaced with dedicated page /landlord/properties/new */}
     </div>
   );
 }

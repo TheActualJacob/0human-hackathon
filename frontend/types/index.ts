@@ -117,6 +117,21 @@ export interface DisputeWithDetails extends Dispute {
   legal_actions?: LegalAction[];
 }
 
+// Backward-compat aliases
+export type MaintenanceTicket = MaintenanceRequest;
+export type Vendor = Contractor;
+
+// Activity feed item for dashboard display
+export interface ActivityItem {
+  id: string;
+  type: string | null;
+  action: string;
+  details: string;
+  entity_id?: string | null;
+  ai_generated: boolean;
+  timestamp: string;
+}
+
 // Workflow types
 export type MaintenanceWorkflow = Tables['maintenance_workflows']['Row'];
 export type WorkflowCommunication = Tables['workflow_communications']['Row'];

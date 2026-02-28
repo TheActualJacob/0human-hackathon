@@ -97,6 +97,9 @@ interface AppState {
   addUnit: (unit: Tables['units']['Insert']) => Promise<void>;
   updateUnit: (unitId: string, updates: Tables['units']['Update']) => Promise<void>;
   
+  // Lease Actions
+  updateLease: (leaseId: string, updates: Tables['leases']['Update']) => Promise<void>;
+  
   // Maintenance Actions
   addMaintenanceRequest: (request: Tables['maintenance_requests']['Insert']) => Promise<void>;
   updateMaintenanceRequest: (requestId: string, updates: Tables['maintenance_requests']['Update']) => Promise<void>;
@@ -382,6 +385,29 @@ const useStore = create<AppState>((set, get) => ({
       }));
     } catch (error: any) {
       console.error('Error updating unit:', error);
+      set({ error: error.message });
+    }
+  },
+  
+  // Lease Actions
+  updateLease: async (leaseId, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('leases')
+        .update(updates)
+        .eq('id', leaseId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      set((state) => ({
+        leases: state.leases.map((lease) =>
+          lease.id === leaseId ? data : lease
+        )
+      }));
+    } catch (error: any) {
+      console.error('Error updating lease:', error);
       set({ error: error.message });
     }
   },
@@ -851,7 +877,7 @@ const useStore = create<AppState>((set, get) => ({
     if (!request) return null;
     
     const lease = state.leases.find(l => l.id === request.lease_id);
-    if (!lease) return { ...request, lease: null, contractor: null, chronic_issue: null };
+    if (!lease) return { ...request, lease: undefined, contractor: null, chronic_issue: null };
     
     return {
       ...request,

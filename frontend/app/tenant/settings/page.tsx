@@ -12,11 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
+// import { useToast } from '@/components/ui/use-toast';
 import useTenantStore from '@/lib/store/tenant';
 
 export default function TenantSettingsPage() {
-  const { toast } = useToast();
+  // const { toast } = useToast();
   const { tenantInfo } = useTenantStore();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
@@ -26,10 +26,10 @@ export default function TenantSettingsPage() {
     // Simulate save
     await new Promise(resolve => setTimeout(resolve, 1000));
     setSaving(false);
-    toast({
-      title: "Settings saved",
-      description: "Your changes have been saved successfully.",
-    });
+    // toast({
+    //   title: "Settings saved",
+    //   description: "Your changes have been saved successfully.",
+    // });
   };
 
   return (

@@ -161,7 +161,7 @@ const useLandlordStore = create<LandlordState>()(
       createUnit: async (unit: Partial<Unit>) => {
         const supabase = createClient();
         
-        // ALWAYS get the current auth user to ensure we have the correct landlord_id
+        // Get current auth user
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser) {
           throw new Error('You must be logged in to create a property');
@@ -176,31 +176,52 @@ const useLandlordStore = create<LandlordState>()(
           .single();
           
         if (authError || !authUserData) {
-          console.error('Auth user lookup error:', authError);
+          console.error('Auth user lookup error:', authError?.message, authError?.details);
           throw new Error('Could not find your landlord profile. Please contact support.');
         }
-        
-        // Ensure landlord_id is set
-        const unitData = {
-          ...unit,
-          landlord_id: authUserData.entity_id
+
+        // Step 1: Insert only the guaranteed base columns
+        const baseData = {
+          landlord_id: authUserData.entity_id,
+          unit_identifier: unit.unit_identifier || 'New Property',
+          address: unit.address || '',
+          city: unit.city || '',
+          country: unit.country || 'GB',
+          jurisdiction: unit.jurisdiction || 'england_wales',
         };
-        
-        console.log('Creating unit with data:', unitData);
-        
+
         const { data, error } = await supabase
           .from('units')
-          .insert(unitData)
+          .insert(baseData)
           .select()
           .single();
         
         if (error) {
           console.error('Error creating unit:', error.message, error.code, error.details, error.hint);
           set({ error: error.message });
-          throw error;
+          throw new Error(error.message || 'Failed to insert unit');
         }
-        
-        console.log('Unit created successfully:', data);
+
+        // Step 2: Update with extended listing columns (may or may not exist in DB)
+        const extendedFields: Record<string, any> = {};
+        if (unit.listing_status !== undefined)      extendedFields.listing_status = unit.listing_status;
+        if (unit.listing_description !== undefined) extendedFields.listing_description = unit.listing_description;
+        if (unit.listing_created_at !== undefined)  extendedFields.listing_created_at = unit.listing_created_at;
+        if (unit.rent_amount !== undefined)         extendedFields.rent_amount = unit.rent_amount;
+        if (unit.security_deposit !== undefined)    extendedFields.security_deposit = unit.security_deposit;
+        if (unit.available_date !== undefined)      extendedFields.available_date = unit.available_date;
+
+        if (Object.keys(extendedFields).length > 0) {
+          const { error: updateError } = await supabase
+            .from('units')
+            .update(extendedFields)
+            .eq('id', data.id);
+
+          if (updateError) {
+            // Column likely doesn't exist yet — log but don't block
+            console.warn('Extended fields not saved (run MUST_RUN_MIGRATION.sql):', updateError.message);
+          }
+        }
         
         // Refetch data to include the new unit
         get().fetchLandlordData(authUserData.entity_id);

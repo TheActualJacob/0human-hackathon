@@ -41,20 +41,39 @@ export async function signUpLandlord(data: {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // 2. Create landlord record WITH auth_user_id from the start
-    const { data: landlord, error: landlordError } = await supabase
+    // 2. Create landlord record, or link to existing one if email already exists
+    let landlord;
+    const { data: existingLandlord } = await supabase
       .from('landlords')
-      .insert({
-        auth_user_id: authData.user.id,  // Set this from the beginning!
-        full_name: data.fullName,
-        email: data.email,
-        phone: data.phone,
-        whatsapp_number: data.whatsappNumber
-      })
       .select()
+      .eq('email', data.email)
       .single();
 
-    if (landlordError) throw landlordError;
+    if (existingLandlord) {
+      // Link auth user to the existing landlord record
+      const { data: updated, error: updateErr } = await supabase
+        .from('landlords')
+        .update({ auth_user_id: authData.user.id })
+        .eq('id', existingLandlord.id)
+        .select()
+        .single();
+      if (updateErr) throw updateErr;
+      landlord = updated;
+    } else {
+      const { data: newLandlord, error: landlordError } = await supabase
+        .from('landlords')
+        .insert({
+          auth_user_id: authData.user.id,
+          full_name: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          whatsapp_number: data.whatsappNumber
+        })
+        .select()
+        .single();
+      if (landlordError) throw landlordError;
+      landlord = newLandlord;
+    }
 
     // 3. Create auth_users mapping
     const { error: mappingError } = await supabase
@@ -66,16 +85,6 @@ export async function signUpLandlord(data: {
       });
 
     if (mappingError) throw mappingError;
-
-    // 4. Update landlord record with auth_user_id to ensure it's linked
-    const { error: updateError } = await supabase
-      .from('landlords')
-      .update({ auth_user_id: authData.user.id })
-      .eq('id', landlord.id);
-      
-    if (updateError) {
-      console.error('Failed to update landlord auth_user_id:', updateError);
-    }
 
     return { user: authData.user, landlord };
   } catch (error: any) {
@@ -91,26 +100,97 @@ export async function signUpTenant(data: {
   password: string;
   fullName: string;
   whatsappNumber: string;
-  inviteCode: string;
+  inviteCode?: string; // Now optional for backward compatibility
+  profileData?: {
+    employmentStatus?: string;
+    monthlyIncome?: string;
+    currentEmployer?: string;
+    employmentDuration?: string;
+    hasRentalHistory?: boolean;
+    currentAddress?: string;
+    reasonForMoving?: string;
+    hasPets?: boolean;
+    petDetails?: string;
+    preferredMoveInDate?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+  };
 }) {
   try {
-    // 1. Verify invite code
-    const { data: invite, error: inviteError } = await supabase
-      .from('tenant_invites')
-      .select('*, leases(*)')
-      .eq('invite_code', data.inviteCode.toUpperCase())
-      .is('used_at', null)
-      .single();
+    // If invite code is provided, use the old flow
+    if (data.inviteCode) {
+      // 1. Verify invite code
+      const { data: invite, error: inviteError } = await supabase
+        .from('tenant_invites')
+        .select('*, leases(*)')
+        .eq('invite_code', data.inviteCode.toUpperCase())
+        .is('used_at', null)
+        .single();
 
-    if (inviteError || !invite) {
-      throw new Error('Invalid or expired invite code');
+      if (inviteError || !invite) {
+        throw new Error('Invalid or expired invite code');
+      }
+
+      if (new Date(invite.expires_at) < new Date()) {
+        throw new Error('Invite code has expired');
+      }
+
+      // 2. Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            full_name: data.fullName,
+            role: 'tenant'
+          }
+        }
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Failed to create user');
+
+      // 3. Create tenant record WITH lease_id from invite
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          auth_user_id: authData.user.id,
+          lease_id: invite.lease_id,
+          full_name: data.fullName,
+          email: data.email,
+          whatsapp_number: data.whatsappNumber,
+          is_primary_tenant: true
+        })
+        .select()
+        .single();
+
+      if (tenantError) throw tenantError;
+
+      // 4. Create auth_users mapping
+      const { error: mappingError } = await supabase
+        .from('auth_users')
+        .insert({
+          id: authData.user.id,
+          role: 'tenant',
+          entity_id: tenant.id
+        });
+
+      if (mappingError) throw mappingError;
+
+      // 5. Mark invite as used
+      await supabase
+        .from('tenant_invites')
+        .update({
+          used_at: new Date().toISOString(),
+          used_by: authData.user.id
+        })
+        .eq('id', invite.id);
+
+      return { user: authData.user, tenant };
     }
-
-    if (new Date(invite.expires_at) < new Date()) {
-      throw new Error('Invite code has expired');
-    }
-
-    // 2. Create auth user
+    
+    // New flow without invite code
+    // 1. Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
@@ -125,23 +205,29 @@ export async function signUpTenant(data: {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // 3. Create tenant record WITH auth_user_id from the start
+    // 2. Create tenant record without lease_id
+    const tenantData: any = {
+      auth_user_id: authData.user.id,
+      full_name: data.fullName,
+      email: data.email,
+      whatsapp_number: data.whatsappNumber,
+      is_primary_tenant: true
+    };
+
+    // Store profile data if provided (might need a new column or separate table)
+    if (data.profileData) {
+      tenantData.profile_data = data.profileData;
+    }
+
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .insert({
-        auth_user_id: authData.user.id,  // Always set this!
-        lease_id: invite.lease_id,
-        full_name: data.fullName,
-        email: data.email,
-        whatsapp_number: data.whatsappNumber,
-        is_primary_tenant: true // Default for invited tenants
-      })
+      .insert(tenantData)
       .select()
       .single();
 
     if (tenantError) throw tenantError;
 
-    // 4. Create auth_users mapping
+    // 3. Create auth_users mapping
     const { error: mappingError } = await supabase
       .from('auth_users')
       .insert({
@@ -151,15 +237,6 @@ export async function signUpTenant(data: {
       });
 
     if (mappingError) throw mappingError;
-
-    // 5. Mark invite as used
-    await supabase
-      .from('tenant_invites')
-      .update({
-        used_at: new Date().toISOString(),
-        used_by: authData.user.id
-      })
-      .eq('id', invite.id);
 
     return { user: authData.user, tenant };
   } catch (error) {

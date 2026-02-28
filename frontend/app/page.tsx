@@ -15,6 +15,9 @@ export default function LandingPage() {
             <h1 className="text-2xl font-bold">PropAI</h1>
           </div>
           <nav className="flex items-center gap-6">
+            <Link href="/properties" className="text-muted-foreground hover:text-foreground transition-colors">
+              Browse Properties
+            </Link>
             <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
               Features
             </Link>
@@ -58,14 +61,14 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/signup/landlord" 
+            <Link href="/properties" 
               className="group px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 text-lg font-medium">
-              I'm a Landlord
-              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              Browse Properties
+              <Home className="h-5 w-5 group-hover:scale-110 transition-transform" />
             </Link>
-            <Link href="/auth/signup/tenant" 
+            <Link href="/auth/signup/landlord" 
               className="group px-8 py-4 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-all flex items-center justify-center gap-2 text-lg font-medium border">
-              I'm a Tenant
+              List Your Property
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>

@@ -29,9 +29,19 @@ export async function createClient() {
 }
 
 // Service-role client — bypasses RLS, for server-side agent use only
-export const supabaseAdmin = createSupabaseClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+// Lazy-initialized to avoid crashing when SUPABASE_SERVICE_ROLE_KEY is not set
+let _supabaseAdmin: ReturnType<typeof createSupabaseClient<Database>> | null = null
+export function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    if (!supabaseServiceRoleKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set')
+    }
+    _supabaseAdmin = createSupabaseClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+  return _supabaseAdmin
+}

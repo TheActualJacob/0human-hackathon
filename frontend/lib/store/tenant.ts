@@ -73,39 +73,48 @@ const useTenantStore = create<TenantState>()(
           if (tenantsError) throw tenantsError;
           if (!tenant) throw new Error('Tenant not found');
 
-          // Fetch payments
-          const { data: payments, error: paymentsError } = await supabase
-            .from('payments')
-            .select('*')
-            .eq('lease_id', tenant.lease_id)
-            .order('due_date', { ascending: false });
+          let payments: Payment[] = [];
+          let maintenanceRequests: MaintenanceRequest[] = [];
+          let maintenanceWorkflows: MaintenanceWorkflow[] = [];
 
-          if (paymentsError) throw paymentsError;
+          // Only fetch lease-related data if tenant has an active lease
+          if (tenant.lease_id) {
+            const { data: payData, error: paymentsError } = await supabase
+              .from('payments')
+              .select('*')
+              .eq('lease_id', tenant.lease_id)
+              .order('due_date', { ascending: false });
 
-          // Fetch maintenance requests
-          const { data: maintenanceRequests, error: maintenanceError } = await supabase
-            .from('maintenance_requests')
-            .select('*')
-            .eq('lease_id', tenant.lease_id)
-            .order('created_at', { ascending: false });
+            if (paymentsError) throw paymentsError;
+            payments = payData || [];
 
-          if (maintenanceError) throw maintenanceError;
+            const { data: maintData, error: maintenanceError } = await supabase
+              .from('maintenance_requests')
+              .select('*')
+              .eq('lease_id', tenant.lease_id)
+              .order('created_at', { ascending: false });
 
-          // Fetch maintenance workflows
-          const requestIds = maintenanceRequests?.map(r => r.id) || [];
-          const { data: maintenanceWorkflows, error: workflowsError } = await supabase
-            .from('maintenance_workflows')
-            .select('*')
-            .in('maintenance_request_id', requestIds)
-            .order('created_at', { ascending: false });
+            if (maintenanceError) throw maintenanceError;
+            maintenanceRequests = maintData || [];
 
-          if (workflowsError) throw workflowsError;
+            const requestIds = maintenanceRequests.map(r => r.id);
+            if (requestIds.length > 0) {
+              const { data: wfData, error: workflowsError } = await supabase
+                .from('maintenance_workflows')
+                .select('*')
+                .in('maintenance_request_id', requestIds)
+                .order('created_at', { ascending: false });
+
+              if (workflowsError) throw workflowsError;
+              maintenanceWorkflows = wfData || [];
+            }
+          }
 
           set({
             tenantInfo: tenant as TenantWithLease,
-            payments: payments || [],
-            maintenanceRequests: maintenanceRequests || [],
-            maintenanceWorkflows: maintenanceWorkflows || [],
+            payments,
+            maintenanceRequests,
+            maintenanceWorkflows,
             loading: false
           });
 

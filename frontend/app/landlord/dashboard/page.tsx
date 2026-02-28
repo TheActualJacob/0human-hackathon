@@ -26,23 +26,21 @@ export default function LandlordDashboard() {
     fetchLandlordData
   } = useLandlordStore();
 
-  // Fetch authenticated user and their data
+  // Fetch authenticated user
   useEffect(() => {
-    async function loadUserData() {
-      if (!user) {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
-        }
-      }
-      
-      if (user?.entityId) {
-        fetchLandlordData(user.entityId);
-      }
+    if (!user) {
+      getCurrentUser().then((currentUser) => {
+        if (currentUser) setUser(currentUser);
+      });
     }
-    
-    loadUserData();
-  }, [user, setUser, fetchLandlordData]);
+  }, [user, setUser]);
+
+  // Fetch landlord data once user is available
+  useEffect(() => {
+    if (user?.entityId) {
+      fetchLandlordData(user.entityId);
+    }
+  }, [user?.entityId, fetchLandlordData]);
 
   // Calculate metrics
   const totalUnits = units.length;

@@ -20,18 +20,14 @@ export default function PropertiesPage() {
   const { 
     units,
     loading,
+    error,
     createUnit,
-    landlord,
     fetchLandlordData
   } = useLandlordStore();
   
   const { user } = useAuthStore();
 
   const {
-    unitAttributes,
-    unitStatus,
-    unitDocuments,
-    unitAppliances,
     getUnitWithDetails
   } = useStore();
 
@@ -39,23 +35,26 @@ export default function PropertiesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'appliances'>('details');
   
-  // Load landlord data on mount
+  // Load landlord data on mount — always get a fresh user from the server
+  // to avoid stale/corrupt entityId values from persisted localStorage
   useEffect(() => {
     async function loadUserData() {
-      if (!user) {
-        const currentUser = await getCurrentUser();
-        if (currentUser) {
-          useAuthStore.getState().setUser(currentUser);
+      const freshUser = await getCurrentUser();
+      if (freshUser) {
+        useAuthStore.getState().setUser(freshUser);
+        // Validate entityId looks like a UUID before using it
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (freshUser.entityId && uuidPattern.test(freshUser.entityId)) {
+          fetchLandlordData(freshUser.entityId);
+        } else {
+          console.error('Invalid entityId in user session:', freshUser.entityId);
         }
-      }
-      
-      if (user?.entityId && !landlord) {
-        fetchLandlordData(user.entityId);
       }
     }
     
     loadUserData();
-  }, [user, landlord, fetchLandlordData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Get selected unit details
   const selectedUnitData = selectedUnit ? getUnitWithDetails(selectedUnit) : null;
@@ -88,6 +87,20 @@ export default function PropertiesPage() {
       <div className="flex-1 p-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-muted-foreground">Loading properties...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-red-400 font-medium mb-2">Failed to load properties</p>
+            <p className="text-muted-foreground text-sm">{error}</p>
+          </div>
         </div>
       </div>
     );

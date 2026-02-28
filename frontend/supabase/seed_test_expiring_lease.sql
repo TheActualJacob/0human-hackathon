@@ -16,15 +16,16 @@ DECLARE
 BEGIN
 
     -- 1. Landlord
-    INSERT INTO landlords (id, full_name, email, phone, whatsapp_number)
+    INSERT INTO landlords (id, full_name, email, phone, whatsapp_number, auth_user_id)
     VALUES (
         v_landlord_id,
         'Test Landlord',
         'test@propai.com',
         '+442071234567',
-        '+442071234567'
+        '+442071234567',
+        '9368ad46-dd38-4a54-9036-b57e9734026d'
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE SET auth_user_id = '9368ad46-dd38-4a54-9036-b57e9734026d';
 
     -- 2. Unit
     INSERT INTO units (id, landlord_id, unit_identifier, address, city, country, jurisdiction)

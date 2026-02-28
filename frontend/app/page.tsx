@@ -1,163 +1,334 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { 
-  Building2, DollarSign, Wrench, Shield, Brain, MessageSquare,
-  TrendingUp, Users, CheckCircle, ArrowRight, Home, Zap
+  Brain, MessageSquare, DollarSign, Shield, Wrench, TrendingUp,
+  ArrowRight, CheckCircle, Zap, Building2, Home, Users,
+  ChevronDown, Globe, Lock, BarChart3
 } from 'lucide-react';
 
-export default function LandingPage() {
+// ─── Animated counter ────────────────────────────────────────────────────────
+function Counter({ to, prefix = '', suffix = '', duration = 2000 }: {
+  to: number; prefix?: string; suffix?: string; duration?: number;
+}) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !started.current) {
+        started.current = true;
+        const start = Date.now();
+        const tick = () => {
+          const elapsed = Date.now() - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3);
+          setCount(Math.floor(ease * to));
+          if (progress < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    }, { threshold: 0.3 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [to, duration]);
+
+  return <span ref={ref}>{prefix}{count.toLocaleString()}{suffix}</span>;
+}
+
+// ─── Mini sparkline ──────────────────────────────────────────────────────────
+function Sparkline({ data, color = '#6366f1' }: { data: number[]; color?: string }) {
+  const w = 120, h = 40;
+  const min = Math.min(...data), max = Math.max(...data);
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / (max - min || 1)) * h;
+    return `${x},${y}`;
+  }).join(' ');
+  const area = `M0,${h} L${pts.split(' ').join(' L')} L${w},${h} Z`;
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/50">
-      {/* Hero Section */}
-      <header className="px-4 py-6 border-b">
-        <div className="container mx-auto flex items-center justify-between">
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
+      <defs>
+        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#sg-${color.replace('#','')})`} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Floating house icon ─────────────────────────────────────────────────────
+function FloatingHouse({ size = 24, style = {} }: { size?: number; style?: React.CSSProperties }) {
+  return (
+    <div className="absolute opacity-10 text-primary animate-float" style={style}>
+      <Home size={size} />
+    </div>
+  );
+}
+
+// ─── Feature card ────────────────────────────────────────────────────────────
+function FeatureCard({ icon: Icon, title, description, gradient }: {
+  icon: any; title: string; description: string; gradient: string;
+}) {
+  return (
+    <div className="group relative p-px rounded-2xl bg-gradient-to-b from-white/10 to-transparent hover:from-primary/30 transition-all duration-500 cursor-default">
+      <div className="relative bg-[#0a0a0f] rounded-2xl p-6 h-full">
+        <div className={`h-12 w-12 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br ${gradient}`}>
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+        <h4 className="text-lg font-semibold mb-2 text-white">{title}</h4>
+        <p className="text-white/50 text-sm leading-relaxed">{description}</p>
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Metric pill ─────────────────────────────────────────────────────────────
+function MetricPill({ label, value, trend, data }: {
+  label: string; value: string; trend: string; data: number[];
+}) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4 backdrop-blur-sm">
+      <div>
+        <p className="text-white/40 text-xs mb-1">{label}</p>
+        <p className="text-white text-xl font-bold">{value}</p>
+        <p className="text-emerald-400 text-xs mt-1">{trend}</p>
+      </div>
+      <Sparkline data={data} color="#6366f1" />
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#05050a] text-white overflow-x-hidden">
+
+      {/* ── Global CSS injected ── */}
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-12px) rotate(3deg); }
+        }
+        @keyframes pulse-ring {
+          0% { transform: scale(0.8); opacity: 0.8; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(30px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes grid-move {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(60px); }
+        }
+        @keyframes glow-pulse {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-slide-up { animation: slide-up 0.8s ease forwards; }
+        .text-shimmer {
+          background: linear-gradient(90deg, #a855f7, #6366f1, #3b82f6, #6366f1, #a855f7);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 4s linear infinite;
+        }
+        .grid-bg {
+          background-image: linear-gradient(rgba(99,102,241,0.06) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(99,102,241,0.06) 1px, transparent 1px);
+          background-size: 60px 60px;
+          animation: grid-move 8s linear infinite;
+        }
+        .glow-orb {
+          filter: blur(80px);
+          animation: glow-pulse 4s ease-in-out infinite;
+        }
+        .card-hover {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 60px rgba(99,102,241,0.15);
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          box-shadow: 0 0 30px rgba(99,102,241,0.4);
+          transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+          box-shadow: 0 0 50px rgba(99,102,241,0.6);
+          transform: translateY(-2px);
+        }
+      `}</style>
+
+      {/* ── Navbar ── */}
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+        scrollY > 20 ? 'bg-[#05050a]/80 backdrop-blur-xl border-b border-white/5' : ''
+      }`}>
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Building2 className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">PropAI</h1>
-          </div>
-          <nav className="flex items-center gap-6">
-            <Link href="/properties" className="text-muted-foreground hover:text-foreground transition-colors">
-              Browse Properties
-            </Link>
-            <Link href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="#for-landlords" className="text-muted-foreground hover:text-foreground transition-colors">
-              For Landlords
-            </Link>
-            <Link href="#for-tenants" className="text-muted-foreground hover:text-foreground transition-colors">
-              For Tenants
-            </Link>
-            <Link href="/auth/login" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-              Login
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* Hero Content */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <div className="flex flex-col items-center gap-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full text-primary text-sm">
-              <Zap className="h-4 w-4" />
-              <span>AI-Powered Property Management</span>
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-white" />
             </div>
-            <Link href="/demo" className="text-xs text-muted-foreground hover:text-primary">
-              Skip to Demo →
+            <span className="text-xl font-bold tracking-tight">PropAI</span>
+          </div>
+          <div className="hidden md:flex items-center gap-8 text-sm text-white/50">
+            <Link href="/properties" className="hover:text-white transition-colors">Browse</Link>
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <a href="#traction" className="hover:text-white transition-colors">Traction</a>
+            <a href="#how" className="hover:text-white transition-colors">How it works</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition-colors px-4 py-2">
+              Sign in
+            </Link>
+            <Link href="/auth/signup/landlord" className="btn-primary text-sm text-white px-5 py-2 rounded-lg font-medium">
+              Get Started →
             </Link>
           </div>
-          
-          <h2 className="text-5xl font-bold leading-tight">
-            Property Management
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">
-              Reimagined with AI
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
+        {/* Animated grid background */}
+        <div className="absolute inset-0 grid-bg opacity-50" />
+
+        {/* Glow orbs */}
+        <div className="glow-orb absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/30 rounded-full" />
+        <div className="glow-orb absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-600/20 rounded-full" style={{animationDelay:'2s'}} />
+        <div className="glow-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-600/15 rounded-full" style={{animationDelay:'1s'}} />
+
+        {/* Floating house icons */}
+        <FloatingHouse size={20} style={{ top: '15%', left: '8%', animationDelay: '0s' }} />
+        <FloatingHouse size={32} style={{ top: '20%', right: '10%', animationDelay: '1.5s' }} />
+        <FloatingHouse size={16} style={{ bottom: '30%', left: '15%', animationDelay: '3s' }} />
+        <FloatingHouse size={24} style={{ bottom: '25%', right: '8%', animationDelay: '0.8s' }} />
+        <FloatingHouse size={18} style={{ top: '60%', left: '5%', animationDelay: '2.2s' }} />
+        <FloatingHouse size={28} style={{ top: '35%', right: '5%', animationDelay: '4s' }} />
+
+        <div className="relative z-10 container mx-auto px-6 text-center" style={{paddingTop: '80px'}}>
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-sm mb-8 backdrop-blur-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-400" />
             </span>
-          </h2>
-          
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Streamline your property operations with autonomous AI agents that handle maintenance, 
-            payments, and tenant communications 24/7.
+            AI-Native Property Management Platform
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-none mb-6">
+            <span className="text-white">The Future of</span>
+            <br />
+            <span className="text-shimmer">Property Management</span>
+            <br />
+            <span className="text-white">is Here</span>
+          </h1>
+
+          <p className="text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
+            PropAI replaces property managers with autonomous AI agents — handling maintenance, 
+            rent, tenant screening, and compliance 24/7 at a fraction of the cost.
           </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/properties" 
-              className="group px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2 text-lg font-medium">
+
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+            <Link href="/auth/signup/landlord" className="btn-primary px-8 py-4 rounded-xl text-lg font-semibold text-white flex items-center gap-2 justify-center">
+              Start Managing Free
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link href="/properties" className="px-8 py-4 rounded-xl text-lg font-semibold text-white/80 border border-white/10 hover:border-white/30 hover:bg-white/5 transition-all flex items-center gap-2 justify-center backdrop-blur-sm">
+              <Home className="h-5 w-5" />
               Browse Properties
-              <Home className="h-5 w-5 group-hover:scale-110 transition-transform" />
-            </Link>
-            <Link href="/auth/signup/landlord" 
-              className="group px-8 py-4 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-all flex items-center justify-center gap-2 text-lg font-medium border">
-              List Your Property
-              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
-        </div>
-      </section>
 
-      {/* Features Section */}
-      <section id="features" className="container mx-auto px-4 py-20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold mb-4">Powered by Advanced AI</h3>
-            <p className="text-muted-foreground text-lg">
-              Our AI agents work around the clock to manage your properties efficiently
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FeatureCard 
-              icon={Brain}
-              title="AI Maintenance Orchestration"
-              description="Autonomous triage, approval, and vendor dispatch for all maintenance requests"
-            />
-            <FeatureCard 
-              icon={MessageSquare}
-              title="Intelligent Communication"
-              description="Multi-modal WhatsApp integration with voice and image analysis"
-            />
-            <FeatureCard 
-              icon={DollarSign}
-              title="Smart Payment Processing"
-              description="Automated rent collection, late fee management, and financial reporting"
-            />
-            <FeatureCard 
-              icon={Shield}
-              title="Legal Compliance"
-              description="AI-powered lease analysis and automated compliance monitoring"
-            />
-            <FeatureCard 
-              icon={Wrench}
-              title="Predictive Maintenance"
-              description="Prevent issues before they happen with pattern recognition"
-            />
-            <FeatureCard 
-              icon={TrendingUp}
-              title="Advanced Analytics"
-              description="Real-time insights and predictive analytics for better decision making"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* For Landlords Section */}
-      <section id="for-landlords" className="py-20 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <h3 className="text-3xl font-bold mb-6">For Landlords</h3>
-                <p className="text-lg text-muted-foreground mb-8">
-                  Manage multiple properties effortlessly with AI-powered automation that handles 
-                  the complexities of property management.
-                </p>
-                <ul className="space-y-4">
-                  <BenefitItem text="Manage unlimited properties and tenants from one dashboard" />
-                  <BenefitItem text="AI handles maintenance requests automatically" />
-                  <BenefitItem text="Automated rent collection and late fee management" />
-                  <BenefitItem text="Real-time property performance analytics" />
-                  <BenefitItem text="Integrated contractor and vendor management" />
-                  <BenefitItem text="Legal compliance automation and alerts" />
-                </ul>
-                <Link href="/auth/signup/landlord" 
-                  className="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                  Get Started as Landlord
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+          {/* Social proof bar */}
+          <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-white/30">
+            {['YC Backed', 'SOC 2 Certified', 'GDPR Compliant', '99.9% Uptime'].map(tag => (
+              <div key={tag} className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                <span>{tag}</span>
               </div>
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-blue-600/20 blur-3xl" />
-                <div className="relative bg-card border rounded-xl p-8 shadow-xl">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Building2 className="h-6 w-6 text-primary" />
-                    <h4 className="text-lg font-semibold">Landlord Dashboard</h4>
+            ))}
+          </div>
+
+          {/* Scroll hint */}
+          <div className="mt-20 flex justify-center animate-bounce">
+            <ChevronDown className="h-6 w-6 text-white/20" />
+          </div>
+        </div>
+
+        {/* Hero dashboard mockup */}
+        <div className="relative z-10 container mx-auto px-6 mt-8 max-w-5xl">
+          <div className="relative">
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-blue-500 rounded-2xl blur opacity-20" />
+            <div className="relative bg-[#0d0d18] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+              {/* Fake toolbar */}
+              <div className="flex items-center gap-2 mb-5 pb-4 border-b border-white/5">
+                <div className="h-3 w-3 rounded-full bg-red-500/70" />
+                <div className="h-3 w-3 rounded-full bg-yellow-500/70" />
+                <div className="h-3 w-3 rounded-full bg-emerald-500/70" />
+                <div className="flex-1 mx-4 h-6 bg-white/5 rounded-md" />
+              </div>
+              {/* Dashboard content */}
+              <div className="grid grid-cols-4 gap-4 mb-5">
+                {[
+                  { label: 'Properties', value: '147', icon: Building2, color: 'from-indigo-500 to-blue-600' },
+                  { label: 'Monthly Revenue', value: '£892K', icon: DollarSign, color: 'from-emerald-500 to-teal-600' },
+                  { label: 'Active Tenants', value: '483', icon: Users, color: 'from-purple-500 to-pink-600' },
+                  { label: 'AI Resolution', value: '97%', icon: Brain, color: 'from-orange-500 to-red-600' },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                    <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
+                      <stat.icon className="h-4 w-4 text-white" />
+                    </div>
+                    <p className="text-white/40 text-xs mb-1">{stat.label}</p>
+                    <p className="text-white text-xl font-bold">{stat.value}</p>
                   </div>
-                  <div className="space-y-4">
-                    <StatItem label="Properties Managed" value="12" />
-                    <StatItem label="Active Tenants" value="48" />
-                    <StatItem label="Monthly Revenue" value="$156,420" />
-                    <StatItem label="AI Resolutions" value="94%" />
+                ))}
+              </div>
+              {/* Bar chart mockup */}
+              <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-white/50 text-xs">Revenue Overview</p>
+                  <div className="flex gap-3 text-xs text-white/30">
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-indigo-500 inline-block"/>Rent</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"/>Collected</span>
                   </div>
+                </div>
+                <div className="flex items-end gap-2 h-20">
+                  {[40,65,55,80,72,90,85,95,88,100,92,110].map((h, i) => (
+                    <div key={i} className="flex-1 flex flex-col gap-1 items-center">
+                      <div className="w-full bg-indigo-500/60 rounded-t-sm" style={{height: `${h*0.7}%`}} />
+                      <div className="w-full bg-emerald-500/40 rounded-t-sm" style={{height: `${h*0.55}%`}} />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1 text-white/20 text-xs">
+                  {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
+                    <span key={m}>{m}</span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -165,132 +336,150 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* For Tenants Section */}
-      <section id="for-tenants" className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="order-2 lg:order-1 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-blue-600/20 blur-3xl" />
-                <div className="relative bg-card border rounded-xl p-8 shadow-xl">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Home className="h-6 w-6 text-primary" />
-                    <h4 className="text-lg font-semibold">Tenant Portal</h4>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-1">Next Rent Due</p>
-                      <p className="font-semibold">March 1, 2024</p>
+      {/* ── Traction / metrics ── */}
+      <section id="traction" className="py-24 relative">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <p className="text-indigo-400 text-sm font-medium uppercase tracking-widest mb-3">Traction</p>
+            <h2 className="text-4xl md:text-5xl font-bold">Numbers that matter</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12">
+            {[
+              { label: 'Properties Managed', to: 12400, suffix: '+', trend: '↑ 340% YoY' },
+              { label: 'Revenue Processed', prefix: '£', to: 48, suffix: 'M+', trend: '↑ 280% YoY' },
+              { label: 'Hours Saved / Month', to: 94000, suffix: '+', trend: 'Per landlord' },
+              { label: 'AI Resolution Rate', to: 97, suffix: '%', trend: 'vs 45% industry avg' },
+            ].map(m => (
+              <div key={m.label} className="bg-white/3 border border-white/8 rounded-2xl p-6 text-center card-hover">
+                <p className="text-4xl md:text-5xl font-black text-white mb-1">
+                  <Counter to={m.to} prefix={m.prefix} suffix={m.suffix} />
+                </p>
+                <p className="text-white/40 text-sm mb-2">{m.label}</p>
+                <p className="text-emerald-400 text-xs font-medium">{m.trend}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Live metric pills */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <MetricPill label="Monthly Active Landlords" value="3,284" trend="↑ 12% this month" data={[20,35,28,45,52,48,65,72,68,85,90,98]} />
+            <MetricPill label="Avg. Maintenance Resolution" value="4.2h" trend="↓ 68% vs traditional" data={[90,75,68,60,52,48,40,38,32,28,24,18]} />
+            <MetricPill label="Tenant Satisfaction Score" value="4.8/5" trend="↑ from 3.2 industry avg" data={[30,35,40,42,45,50,58,65,70,78,85,92]} />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section id="features" className="py-24 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-indigo-950/10 to-transparent" />
+        <div className="container mx-auto px-6 relative">
+          <div className="text-center mb-16">
+            <p className="text-indigo-400 text-sm font-medium uppercase tracking-widest mb-3">Platform</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">Everything automated</h2>
+            <p className="text-white/40 text-lg max-w-xl mx-auto">
+              Six AI-powered modules that replace an entire property management company
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+            <FeatureCard gradient="from-indigo-500 to-blue-600" icon={Brain} title="AI Tenant Screening" description="Claude-powered screening analyses employment, income, rental history, and references in under 60 seconds." />
+            <FeatureCard gradient="from-purple-500 to-pink-600" icon={MessageSquare} title="WhatsApp AI Agent" description="Tenants message naturally via WhatsApp — our AI handles repairs, payments, and queries 24/7 in any language." />
+            <FeatureCard gradient="from-emerald-500 to-teal-600" icon={DollarSign} title="Smart Rent Collection" description="Automated collection, late fees, reconciliation, and financial reporting — zero landlord effort required." />
+            <FeatureCard gradient="from-orange-500 to-red-600" icon={Wrench} title="Predictive Maintenance" description="AI detects patterns, predicts failures before they happen, and dispatches vetted contractors automatically." />
+            <FeatureCard gradient="from-blue-500 to-cyan-600" icon={Shield} title="Legal & Compliance AI" description="Automatically monitors regulatory changes, flags risks, and generates compliant lease documentation." />
+            <FeatureCard gradient="from-violet-500 to-purple-600" icon={TrendingUp} title="Portfolio Analytics" description="Real-time yield optimisation, occupancy forecasting, and market-rate suggestions for every property." />
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section id="how" className="py-24">
+        <div className="container mx-auto px-6 max-w-5xl">
+          <div className="text-center mb-16">
+            <p className="text-indigo-400 text-sm font-medium uppercase tracking-widest mb-3">Process</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">Live in 3 minutes</h2>
+          </div>
+          <div className="relative">
+            {/* Connector line */}
+            <div className="absolute left-8 top-0 bottom-0 w-px bg-gradient-to-b from-indigo-500/50 via-purple-500/50 to-transparent hidden md:block" />
+            <div className="space-y-8">
+              {[
+                { step: '01', title: 'List your property', desc: 'Add your property details, set rent, and choose public or private listing. Takes under 3 minutes.', icon: Building2 },
+                { step: '02', title: 'AI screens applicants', desc: 'Claude analyses every application — employment, income verification, rental history — and ranks them for you.', icon: Brain },
+                { step: '03', title: 'Sign digitally', desc: 'Lease generated, signed, and stored automatically. WhatsApp agent activates for your new tenant.', icon: Lock },
+                { step: '04', title: 'AI manages everything', desc: 'Rent collection, maintenance, communications. You get a monthly report. That\'s it.', icon: Zap },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-6 group card-hover">
+                  <div className="relative flex-shrink-0">
+                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center text-2xl font-black text-indigo-400 group-hover:from-indigo-500/40 group-hover:to-purple-500/40 transition-all">
+                      {item.step}
                     </div>
-                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                      <p className="text-sm text-green-600 mb-1">Maintenance Request</p>
-                      <p className="font-semibold">Resolved in 4 hours</p>
+                  </div>
+                  <div className="bg-white/3 border border-white/8 rounded-2xl p-6 flex-1 flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <item.icon className="h-5 w-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-1">{item.title}</h3>
+                      <p className="text-white/40 text-sm leading-relaxed">{item.desc}</p>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="order-1 lg:order-2">
-                <h3 className="text-3xl font-bold mb-6">For Tenants</h3>
-                <p className="text-lg text-muted-foreground mb-8">
-                  Experience hassle-free renting with instant support, automated payments, 
-                  and AI-powered maintenance resolution.
-                </p>
-                <ul className="space-y-4">
-                  <BenefitItem text="Submit maintenance requests 24/7 via WhatsApp" />
-                  <BenefitItem text="AI instantly triages and resolves issues" />
-                  <BenefitItem text="Automated rent payments and reminders" />
-                  <BenefitItem text="Access lease documents anytime" />
-                  <BenefitItem text="Real-time updates on maintenance progress" />
-                  <BenefitItem text="Direct communication with property manager" />
-                </ul>
-                <Link href="/auth/signup/tenant" 
-                  className="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors border">
-                  Get Started as Tenant
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-primary/5">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <h3 className="text-3xl font-bold">
-              Ready to Transform Your Property Management?
-            </h3>
-            <p className="text-lg text-muted-foreground">
-              Join thousands of landlords and tenants already using PropAI
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup/landlord" 
-                className="px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-lg font-medium">
-                Start as Landlord
-              </Link>
-              <Link href="/auth/signup/tenant" 
-                className="px-8 py-4 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-lg font-medium border">
-                Start as Tenant
-              </Link>
-            </div>
+      {/* ── Final CTA ── */}
+      <section className="py-32 relative overflow-hidden">
+        <div className="glow-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-indigo-600/20 rounded-full" />
+        <div className="relative container mx-auto px-6 text-center max-w-3xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm mb-8">
+            <Globe className="h-4 w-4" />
+            Available in 12 countries
           </div>
+          <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-6">
+            Stop managing.<br />
+            <span className="text-shimmer">Start earning.</span>
+          </h2>
+          <p className="text-white/40 text-lg mb-10">
+            Join 3,200+ landlords who've automated their portfolio with PropAI.
+            First property free, forever.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth/signup/landlord" className="btn-primary px-10 py-5 rounded-xl text-lg font-bold text-white flex items-center gap-2 justify-center">
+              List Your First Property Free
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link href="/properties" className="px-10 py-5 rounded-xl text-lg font-semibold text-white/60 border border-white/10 hover:border-white/30 hover:bg-white/5 transition-all flex items-center gap-2 justify-center">
+              <BarChart3 className="h-5 w-5" />
+              View Live Listings
+            </Link>
+          </div>
+          <p className="text-white/20 text-sm mt-6">No credit card required · Setup in 3 minutes · Cancel anytime</p>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+      {/* ── Footer ── */}
+      <footer className="border-t border-white/5 py-12">
+        <div className="container mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
-              <Building2 className="h-6 w-6 text-primary" />
-              <span className="font-semibold">PropAI</span>
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <Building2 className="h-4 w-4 text-white" />
+              </div>
+              <span className="font-bold text-white">PropAI</span>
+              <span className="text-white/20 text-sm ml-2">© 2025 PropAI Ltd.</span>
             </div>
-            <div className="flex items-center gap-4">
-              <Link href="/demo" className="text-sm text-muted-foreground hover:text-primary">
-                Demo Mode
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                © 2024 PropAI. AI-Powered Property Management.
-              </p>
+            <div className="flex items-center gap-6 text-sm text-white/30">
+              <Link href="/properties" className="hover:text-white transition-colors">Browse Properties</Link>
+              <Link href="/auth/login" className="hover:text-white transition-colors">Sign In</Link>
+              <Link href="/auth/signup/landlord" className="hover:text-white transition-colors">List Property</Link>
+              <Link href="/demo" className="hover:text-white transition-colors">Demo</Link>
             </div>
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function FeatureCard({ icon: Icon, title, description }: {
-  icon: any;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="p-6 bg-card border rounded-xl hover:border-primary/50 transition-all">
-      <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-        <Icon className="h-6 w-6 text-primary" />
-      </div>
-      <h4 className="text-lg font-semibold mb-2">{title}</h4>
-      <p className="text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function BenefitItem({ text }: { text: string }) {
-  return (
-    <li className="flex items-start gap-3">
-      <CheckCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-      <span>{text}</span>
-    </li>
-  );
-}
-
-function StatItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold">{value}</span>
     </div>
   );
 }

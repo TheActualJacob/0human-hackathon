@@ -2,15 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Search, Filter, MapPin, Bed, Bath, Calendar,
-  Home, DollarSign, Shield
+  Search, MapPin, Bed, Bath, Calendar,
+  Home, Shield, SlidersHorizontal, ArrowRight, Building2, Zap
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -28,6 +22,7 @@ export default function PropertiesPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     minRent: '',
     maxRent: '',
@@ -44,8 +39,7 @@ export default function PropertiesPage() {
   const fetchPublicListings = async () => {
     setLoading(true);
     try {
-      // Try fetching with listing_status filter first
-      let query = supabase
+      const { data: raw, error } = await supabase
         .from('units')
         .select(`
           *,
@@ -59,11 +53,7 @@ export default function PropertiesPage() {
         `)
         .order('created_at', { ascending: false });
 
-      // Only filter by listing_status if we have the column
-      const { data: raw, error } = await query;
-
       if (error) {
-        console.error('Error fetching listings:', error.message);
         setFetchError(error.message);
         setUnits([]);
         setLoading(false);
@@ -71,27 +61,18 @@ export default function PropertiesPage() {
       }
       setFetchError(null);
 
-      // Filter to only public listings (handles both when column exists and when it doesn't)
-      let data = (raw || []).filter((u: any) => 
+      let data = (raw || []).filter((u: any) =>
         !u.listing_status || u.listing_status === 'public'
       );
 
-      // Apply filters
-      if (filters.minRent) {
-        data = data.filter((u: any) => u.rent_amount && parseFloat(u.rent_amount) >= parseFloat(filters.minRent));
-      }
-      if (filters.maxRent) {
-        data = data.filter((u: any) => u.rent_amount && parseFloat(u.rent_amount) <= parseFloat(filters.maxRent));
-      }
-      if (filters.city) {
-        data = data.filter((u: any) => u.city?.toLowerCase().includes(filters.city.toLowerCase()));
-      }
+      if (filters.minRent) data = data.filter((u: any) => u.rent_amount && parseFloat(u.rent_amount) >= parseFloat(filters.minRent));
+      if (filters.maxRent) data = data.filter((u: any) => u.rent_amount && parseFloat(u.rent_amount) <= parseFloat(filters.maxRent));
+      if (filters.city) data = data.filter((u: any) => u.city?.toLowerCase().includes(filters.city.toLowerCase()));
 
-      // Apply client-side filters
       let filteredData = data || [];
-      
+
       if (searchTerm) {
-        filteredData = filteredData.filter(unit => 
+        filteredData = filteredData.filter(unit =>
           unit.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
           unit.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
           unit.unit_identifier.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -100,7 +81,7 @@ export default function PropertiesPage() {
       }
 
       if (filters.bedrooms && filters.bedrooms !== 'any') {
-        filteredData = filteredData.filter(unit => 
+        filteredData = filteredData.filter(unit =>
           unit.unit_attributes?.bedrooms === parseInt(filters.bedrooms) ||
           unit.bedrooms === parseInt(filters.bedrooms)
         );
@@ -114,282 +95,352 @@ export default function PropertiesPage() {
     }
   };
 
-  const handleSearch = () => {
-    fetchPublicListings();
-  };
-
   const formatDate = (date: string | null) => {
     if (!date) return 'Immediately';
-    return new Date(date).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const handleViewDetails = (unitId: string) => {
-    router.push(`/properties/${unitId}`);
+  const getBeds = (unit: UnitWithAttributes): number | null => {
+    if (unit.unit_attributes?.bedrooms != null) return unit.unit_attributes.bedrooms;
+    if (unit.bedrooms != null) return unit.bedrooms;
+    return null;
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Find Your Next Home</h1>
-          <p className="text-muted-foreground text-lg">Browse available properties</p>
-        </div>
-        
-        {/* Loading Skeletons */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="overflow-hidden">
-              <Skeleton className="h-48 w-full" />
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-2/3" />
-              </CardContent>
-              <CardFooter>
-                <Skeleton className="h-10 w-full" />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const getBaths = (unit: UnitWithAttributes): number | null => {
+    if (unit.unit_attributes?.bathrooms != null) return unit.unit_attributes.bathrooms;
+    if (unit.bathrooms != null) return unit.bathrooms;
+    return null;
+  };
 
-  if (fetchError) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Find Your Next Home</h1>
-        </div>
-        <Card className="max-w-md mx-auto p-8">
-          <Home className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No listings available yet</h3>
-          <p className="text-muted-foreground text-sm">
-            Check back soon — landlords are setting up their properties.
-          </p>
-        </Card>
-      </div>
-    );
-  }
+  const tags = (unit: UnitWithAttributes) => {
+    const t: string[] = [];
+    if (unit.unit_attributes?.furnished_status) t.push(unit.unit_attributes.furnished_status.replace(/_/g, ' '));
+    if (unit.unit_attributes?.has_parking) t.push('Parking');
+    if (unit.unit_attributes?.has_garden_access) t.push('Garden');
+    return t;
+  };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">Find Your Next Home</h1>
-        <p className="text-muted-foreground text-lg">
-          {units.length} properties available for rent
-        </p>
+    <div className="min-h-screen bg-[#05050a] text-white">
+      <style>{`
+        @keyframes shimmer-bar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .card-appear { animation: fade-up 0.5s ease forwards; }
+        .skeleton-shimmer {
+          position: relative;
+          overflow: hidden;
+          background: rgba(255,255,255,0.04);
+        }
+        .skeleton-shimmer::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+          animation: shimmer-bar 1.5s infinite;
+        }
+        .property-card {
+          transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        .property-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 60px rgba(99,102,241,0.12);
+          border-color: rgba(99,102,241,0.3);
+        }
+        .glow-orb {
+          filter: blur(80px);
+        }
+      `}</style>
+
+      {/* Navbar */}
+      <nav className="border-b border-white/5 bg-[#05050a]/80 backdrop-blur-xl sticky top-0 z-40">
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-bold text-white">PropAI</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/auth/login" className="text-sm text-white/50 hover:text-white transition-colors px-4 py-2">Sign in</Link>
+            <Link href="/auth/signup/tenant" className="text-sm font-medium text-white px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors">
+              Apply as Tenant
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero header */}
+      <div className="relative overflow-hidden border-b border-white/5">
+        <div className="glow-orb absolute top-0 left-1/3 w-96 h-48 bg-indigo-600/20 rounded-full" />
+        <div className="glow-orb absolute top-0 right-1/4 w-64 h-48 bg-purple-600/15 rounded-full" />
+        <div className="relative container mx-auto px-6 py-16 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs mb-6">
+            <Zap className="h-3 w-3" />
+            AI-screened properties · Verified landlords
+          </div>
+          <h1 className="text-5xl md:text-6xl font-black tracking-tighter mb-4">
+            Find Your{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+              Next Home
+            </span>
+          </h1>
+          <p className="text-white/40 text-lg max-w-lg mx-auto mb-8">
+            Browse verified listings. Apply in minutes. AI-powered screening means faster decisions.
+          </p>
+
+          {/* Search bar */}
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-2 backdrop-blur-sm focus-within:border-indigo-500/50 transition-colors">
+              <Search className="h-5 w-5 text-white/30 ml-3 flex-shrink-0" />
+              <input
+                className="flex-1 bg-transparent text-white placeholder-white/30 outline-none py-2 text-sm"
+                placeholder="Search by address, city, or description…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && fetchPublicListings()}
+              />
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition-colors ${showFilters ? 'bg-indigo-500 text-white' : 'bg-white/8 text-white/50 hover:text-white hover:bg-white/12'}`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Filters
+              </button>
+              <button
+                onClick={fetchPublicListings}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium text-white"
+              >
+                Search
+              </button>
+            </div>
+
+            {/* Expanded filters */}
+            {showFilters && (
+              <div className="mt-3 bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-left backdrop-blur-sm">
+                {[
+                  { label: 'Min Rent (£)', key: 'minRent', placeholder: '0' },
+                  { label: 'Max Rent (£)', key: 'maxRent', placeholder: '5000' },
+                  { label: 'City', key: 'city', placeholder: 'London…' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label className="text-white/40 text-xs mb-1 block">{f.label}</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500/50 transition-colors"
+                      placeholder={f.placeholder}
+                      value={(filters as any)[f.key]}
+                      onChange={(e) => setFilters({ ...filters, [f.key]: e.target.value })}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="text-white/40 text-xs mb-1 block">Bedrooms</label>
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50 transition-colors"
+                    value={filters.bedrooms}
+                    onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
+                  >
+                    <option value="any" className="bg-[#0d0d18]">Any</option>
+                    <option value="0" className="bg-[#0d0d18]">Studio</option>
+                    <option value="1" className="bg-[#0d0d18]">1 Bed</option>
+                    <option value="2" className="bg-[#0d0d18]">2 Beds</option>
+                    <option value="3" className="bg-[#0d0d18]">3 Beds</option>
+                    <option value="4" className="bg-[#0d0d18]">4+ Beds</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Search and Filters */}
-      <Card className="p-6">
-        <div className="space-y-4">
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by location, address, or description..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            />
-          </div>
-
-          {/* Filters */}
-          <div className="grid gap-4 md:grid-cols-5">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Min Rent</label>
-              <Input
-                type="number"
-                placeholder="£ Min"
-                value={filters.minRent}
-                onChange={(e) => setFilters({ ...filters, minRent: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Max Rent</label>
-              <Input
-                type="number"
-                placeholder="£ Max"
-                value={filters.maxRent}
-                onChange={(e) => setFilters({ ...filters, maxRent: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Bedrooms</label>
-              <Select
-                value={filters.bedrooms}
-                onValueChange={(value) => setFilters({ ...filters, bedrooms: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="0">Studio</SelectItem>
-                  <SelectItem value="1">1 Bedroom</SelectItem>
-                  <SelectItem value="2">2 Bedrooms</SelectItem>
-                  <SelectItem value="3">3 Bedrooms</SelectItem>
-                  <SelectItem value="4">4+ Bedrooms</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">City</label>
-              <Input
-                placeholder="Enter city"
-                value={filters.city}
-                onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleSearch} className="w-full">
-                <Filter className="h-4 w-4 mr-2" />
-                Search
-              </Button>
+      {/* Results */}
+      <div className="container mx-auto px-6 py-10">
+        {/* Count row */}
+        {!loading && !fetchError && (
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-white/40 text-sm">
+              <span className="text-white font-semibold">{units.length}</span> properties available
+            </p>
+            <div className="text-white/30 text-xs flex items-center gap-1">
+              <Shield className="h-3 w-3 text-emerald-400" />
+              All landlords verified
             </div>
           </div>
-        </div>
-      </Card>
+        )}
 
-      {/* Property Listings */}
-      {units.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Home className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No properties found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your search criteria to find more properties
-          </p>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {units.map((unit) => (
-            <Card key={unit.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              {/* Property Image */}
-              {unit.images && unit.images.length > 0 ? (
-                <div className="h-48 relative overflow-hidden">
-                  <img 
-                    src={unit.images[0]} 
-                    alt={unit.unit_identifier}
-                    className="w-full h-full object-cover"
-                  />
-                  {unit.images.length > 1 && (
-                    <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
-                      +{unit.images.length - 1}
-                    </div>
-                  )}
+        {/* Loading skeletons */}
+        {loading && (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/8 overflow-hidden" style={{ animationDelay: `${i * 0.08}s` }}>
+                <div className="skeleton-shimmer h-52 w-full" />
+                <div className="p-5 space-y-3">
+                  <div className="skeleton-shimmer h-5 w-3/4 rounded-lg" />
+                  <div className="skeleton-shimmer h-4 w-1/2 rounded-lg" />
+                  <div className="skeleton-shimmer h-4 w-full rounded-lg" />
+                  <div className="skeleton-shimmer h-10 w-full rounded-xl mt-2" />
                 </div>
-              ) : (
-                <div className="h-48 bg-muted flex items-center justify-center">
-                  <Home className="h-16 w-16 text-muted-foreground/20" />
-                </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
 
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl">
-                    {unit.unit_identifier}
-                  </CardTitle>
-                  <Badge variant="default" className="text-lg px-3">
-                    £{unit.rent_amount}/mo
-                  </Badge>
-                </div>
-                <div className="flex items-center text-muted-foreground text-sm mt-1">
-                  <MapPin className="h-3 w-3 mr-1" />
-                  {unit.address}, {unit.city}
-                </div>
-              </CardHeader>
+        {/* Error / empty */}
+        {!loading && (fetchError || units.length === 0) && (
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="h-20 w-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+              <Home className="h-10 w-10 text-white/20" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              {fetchError ? 'Unable to load listings' : 'No properties found'}
+            </h3>
+            <p className="text-white/30 text-sm max-w-xs">
+              {fetchError
+                ? 'Check back soon — landlords are setting up their properties.'
+                : 'Try adjusting your search or filters to see more results.'}
+            </p>
+          </div>
+        )}
 
-              <CardContent className="space-y-3">
-                {/* Property Details */}
-                <div className="flex gap-4 text-sm">
-                  {unit.unit_attributes?.bedrooms != null && (
-                    <div className="flex items-center gap-1">
-                      <Bed className="h-4 w-4 text-muted-foreground" />
-                      <span>{unit.unit_attributes.bedrooms} bed</span>
-                    </div>
-                  )}
-                  {unit.bedrooms != null && unit.unit_attributes == null && (
-                    <div className="flex items-center gap-1">
-                      <Bed className="h-4 w-4 text-muted-foreground" />
-                      <span>{unit.bedrooms} bed</span>
-                    </div>
-                  )}
-                  {unit.unit_attributes?.bathrooms != null && (
-                    <div className="flex items-center gap-1">
-                      <Bath className="h-4 w-4 text-muted-foreground" />
-                      <span>{unit.unit_attributes.bathrooms} bath</span>
-                    </div>
-                  )}
-                  {unit.bathrooms != null && unit.unit_attributes == null && (
-                    <div className="flex items-center gap-1">
-                      <Bath className="h-4 w-4 text-muted-foreground" />
-                      <span>{unit.bathrooms} bath</span>
-                    </div>
-                  )}
-                </div>
+        {/* Property cards */}
+        {!loading && !fetchError && units.length > 0 && (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {units.map((unit, i) => {
+              const beds = getBeds(unit);
+              const baths = getBaths(unit);
+              const unitTags = tags(unit);
 
-                {/* Description */}
-                {unit.listing_description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {unit.listing_description}
-                  </p>
-                )}
-
-                {/* Additional Features */}
-                <div className="flex gap-2 flex-wrap">
-                  {unit.unit_attributes?.furnished_status && (
-                    <Badge variant="secondary" className="text-xs">
-                      {unit.unit_attributes.furnished_status.replace('_', ' ')}
-                    </Badge>
-                  )}
-                  {unit.unit_attributes?.has_parking && (
-                    <Badge variant="secondary" className="text-xs">
-                      Parking
-                    </Badge>
-                  )}
-                  {unit.unit_attributes?.has_garden_access && (
-                    <Badge variant="secondary" className="text-xs">
-                      Garden
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Availability */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>Available from {formatDate(unit.available_date)}</span>
-                </div>
-
-                {/* Security Deposit */}
-                {unit.security_deposit && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <span>£{unit.security_deposit} deposit</span>
-                  </div>
-                )}
-              </CardContent>
-
-              <CardFooter>
-                <Button 
-                  className="w-full" 
-                  onClick={() => handleViewDetails(unit.id)}
+              return (
+                <div
+                  key={unit.id}
+                  className="property-card bg-[#0d0d18] border border-white/8 rounded-2xl overflow-hidden cursor-pointer card-appear"
+                  style={{ animationDelay: `${i * 0.06}s` }}
+                  onClick={() => router.push(`/properties/${unit.id}`)}
                 >
-                  View Details
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                  {/* Image */}
+                  {unit.images && unit.images.length > 0 ? (
+                    <div className="h-52 relative overflow-hidden">
+                      <img
+                        src={unit.images[0]}
+                        alt={unit.unit_identifier}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      {unit.images.length > 1 && (
+                        <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-xs font-medium">
+                          +{unit.images.length - 1} photos
+                        </div>
+                      )}
+                      {/* Price overlay */}
+                      <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5">
+                        <span className="text-white font-bold">£{unit.rent_amount}</span>
+                        <span className="text-white/50 text-xs">/mo</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-52 bg-gradient-to-br from-indigo-950/40 to-purple-950/30 flex flex-col items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-0 opacity-5"
+                        style={{
+                          backgroundImage: 'linear-gradient(rgba(99,102,241,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.3) 1px, transparent 1px)',
+                          backgroundSize: '30px 30px'
+                        }}
+                      />
+                      <Home className="h-12 w-12 text-indigo-500/40 mb-2" />
+                      {/* Price overlay */}
+                      <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5">
+                        <span className="text-white font-bold">£{unit.rent_amount}</span>
+                        <span className="text-white/50 text-xs">/mo</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Content */}
+                  <div className="p-5">
+                    <div className="mb-3">
+                      <h3 className="text-white font-bold text-lg leading-tight mb-1 line-clamp-1">
+                        {unit.unit_identifier}
+                      </h3>
+                      <div className="flex items-center gap-1 text-white/40 text-sm">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="line-clamp-1">{unit.address}, {unit.city}</span>
+                      </div>
+                    </div>
+
+                    {/* Bed / bath row */}
+                    {(beds != null || baths != null) && (
+                      <div className="flex gap-3 mb-3">
+                        {beds != null && (
+                          <div className="flex items-center gap-1.5 text-white/50 text-sm">
+                            <Bed className="h-4 w-4 text-indigo-400" />
+                            <span>{beds === 0 ? 'Studio' : `${beds} bed`}</span>
+                          </div>
+                        )}
+                        {baths != null && (
+                          <div className="flex items-center gap-1.5 text-white/50 text-sm">
+                            <Bath className="h-4 w-4 text-indigo-400" />
+                            <span>{baths} bath</span>
+                          </div>
+                        )}
+                        {unit.available_date && (
+                          <div className="flex items-center gap-1.5 text-white/50 text-sm ml-auto">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>{formatDate(unit.available_date)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Description */}
+                    {unit.listing_description && (
+                      <p className="text-white/30 text-xs leading-relaxed mb-3 line-clamp-2">
+                        {unit.listing_description}
+                      </p>
+                    )}
+
+                    {/* Tags */}
+                    {unitTags.length > 0 && (
+                      <div className="flex gap-1.5 flex-wrap mb-4">
+                        {unitTags.map(tag => (
+                          <span key={tag} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/8 text-white/40 text-xs capitalize">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* CTA */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/properties/${unit.id}`); }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 hover:border-indigo-500 text-indigo-300 hover:text-white text-sm font-medium transition-all duration-200"
+                    >
+                      View Details
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 py-8 mt-10">
+        <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <Building2 className="h-3.5 w-3.5 text-white" />
+            </div>
+            <span className="text-white font-bold text-sm">PropAI</span>
+          </Link>
+          <p className="text-white/20 text-xs">© 2025 PropAI Ltd. All rights reserved.</p>
         </div>
-      )}
+      </footer>
     </div>
   );
 }

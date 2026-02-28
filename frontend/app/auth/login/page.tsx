@@ -25,26 +25,17 @@ export default function LoginPage() {
 
     try {
       console.log('Login form submitted for:', formData.email);
-      // Normal authentication flow
-      const { data, error: signInError } = await signIn(formData.email, formData.password);
-      
-      if (signInError) {
-        setError(signInError.message);
-        setLoading(false);
-        return;
-      }
+      await signIn(formData.email, formData.password);
 
-      console.log('Sign in successful, attempting redirect...');
-      
-      // Force a hard navigation to bypass any stale client-side state
-      window.location.href = '/landlord/dashboard';
-      return;
+      console.log('Sign in successful, determining user role...');
 
-      /* Commenting out complex logic temporarily to ensure basic redirect works
-      // Get user data to determine where to go
+      // Get user role to redirect to the correct dashboard
       const user = await getCurrentUser();
-      ...
-      */
+      if (user?.role === 'tenant') {
+        window.location.href = '/tenant/dashboard';
+      } else {
+        window.location.href = '/landlord/dashboard';
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Invalid email or password');

@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter
 
-from app.database import get_db
+from app.database import supabase
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-async def health_check(db: AsyncSession = Depends(get_db)):
+async def health_check():
     try:
-        await db.execute(text("SELECT 1"))
+        supabase.table("landlords").select("id", count="exact").limit(0).execute()
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {e}"

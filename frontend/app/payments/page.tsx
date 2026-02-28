@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from "react";
-import { 
-  DollarSign, Send, AlertCircle, CheckCircle, 
+import {
+  DollarSign, Send, AlertCircle, CheckCircle,
   Calendar, TrendingUp, FileText, Plus, Clock,
-  Home, User, CreditCard
+  Home, User, CreditCard, Play, Loader2
 } from "lucide-react";
+import { recordPayment, triggerOverdueCheck } from "@/lib/api/payments";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Card } from "@/components/ui/card";
@@ -37,6 +38,12 @@ export default function PaymentsPage() {
   const [autonomousMode, setAutonomousMode] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
   const [showPaymentPlanDialog, setShowPaymentPlanDialog] = useState(false);
+  const [showRecordPaymentDialog, setShowRecordPaymentDialog] = useState(false);
+  const [recordForm, setRecordForm] = useState({ lease_id: '', amount: '', payment_method: 'bank_transfer', reference: '' });
+  const [recordLoading, setRecordLoading] = useState(false);
+  const [recordMessage, setRecordMessage] = useState('');
+  const [overdueLoading, setOverdueLoading] = useState(false);
+  const [overdueResult, setOverdueResult] = useState<string | null>(null);
 
   // Get payment with details
   const getPaymentWithDetails = (paymentId: string) => {
@@ -119,6 +126,45 @@ export default function PaymentsPage() {
     });
 
     setShowPaymentPlanDialog(false);
+  };
+
+  const handleRecordPayment = async () => {
+    if (!recordForm.lease_id || !recordForm.amount) return;
+    setRecordLoading(true);
+    setRecordMessage('');
+    try {
+      const result = await recordPayment({
+        lease_id: recordForm.lease_id,
+        amount: parseFloat(recordForm.amount),
+        payment_method: recordForm.payment_method || undefined,
+        reference: recordForm.reference || undefined,
+      });
+      setRecordMessage(result.message);
+      setRecordForm({ lease_id: '', amount: '', payment_method: 'bank_transfer', reference: '' });
+      setTimeout(() => {
+        setShowRecordPaymentDialog(false);
+        setRecordMessage('');
+      }, 2000);
+    } catch (err: any) {
+      setRecordMessage(`Error: ${err.message}`);
+    } finally {
+      setRecordLoading(false);
+    }
+  };
+
+  const handleRunOverdueCheck = async () => {
+    setOverdueLoading(true);
+    setOverdueResult(null);
+    try {
+      const result = await triggerOverdueCheck();
+      setOverdueResult(
+        `Processed ${result.processed} payments. Sent ${result.reminders_sent} reminders, ${result.landlord_alerts} landlord alerts.`
+      );
+    } catch (err: any) {
+      setOverdueResult(`Error: ${err.message}`);
+    } finally {
+      setOverdueLoading(false);
+    }
   };
 
   const columns = [
@@ -243,25 +289,32 @@ export default function PaymentsPage() {
           <h1 className="text-2xl font-bold">Payments</h1>
           <p className="text-muted-foreground">Manage rent collection and payment plans</p>
         </div>
-        
-        {/* Autonomous Mode Toggle */}
-        <Card className="p-4 ai-glow">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="autonomous-mode"
-                checked={autonomousMode}
-                onCheckedChange={setAutonomousMode}
-              />
-              <Label htmlFor="autonomous-mode" className="font-medium">
-                Autonomous Mode
-              </Label>
+
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setShowRecordPaymentDialog(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Record Payment
+          </Button>
+
+          {/* Autonomous Mode Toggle */}
+          <Card className="p-4 ai-glow">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="autonomous-mode"
+                  checked={autonomousMode}
+                  onCheckedChange={setAutonomousMode}
+                />
+                <Label htmlFor="autonomous-mode" className="font-medium">
+                  Autonomous Mode
+                </Label>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                AI handles reminders & payment plans
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              AI handles reminders & payment plans
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -404,7 +457,30 @@ export default function PaymentsPage() {
 
       {/* Collection Settings */}
       <Card className="p-6">
-        <h3 className="font-semibold mb-4">Automated Collection Rules</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Automated Collection Rules</h3>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="ai-glow"
+              onClick={handleRunOverdueCheck}
+              disabled={overdueLoading}
+            >
+              {overdueLoading ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-1" />
+              )}
+              Run Overdue Check
+            </Button>
+          </div>
+        </div>
+        {overdueResult && (
+          <div className="mb-4 p-3 rounded-lg bg-accent/50 text-sm">
+            {overdueResult}
+          </div>
+        )}
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 rounded-lg bg-secondary">
             <div>
@@ -447,6 +523,104 @@ export default function PaymentsPage() {
           </div>
         </div>
       </Card>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={showRecordPaymentDialog} onOpenChange={setShowRecordPaymentDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Record an incoming payment and send a receipt to the tenant
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Lease</Label>
+              <Select
+                value={recordForm.lease_id}
+                onValueChange={(v) => setRecordForm(f => ({ ...f, lease_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a lease..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {leases.filter(l => l.status === 'active').map(lease => {
+                    const unit = units.find(u => u.id === lease.unit_id);
+                    const tenant = tenants.find(t => t.lease_id === lease.id && t.is_primary_tenant);
+                    return (
+                      <SelectItem key={lease.id} value={lease.id}>
+                        {tenant?.full_name || 'Unknown'} — {unit?.unit_identifier || 'N/A'} (£{lease.monthly_rent}/mo)
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Amount (£)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={recordForm.amount}
+                onChange={(e) => setRecordForm(f => ({ ...f, amount: e.target.value }))}
+                className="font-mono"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select
+                value={recordForm.payment_method}
+                onValueChange={(v) => setRecordForm(f => ({ ...f, payment_method: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reference (optional)</Label>
+              <Input
+                placeholder="Bank reference or note"
+                value={recordForm.reference}
+                onChange={(e) => setRecordForm(f => ({ ...f, reference: e.target.value }))}
+              />
+            </div>
+
+            {recordMessage && (
+              <div className={cn(
+                "p-3 rounded-lg text-sm",
+                recordMessage.startsWith("Error") ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"
+              )}>
+                {recordMessage}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowRecordPaymentDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRecordPayment}
+                disabled={recordLoading || !recordForm.lease_id || !recordForm.amount}
+              >
+                {recordLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Record Payment
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Plan Dialog */}
       <Dialog open={showPaymentPlanDialog} onOpenChange={setShowPaymentPlanDialog}>

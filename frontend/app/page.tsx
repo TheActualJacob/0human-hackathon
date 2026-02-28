@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Brain, MessageSquare, DollarSign, Shield, Wrench, TrendingUp,
-  ArrowRight, CheckCircle, Zap, Building2, Home, Users,
+  ArrowRight, CheckCircle, Zap, Building2, Home,
   ChevronDown, Globe, Lock, BarChart3
 } from 'lucide-react';
 
@@ -31,22 +31,6 @@ function FeatureCard({ icon: Icon, title, description, gradient }: {
         <p className="text-white/50 text-sm leading-relaxed">{description}</p>
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       </div>
-    </div>
-  );
-}
-
-// ─── Metric pill ─────────────────────────────────────────────────────────────
-function MetricPill({ label, value, trend, data }: {
-  label: string; value: string; trend: string; data: number[];
-}) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4 backdrop-blur-sm">
-      <div>
-        <p className="text-white/40 text-xs mb-1">{label}</p>
-        <p className="text-white text-xl font-bold">{value}</p>
-        <p className="text-emerald-400 text-xs mt-1">{trend}</p>
-      </div>
-      <Sparkline data={data} color="#6366f1" />
     </div>
   );
 }
@@ -141,7 +125,6 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm text-white/50">
             <Link href="/properties" className="hover:text-white transition-colors">Browse</Link>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#traction" className="hover:text-white transition-colors">Traction</a>
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
           </div>
           <div className="flex items-center gap-3">
@@ -242,7 +225,7 @@ export default function LandingPage() {
                 {[
                   { label: 'Properties', value: '147', icon: Building2, color: 'from-indigo-500 to-blue-600' },
                   { label: 'Monthly Revenue', value: '£892K', icon: DollarSign, color: 'from-emerald-500 to-teal-600' },
-                  { label: 'Active Tenants', value: '483', icon: Users, color: 'from-purple-500 to-pink-600' },
+                  { label: 'Active Tenants', value: '483', icon: Home, color: 'from-purple-500 to-pink-600' },
                   { label: 'AI Resolution', value: '97%', icon: Brain, color: 'from-orange-500 to-red-600' },
                 ].map(stat => (
                   <div key={stat.label} className="bg-white/5 rounded-xl p-4 border border-white/5">

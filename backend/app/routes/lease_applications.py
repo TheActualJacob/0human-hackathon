@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
@@ -40,7 +40,7 @@ class ApplicationReject(BaseModel):
 
 
 @router.post("/api/applications")
-async def create_application(body: ApplicationCreate):
+async def create_application(body: ApplicationCreate, background_tasks: BackgroundTasks):
     sb = _sb()
 
     prospect_res = sb.table("prospects").select("*").eq("id", body.prospect_id).maybe_single().execute()
@@ -80,6 +80,9 @@ async def create_application(body: ApplicationCreate):
     sb.table("prospects").update(updates).eq("id", body.prospect_id).execute()
 
     _notify_landlord_application(prospect, body.full_name, unit_id, app_id)
+
+    from app.services.application_review_agent import run_application_review
+    background_tasks.add_task(run_application_review, application_id=app_id)
 
     return {"id": app_id, "status": "pending"}
 

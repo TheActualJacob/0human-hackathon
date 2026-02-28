@@ -8,8 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
 interface LeaseData {
   token: string;
   prospect_name: string | null;
@@ -34,7 +32,7 @@ export default function SignPage() {
   useEffect(() => {
     async function fetchLease() {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/sign/${token}`);
+        const res = await fetch(`/api/sign/${token}`);
         if (res.status === 404) throw new Error("Signing link not found. Please check the link you received.");
         if (res.status === 410) {
           const data = await res.json().catch(() => ({}));
@@ -60,7 +58,7 @@ export default function SignPage() {
     setSigning(true);
     try {
       const signatureDataUrl = sigRef.current.getTrimmedCanvas().toDataURL("image/png");
-      const res = await fetch(`${BACKEND_URL}/api/sign/${token}`, {
+      const res = await fetch(`/api/sign/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ signature_data_url: signatureDataUrl }),

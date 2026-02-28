@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
+import { 
   Brain,
   Zap,
   Plus,
@@ -1027,7 +1027,7 @@ export default function MaintenancePage() {
                 workflow.owner_response === 'approved' &&
                 typeof workflow.owner_message === 'string' &&
                 workflow.owner_message.startsWith('Auto-approved');
-
+              
               return (
                 <div
                   key={workflow.id}
@@ -1048,7 +1048,7 @@ export default function MaintenancePage() {
                         {request?.description ?? 'Maintenance request'}
                       </p>
                     </div>
-
+                    
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
                         className={cn(
@@ -1066,7 +1066,7 @@ export default function MaintenancePage() {
                           )}
                         >
                           {ai.urgency}
-                        </span>
+                      </span>
                       )}
                       {wasAutoApproved && (
                         <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border bg-green-500/15 border-green-500/30 text-green-400 font-medium">
@@ -1075,7 +1075,7 @@ export default function MaintenancePage() {
                         </span>
                       )}
                     </div>
-
+                    
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {requestDetails?.lease?.tenants?.[0] && (
                         <span className="flex items-center gap-1">
@@ -1117,7 +1117,7 @@ export default function MaintenancePage() {
                     )}
                   >
                     {STATE_LABELS[currentState]}
-                  </span>
+                </span>
                   {selectedAI?.urgency && (
                     <span
                       className={cn(
@@ -1134,7 +1134,7 @@ export default function MaintenancePage() {
                       <span className="capitalize">{selectedAI.category}</span>
                     </span>
                   )}
-                </div>
+              </div>
                 {selectedWorkflowData.owner_response === 'approved' &&
                   typeof selectedWorkflowData.owner_message === 'string' &&
                   selectedWorkflowData.owner_message.startsWith('Auto-approved') && (
@@ -1146,7 +1146,7 @@ export default function MaintenancePage() {
                           {selectedWorkflowData.owner_message}
                         </span>
                       </p>
-                    </div>
+                </div>
                   )}
                 <h2 className="text-xl font-bold line-clamp-2 leading-snug">
                   {selectedRequest.description ?? 'Maintenance Request'}
@@ -1169,9 +1169,9 @@ export default function MaintenancePage() {
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
                     {format(new Date(selectedWorkflowData.created_at), 'MMM d, yyyy h:mm a')}
-                  </span>
+                    </span>
+                  </div>
                 </div>
-              </div>
 
               {currentState === 'IN_PROGRESS' && (
                 <Button
@@ -1199,8 +1199,8 @@ export default function MaintenancePage() {
                       currentState={currentState}
                       vendorRequired={vendorRequired}
                     />
-                  </div>
-                </div>
+              </div>
+            </div>
 
                 {/* Communication Feed */}
                 <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -1209,11 +1209,11 @@ export default function MaintenancePage() {
                     <span className="text-sm font-semibold">Communication Feed</span>
                     <span className="ml-auto text-xs text-muted-foreground">
                       {selectedComms.length} messages
-                    </span>
-                  </div>
+                      </span>
+                    </div>
                   <div className="p-4 max-h-[600px] overflow-y-auto">
                     <CommunicationFeed communications={selectedComms} />
-                  </div>
+                    </div>
                 </div>
               </div>
 
@@ -1251,7 +1251,7 @@ export default function MaintenancePage() {
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-red-500/20 bg-red-500/5">
                       <XCircle className="h-4 w-4 text-red-400" />
                       <span className="text-sm font-semibold text-red-300">Request Denied</span>
-                    </div>
+                  </div>
                     <div className="p-4 space-y-2">
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         This request was denied by the property owner.{' '}
@@ -1264,8 +1264,8 @@ export default function MaintenancePage() {
                         {format(new Date(selectedWorkflowData.updated_at), 'MMM d, yyyy h:mm a')}
                       </p>
                     </div>
-                  </div>
-                )}
+              </div>
+            )}
 
                 {/* Tenant info card */}
                 {selectedRequest.lease && (
@@ -1281,7 +1281,7 @@ export default function MaintenancePage() {
                           <span className="font-medium">
                             {selectedRequest.lease.tenants[0].full_name}
                           </span>
-                        </div>
+                  </div>
                       )}
                       {selectedRequest.lease.unit && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1291,7 +1291,7 @@ export default function MaintenancePage() {
                             {selectedRequest.lease.unit.address &&
                               ` · ${selectedRequest.lease.unit.address}`}
                           </span>
-                        </div>
+                </div>
                       )}
                       {selectedWorkflowData.vendor_eta && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1300,10 +1300,10 @@ export default function MaintenancePage() {
                             Vendor ETA:{' '}
                             {format(new Date(selectedWorkflowData.vendor_eta), 'MMM d, h:mm a')}
                           </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              </div>
+            )}
+                </div>
+              </div>
                 )}
               </div>
             </div>
@@ -1346,7 +1346,7 @@ export default function MaintenancePage() {
               vendor requirements, and immediately notify the property owner for approval.
             </DialogDescription>
           </DialogHeader>
-
+          
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="lease">Unit / Tenant</Label>
@@ -1367,7 +1367,7 @@ export default function MaintenancePage() {
                 </SelectContent>
               </Select>
             </div>
-
+            
             <div className="space-y-2">
               <Label htmlFor="description">Issue Description</Label>
               <Textarea
@@ -1384,7 +1384,7 @@ export default function MaintenancePage() {
                   type="button"
                   onClick={() =>
                     setFormData({
-                      ...formData,
+                    ...formData, 
                       description:
                         'There is water leaking from under my kitchen sink. It started two days ago and is getting worse. The cabinet below is soaked.',
                     })
@@ -1415,7 +1415,7 @@ export default function MaintenancePage() {
               </div>
             )}
           </div>
-
+          
           <div className="flex justify-end gap-3">
             <Button
               variant="outline"
@@ -1424,7 +1424,7 @@ export default function MaintenancePage() {
             >
               Cancel
             </Button>
-            <Button
+            <Button 
               onClick={handleCreateRequest}
               disabled={isSubmitting || !formData.leaseId || !formData.description}
               className="ai-glow"

@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ActivityItem } from "@/types";
+import type { ActivityItem } from "@/types";
 import { 
   Home, 
   DollarSign, 
@@ -18,7 +18,7 @@ interface ActivityFeedProps {
   className?: string;
 }
 
-const activityIcons = {
+const activityIcons: Record<string, typeof Wrench> = {
   maintenance: Wrench,
   rent: DollarSign,
   lease: FileText,
@@ -44,21 +44,21 @@ export default function ActivityFeed({ activities, className }: ActivityFeedProp
           </p>
         ) : (
           activities.map((activity) => {
-            const Icon = activityIcons[activity.type];
+            const Icon = activityIcons[activity.type ?? 'system'] ?? Home;
             
             return (
               <div 
                 key={activity.id}
                 className={cn(
                   "flex gap-3 p-3 rounded-lg transition-all",
-                  activity.aiGenerated && "bg-primary/5 border border-primary/20"
+                  activity.ai_generated && "bg-primary/5 border border-primary/20"
                 )}
               >
                 <div className={cn(
                   "rounded-lg p-2 shrink-0",
-                  activity.aiGenerated ? "bg-primary/10" : "bg-secondary"
+                  activity.ai_generated ? "bg-primary/10" : "bg-secondary"
                 )}>
-                  {activity.aiGenerated ? (
+                  {activity.ai_generated ? (
                     <Brain className="h-4 w-4 text-primary" />
                   ) : (
                     <Icon className="h-4 w-4 text-muted-foreground" />

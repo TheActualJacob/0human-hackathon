@@ -64,56 +64,33 @@ export const classifyMaintenanceIssue = (description: string): {
   return { category, urgency, confidence, reasoning };
 };
 
-// Select optimal vendor for a maintenance issue
+// Select optimal contractor for a maintenance issue
 export const selectOptimalVendor = (
-  ticket: MaintenanceTicket,
-  vendors: Vendor[]
+  ticket: { category?: string | null; urgency?: string | null },
+  vendors: { id: string; name: string; trades?: string[] | null; emergency_available?: boolean | null }[]
 ): {
   vendorId: string;
   confidence: number;
   reasoning: string;
 } | null => {
-  // Filter available vendors with matching specialty
-  const eligibleVendors = vendors.filter(vendor => 
-    vendor.isAvailable && 
-    (vendor.specialty.includes(ticket.category || '') || 
-     (ticket.urgency === 'emergency' && vendor.specialty.includes('emergency')))
+  if (vendors.length === 0) return null;
+
+  const isEmergency = ticket.urgency === 'emergency';
+  const category = ticket.category ?? '';
+
+  const matching = vendors.filter(v =>
+    (v.trades ?? []).some(t => t.toLowerCase().includes(category.toLowerCase())) ||
+    (isEmergency && v.emergency_available)
   );
-  
-  if (eligibleVendors.length === 0) return null;
-  
-  // Score vendors based on multiple factors
-  const scoredVendors = eligibleVendors.map(vendor => {
-    let score = 0;
-    
-    // Response time (higher weight for urgent tickets)
-    const responseWeight = ticket.urgency === 'emergency' ? 40 : 
-                          ticket.urgency === 'high' ? 30 : 20;
-    score += (5 - vendor.avgResponseTime) * responseWeight;
-    
-    // AI performance score
-    score += vendor.aiPerformanceScore * 0.3;
-    
-    // Rating
-    score += vendor.rating * 10;
-    
-    // Cost efficiency (inverse relationship)
-    score += (500 - vendor.avgCost) * 0.05;
-    
-    return { vendor, score };
-  });
-  
-  // Sort by score and select the best
-  scoredVendors.sort((a, b) => b.score - a.score);
-  const selected = scoredVendors[0].vendor;
-  
-  const confidence = getConfidenceLevel(85, 95);
-  const reasoning = `Selected ${selected.name} based on: ` +
-                   `${selected.avgResponseTime}h response time, ` +
-                   `${selected.rating}/5 rating, ` +
-                   `${selected.aiPerformanceScore}% AI score. ` +
-                   `Best match for ${ticket.urgency} ${ticket.category} issue.`;
-  
+
+  const pool = matching.length > 0 ? matching : vendors;
+  const selected = isEmergency
+    ? (pool.find(v => v.emergency_available) ?? pool[0])
+    : pool[0];
+
+  const confidence = getConfidenceLevel(75, 95);
+  const reasoning = `Selected ${selected.name} for ${ticket.urgency ?? 'routine'} ${category} issue based on trade match.`;
+
   return {
     vendorId: selected.id,
     confidence,
@@ -455,7 +432,7 @@ export const generateActivityMessage = (
   // Simple template replacement
   let message = template;
   Object.entries(details).forEach(([key, value]) => {
-    message = message.replace(`\${${key}}`, value);
+    message = message.replace(`\${${key}}`, String(value));
   });
   
   return message;

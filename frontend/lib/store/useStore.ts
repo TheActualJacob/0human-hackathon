@@ -777,7 +777,7 @@ const useStore = create<AppState>((set, get) => ({
     if (!request) return null;
     
     const lease = state.leases.find(l => l.id === request.lease_id);
-    if (!lease) return { ...request, lease: null, contractor: null, chronic_issue: null };
+    if (!lease) return { ...request, lease: undefined, contractor: null, chronic_issue: null };
     
     return {
       ...request,

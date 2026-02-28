@@ -1,12 +1,15 @@
 import { Card } from "@/components/ui/card";
 import { Brain, Clock, Zap, User, DollarSign } from "lucide-react";
-import { MaintenanceTicket, Vendor } from "@/types";
+import { MaintenanceTicket, Contractor } from "@/types";
 import { format } from "date-fns";
 import StatusBadge from "@/components/shared/StatusBadge";
 
+type AiDecision = { action?: string; reasoning?: string; confidence?: number; timestamp?: string };
+type TicketAny = MaintenanceTicket & { ai_decisions?: AiDecision[] | null; estimated_cost?: number | null };
+
 interface AIDecisionPanelProps {
-  ticket: MaintenanceTicket;
-  vendor?: Vendor;
+  ticket: TicketAny;
+  vendor?: Contractor;
 }
 
 export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps) {
@@ -37,15 +40,15 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-1">Urgency</p>
-            <StatusBadge status={ticket.urgency} />
+            <StatusBadge status={(ticket.urgency ?? 'medium') as 'medium'} />
           </div>
         </div>
         
-        {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).length > 0 && (
+        {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).length > 0 && (
           <div className="rounded-lg bg-secondary/50 p-3">
-            <p className="text-sm">{(ticket.ai_decisions as any[])[0].reasoning}</p>
+            <p className="text-sm">{((ticket.ai_decisions ?? []) as AiDecision[])[0].reasoning}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Confidence: {(ticket.ai_decisions as any[])[0].confidence}%
+              Confidence: {((ticket.ai_decisions ?? []) as AiDecision[])[0].confidence}%
             </p>
           </div>
         )}
@@ -64,20 +67,18 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
               <span className="text-sm text-muted-foreground">Selected Vendor</span>
               <span className="font-medium">{vendor.name}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Response Time</span>
-              <span className="text-sm">{vendor.avgResponseTime}h average</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">AI Score</span>
-              <span className="text-sm font-medium text-primary">{vendor.aiPerformanceScore}%</span>
-            </div>
+            {vendor.phone && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Phone</span>
+                <span className="text-sm">{vendor.phone}</span>
+              </div>
+            )}
           </div>
           
-          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).find(d => d.action === 'Vendor Assignment') && (
+          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).find(d => d.action === 'Vendor Assignment') && (
             <div className="rounded-lg bg-secondary/50 p-3">
               <p className="text-sm">
-                {(ticket.ai_decisions as any[]).find(d => d.action === 'Vendor Assignment')?.reasoning}
+                {((ticket.ai_decisions ?? []) as AiDecision[]).find(d => d.action === 'Vendor Assignment')?.reasoning}
               </p>
             </div>
           )}
@@ -107,13 +108,13 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
         </h4>
         
         <div className="space-y-3">
-          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).map((decision, index) => (
+          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).map((decision, index) => (
             <div key={index} className="flex gap-3">
               <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium">{decision.action}</p>
                 <p className="text-xs text-muted-foreground">
-                  {format(new Date(decision.timestamp), 'MMM d, h:mm a')}
+                  {decision.timestamp ? format(new Date(decision.timestamp), 'MMM d, h:mm a') : '—'}
                 </p>
               </div>
             </div>

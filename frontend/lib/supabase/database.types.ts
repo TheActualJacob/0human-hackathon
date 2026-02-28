@@ -43,6 +43,7 @@ export interface Database {
           confidence_score?: number | null
           timestamp?: string | null
         }
+        Relationships: []
       }
       contractors: {
         Row: {
@@ -78,6 +79,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       conversation_context: {
         Row: {
@@ -101,6 +103,7 @@ export interface Database {
           open_threads?: Json | null
           last_updated?: string | null
         }
+        Relationships: []
       }
       conversations: {
         Row: {
@@ -130,6 +133,7 @@ export interface Database {
           intent_classification?: string | null
           timestamp?: string | null
         }
+        Relationships: []
       }
       disputes: {
         Row: {
@@ -165,6 +169,7 @@ export interface Database {
           opened_at?: string | null
           closed_at?: string | null
         }
+        Relationships: []
       }
       document_templates: {
         Row: {
@@ -197,6 +202,7 @@ export interface Database {
           last_reviewed_at?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       landlord_notifications: {
         Row: {
@@ -235,6 +241,7 @@ export interface Database {
           read_at?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       landlords: {
         Row: {
@@ -264,6 +271,7 @@ export interface Database {
           notification_preferences?: Json | null
           created_at?: string | null
         }
+        Relationships: []
       }
       leases: {
         Row: {
@@ -311,6 +319,7 @@ export interface Database {
           special_terms?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       legal_actions: {
         Row: {
@@ -352,6 +361,7 @@ export interface Database {
           agent_reasoning?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       maintenance_issues: {
         Row: {
@@ -417,6 +427,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       maintenance_requests: {
         Row: {
@@ -467,6 +478,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       payment_plans: {
         Row: {
@@ -508,6 +520,7 @@ export interface Database {
           document_url?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -546,6 +559,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       tenants: {
         Row: {
@@ -578,6 +592,7 @@ export interface Database {
           is_primary_tenant?: boolean | null
           created_at?: string | null
         }
+        Relationships: []
       }
       unit_appliances: {
         Row: {
@@ -625,6 +640,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       unit_attributes: {
         Row: {
@@ -747,6 +763,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
         }
+        Relationships: []
       }
       unit_documents: {
         Row: {
@@ -785,6 +802,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
       unit_status: {
         Row: {
@@ -841,6 +859,7 @@ export interface Database {
           actual_move_out_date?: string | null
           last_updated_at?: string | null
         }
+        Relationships: []
       }
       units: {
         Row: {
@@ -873,6 +892,7 @@ export interface Database {
           jurisdiction?: string | null
           created_at?: string | null
         }
+        Relationships: []
       }
     }
     Views: {

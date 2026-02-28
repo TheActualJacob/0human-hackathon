@@ -258,8 +258,8 @@ export default function TenantsPage() {
             columns={columns}
             data={filteredTenants}
             onRowClick={handleRowClick}
-            selectedId={selectedLease}
-            getRowId={(tenant) => tenant.lease.id}
+            selectedId={selectedLease ?? undefined}
+            getRowId={(tenant) => tenant.lease?.id ?? tenant.id}
             emptyMessage="No tenants found"
           />
         )}
@@ -282,7 +282,7 @@ export default function TenantsPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Unit</span>
-                  <span className="font-medium">{selectedTenantData.unit.unit_identifier}</span>
+                  <span className="font-medium">{selectedTenantData.unit?.unit_identifier ?? "—"}</span>
                 </div>
                 {selectedTenantData.email && (
                   <div className="flex justify-between">
@@ -302,7 +302,7 @@ export default function TenantsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Rent</span>
-                  <span className="font-medium">${selectedTenantData.lease.monthly_rent.toLocaleString()}</span>
+                  <span className="font-medium">${(selectedTenantData.lease?.monthly_rent ?? 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Primary Tenant</span>
@@ -318,7 +318,7 @@ export default function TenantsPage() {
                     Send WhatsApp
                   </button>
                 </Link>
-                <Link href={`/units?unit=${selectedTenantData.unit.id}`} className="flex-1">
+                <Link href={`/units?unit=${selectedTenantData.unit?.id ?? ""}`} className="flex-1">
                   <button className="w-full text-sm border border-border px-3 py-2 rounded-lg hover:bg-accent transition-colors">
                     View Unit
                   </button>
@@ -405,32 +405,32 @@ export default function TenantsPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Lease Start</span>
-                    <span>{format(new Date(selectedTenantData.lease.start_date), 'MMM d, yyyy')}</span>
+                    <span>{format(new Date(selectedTenantData.lease?.start_date ?? ""), 'MMM d, yyyy')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Lease End</span>
                     <span>
-                      {selectedTenantData.lease.end_date 
-                        ? format(new Date(selectedTenantData.lease.end_date), 'MMM d, yyyy')
+                      {selectedTenantData.lease?.end_date 
+                        ? format(new Date(selectedTenantData.lease?.end_date), 'MMM d, yyyy')
                         : 'Open-ended'
                       }
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Deposit</span>
-                    <span>${selectedTenantData.lease.deposit_amount?.toLocaleString() || 0}</span>
+                    <span>${selectedTenantData.lease?.deposit_amount?.toLocaleString() || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Notice Period</span>
-                    <span>{selectedTenantData.lease.notice_period_days || 30} days</span>
+                    <span>{selectedTenantData.lease?.notice_period_days || 30} days</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
-                    <Badge variant="outline">{selectedTenantData.lease.status}</Badge>
+                    <Badge variant="outline">{selectedTenantData.lease?.status}</Badge>
                   </div>
                 </div>
                 <div className="pt-3 border-t">
-                  <Link href={`/leases/${selectedTenantData.lease.id}`} className="text-sm text-primary hover:underline">
+                  <Link href={`/leases/${selectedTenantData.lease?.id ?? ""}`} className="text-sm text-primary hover:underline">
                     View full lease details →
                   </Link>
                 </div>
@@ -440,7 +440,7 @@ export default function TenantsPage() {
                 <div className="space-y-3">
                   {(() => {
                     const recentConvos = conversations
-                      .filter(c => c.lease_id === selectedTenantData.lease.id)
+                      .filter(c => c.lease_id === (selectedTenantData.lease?.id ?? ""))
                       .slice(0, 5);
                     
                     if (recentConvos.length === 0) {
@@ -478,9 +478,10 @@ export default function TenantsPage() {
               <TabsContent value="issues" className="mt-4">
                 <div className="space-y-3">
                   {(() => {
-                    const tenantDisputes = disputes.filter(d => d.lease_id === selectedTenantData.lease.id);
-                    const tenantLegalActions = legalActions.filter(la => la.lease_id === selectedTenantData.lease.id);
-                    const tenantMaintenanceRequests = maintenanceRequests.filter(mr => mr.lease_id === selectedTenantData.lease.id);
+                    const leaseId = selectedTenantData.lease?.id ?? "";
+                    const tenantDisputes = disputes.filter(d => d.lease_id === leaseId);
+                    const tenantLegalActions = legalActions.filter(la => la.lease_id === leaseId);
+                    const tenantMaintenanceRequests = maintenanceRequests.filter(mr => mr.lease_id === leaseId);
                     
                     const hasIssues = tenantDisputes.length > 0 || tenantLegalActions.length > 0;
                     

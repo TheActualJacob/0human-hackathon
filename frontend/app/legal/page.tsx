@@ -40,7 +40,7 @@ export default function LegalPage() {
 
     return {
       ...dispute,
-      lease,
+      lease: lease ?? undefined,
       legal_actions: disputeLegalActions
     };
   };
@@ -577,10 +577,10 @@ export default function LegalPage() {
                 const responseDeadline = formData.get('deadline');
                 await addLegalAction({
                   lease_id: formData.get('lease') as string,
-                  dispute_id: formData.get('dispute') || null,
+                  dispute_id: (formData.get('dispute') as string | null) || null,
                   action_type: formData.get('type') as any,
                   response_deadline: responseDeadline ? new Date(responseDeadline as string).toISOString() : null,
-                  agent_reasoning: formData.get('reasoning') as string,
+                  agent_reasoning: formData.get('reasoning') as string | null,
                 });
                 setShowAddActionModal(false);
               }}

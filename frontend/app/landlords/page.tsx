@@ -199,7 +199,7 @@ export default function LandlordsPage() {
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={selectedLandlordData.notification_preferences?.email || false}
+                          checked={(selectedLandlordData.notification_preferences as Record<string, unknown> | null)?.['email'] as boolean || false}
                           className="rounded"
                           readOnly
                         />
@@ -208,7 +208,7 @@ export default function LandlordsPage() {
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={selectedLandlordData.notification_preferences?.whatsapp || false}
+                          checked={(selectedLandlordData.notification_preferences as Record<string, unknown> | null)?.['whatsapp'] as boolean || false}
                           className="rounded"
                           readOnly
                         />

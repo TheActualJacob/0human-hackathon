@@ -1,119 +1,71 @@
 'use client';
 
-import { Hammer, Clock, DollarSign, Star, Brain } from "lucide-react";
+import { Hammer, Phone, Mail, AlertCircle, Brain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import useStore from "@/lib/store/useStore";
 import { cn } from "@/lib/utils";
 
-export default function VendorsPage() {
-  const { vendors, tickets } = useStore();
+export default function ContractorsPage() {
+  const { contractors, maintenanceRequests } = useStore();
 
-  // Calculate vendor stats
-  const getVendorStats = (vendorId: string) => {
-    const vendorTickets = tickets.filter(t => t.vendor_id === vendorId);
-    const completed = vendorTickets.filter(t => t.status === 'completed').length;
-    const active = vendorTickets.filter(t => ['assigned', 'in_progress'].includes(t.status)).length;
-    
-    return { total: vendorTickets.length, completed, active };
+  const getContractorStats = (contractorId: string) => {
+    const requests = maintenanceRequests.filter(r => r.contractor_id === contractorId);
+    const completed = requests.filter(r => r.status === 'completed').length;
+    const active = requests.filter(r => ['assigned', 'in_progress'].includes(r.status ?? '')).length;
+    return { total: requests.length, completed, active };
   };
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold">Vendors</h1>
-        <p className="text-muted-foreground">Manage service providers and performance metrics</p>
+        <h1 className="text-2xl font-bold">Contractors</h1>
+        <p className="text-muted-foreground">Manage service providers and maintenance assignments</p>
       </div>
 
-      {/* Vendor Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {vendors.map(vendor => {
-          const stats = getVendorStats(vendor.id);
-          
+        {contractors.map(contractor => {
+          const stats = getContractorStats(contractor.id);
+
           return (
-            <Card key={vendor.id} className={cn(
-              "p-6 space-y-4",
-              vendor.ai_performance_score > 90 && "ai-glow"
-            )}>
-              {/* Header */}
+            <Card key={contractor.id} className={cn("p-6 space-y-4")}>
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-semibold">{vendor.name}</h3>
+                  <h3 className="font-semibold">{contractor.name}</h3>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {vendor.specialty.map((spec, idx) => (
+                    {(contractor.trades ?? []).map((trade, idx) => (
                       <Badge key={idx} variant="outline" className="text-xs">
-                        {spec}
+                        {trade}
                       </Badge>
                     ))}
                   </div>
                 </div>
-                <Badge 
-                  variant={vendor.is_available ? "default" : "secondary"}
-                  className={vendor.is_available ? "bg-green-500/10 text-green-500" : ""}
+                <Badge
+                  variant={contractor.emergency_available ? "default" : "secondary"}
+                  className={contractor.emergency_available ? "bg-green-500/10 text-green-500" : ""}
                 >
-                  {vendor.is_available ? "Available" : "Busy"}
+                  {contractor.emergency_available ? "24/7" : "Standard"}
                 </Badge>
               </div>
 
-              {/* Contact Info */}
               <div className="space-y-1 text-sm">
-                <p className="text-muted-foreground">{vendor.email}</p>
-                <p className="text-muted-foreground">{vendor.phone}</p>
+                {contractor.email && (
+                  <p className="text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    {contractor.email}
+                  </p>
+                )}
+                {contractor.phone && (
+                  <p className="text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {contractor.phone}
+                  </p>
+                )}
+                {contractor.notes && (
+                  <p className="text-muted-foreground text-xs mt-2">{contractor.notes}</p>
+                )}
               </div>
 
-              {/* Performance Metrics */}
-              <div className="space-y-3">
-                {/* Response Time */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Avg Response</span>
-                  </div>
-                  <span className="text-sm font-medium">{vendor.avg_response_time}h</span>
-                </div>
-
-                {/* Average Cost */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Avg Cost</span>
-                  </div>
-                  <span className="text-sm font-medium">${vendor.avg_cost}</span>
-                </div>
-
-                {/* Rating */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Star className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Rating</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium">{vendor.rating}</span>
-                    <span className="text-xs text-muted-foreground">/5</span>
-                  </div>
-                </div>
-
-                {/* AI Performance Score */}
-                <div className="pt-3 border-t">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Brain className="h-4 w-4 text-primary" />
-                      <span className="font-medium">AI Performance Score</span>
-                    </div>
-                    <span className="text-sm font-medium text-primary">
-                      {vendor.ai_performance_score}%
-                    </span>
-                  </div>
-                  <Progress 
-                    value={vendor.ai_performance_score} 
-                    className="h-2"
-                  />
-                </div>
-              </div>
-
-              {/* Job Stats */}
               <div className="flex items-center justify-between pt-3 border-t text-sm">
                 <span className="text-muted-foreground">
                   Jobs: {stats.total} total
@@ -126,45 +78,43 @@ export default function VendorsPage() {
             </Card>
           );
         })}
+
+        {contractors.length === 0 && (
+          <div className="col-span-3 text-center py-12 text-muted-foreground">
+            <Hammer className="h-12 w-12 mx-auto mb-4 opacity-30" />
+            <p>No contractors found</p>
+          </div>
+        )}
       </div>
 
-      {/* AI Insights Card */}
-      <Card className="p-6 ai-glow">
+      <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="rounded-lg bg-primary/10 p-3">
             <Brain className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold">AI Vendor Insights</h3>
-            <p className="text-sm text-muted-foreground">Performance analysis based on current data</p>
+            <h3 className="text-lg font-semibold">Contractor Insights</h3>
+            <p className="text-sm text-muted-foreground">Overview of contractor availability and activity</p>
           </div>
         </div>
 
-        <div className="space-y-4">
-          {vendors.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No vendor data available. Add vendors to see insights.
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Total</p>
+            <p className="text-2xl font-bold">{contractors.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Emergency Ready</p>
+            <p className="text-2xl font-bold text-green-500">
+              {contractors.filter(c => c.emergency_available).length}
             </p>
-          ) : (
-            <>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Vendors</p>
-                <p className="text-2xl font-bold">{vendors.length}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Available Now</p>
-                <p className="text-2xl font-bold text-green-500">
-                  {vendors.filter(v => v.is_available).length}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Average Response Time</p>
-                <p className="text-2xl font-bold">
-                  {avgResponseTime.toFixed(1)}h
-                </p>
-              </div>
-            </>
-          )}
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Active Jobs</p>
+            <p className="text-2xl font-bold">
+              {maintenanceRequests.filter(r => ['assigned', 'in_progress'].includes(r.status ?? '')).length}
+            </p>
+          </div>
         </div>
       </Card>
     </div>

@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_NUMBER: str = ""
     APP_URL: str = ""  # public URL for Twilio signature validation (backend)
     FRONTEND_URL: str = "http://localhost:3000"  # public URL for the Next.js frontend
-    GEMINI_API_KEY: str = ""  # Google Gemini API key (Imagen 3 image generation)
-    INSTAGRAM_ACCESS_TOKEN: str = ""  # Instagram Graph API access token
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

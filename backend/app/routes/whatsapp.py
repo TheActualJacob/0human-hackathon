@@ -116,18 +116,6 @@ async def _process_and_reply(
 
         await _refresh_conversation_context(ctx, user_message, reply_message, tools_used)
 
-        # If the agent recorded a not_renewing decision, trigger the listing flow now
-        if "record_renewal_decision" in tools_used:
-            from app.services.lease_expiry_service import trigger_listing_for_lease
-            from supabase import create_client as _create_client
-            _sb = _create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-            lease_check = _sb.table("leases").select("renewal_status").eq("id", ctx.lease.id).single().execute()
-            if lease_check.data and lease_check.data.get("renewal_status") == "not_renewing":
-                try:
-                    await trigger_listing_for_lease(ctx.lease.id)
-                except Exception as listing_exc:
-                    print(f"[Webhook] Listing flow error: {listing_exc}")
-
     except Exception as exc:
         print(f"Agent loop error: {exc}")
         reply_message = (

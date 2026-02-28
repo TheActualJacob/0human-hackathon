@@ -8,13 +8,13 @@ import useStore from "@/lib/store/useStore";
 import { cn } from "@/lib/utils";
 
 export default function VendorsPage() {
-  const { vendors, tickets } = useStore();
+  const { contractors, maintenanceRequests } = useStore();
 
   // Calculate vendor stats
   const getVendorStats = (vendorId: string) => {
-    const vendorTickets = tickets.filter(t => t.vendor_id === vendorId);
-    const completed = vendorTickets.filter(t => t.status === 'completed').length;
-    const active = vendorTickets.filter(t => ['assigned', 'in_progress'].includes(t.status)).length;
+    const vendorTickets = maintenanceRequests.filter(t => t.assigned_contractor === vendorId);
+    const completed = vendorTickets.filter(t => t.status === 'resolved').length;
+    const active = vendorTickets.filter(t => ['in_progress', 'scheduled'].includes(t.status)).length;
     
     return { total: vendorTickets.length, completed, active };
   };
@@ -29,7 +29,7 @@ export default function VendorsPage() {
 
       {/* Vendor Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {vendors.map(vendor => {
+        {contractors.map(vendor => {
           const stats = getVendorStats(vendor.id);
           
           return (
@@ -141,7 +141,7 @@ export default function VendorsPage() {
         </div>
 
         <div className="space-y-4">
-          {vendors.length === 0 ? (
+          {contractors.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               No vendor data available. Add vendors to see insights.
             </p>
@@ -149,12 +149,12 @@ export default function VendorsPage() {
             <>
               <div>
                 <p className="text-sm text-muted-foreground">Total Vendors</p>
-                <p className="text-2xl font-bold">{vendors.length}</p>
+                <p className="text-2xl font-bold">{contractors.length}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Available Now</p>
                 <p className="text-2xl font-bold text-green-500">
-                  {vendors.filter(v => v.is_available).length}
+                  {contractors.filter(v => v.is_available).length}
                 </p>
               </div>
               <div>

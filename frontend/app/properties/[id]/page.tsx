@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import {
   ArrowLeft, MapPin, Bed, Bath, Calendar, Home,
@@ -10,9 +11,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const MapView = dynamic(() => import('@/components/properties/MapView'), { ssr: false });
+
 export default function PropertyDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const supabase = createClient();
 
   const [unit, setUnit] = useState<any>(null);
@@ -252,6 +254,24 @@ export default function PropertyDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Map */}
+            <div>
+              <h2 className="text-white font-bold text-lg mb-3">Location</h2>
+              <div className="rounded-2xl overflow-hidden border border-white/8" style={{ height: 320 }}>
+                <MapView
+                  units={[unit]}
+                  highlightedId={null}
+                  selectedId={null}
+                  onSelect={() => {}}
+                  isSplit={false}
+                />
+              </div>
+              <p className="text-white/30 text-xs mt-2 flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {unit.address}, {unit.city}{unit.postcode ? ` ${unit.postcode}` : ''}
+              </p>
+            </div>
 
             {/* Details table */}
             <div>

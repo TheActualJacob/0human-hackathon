@@ -10,7 +10,11 @@ import {
   Hammer, 
   BarChart3, 
   Settings,
-  Brain
+  Brain,
+  Building2,
+  Key,
+  MessageCircle,
+  Scale
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,11 +22,15 @@ import useStore from "@/lib/store/useStore";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Rent Collection', href: '/rent', icon: DollarSign },
-  { name: 'Maintenance', href: '/maintenance', icon: Wrench },
+  { name: 'Landlords', href: '/landlords', icon: Building2 },
+  { name: 'Units', href: '/units', icon: Key },
   { name: 'Tenants', href: '/tenants', icon: Users },
   { name: 'Leases', href: '/leases', icon: FileText },
-  { name: 'Vendors', href: '/vendors', icon: Hammer },
+  { name: 'Payments', href: '/payments', icon: DollarSign },
+  { name: 'Maintenance', href: '/maintenance', icon: Wrench },
+  { name: 'Conversations', href: '/conversations', icon: MessageCircle },
+  { name: 'Legal', href: '/legal', icon: Scale },
+  { name: 'Contractors', href: '/contractors', icon: Hammer },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

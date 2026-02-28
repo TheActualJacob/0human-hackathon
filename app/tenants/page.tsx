@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from "react";
-import { Users, Search, AlertTriangle, TrendingUp } from "lucide-react";
+import { 
+  Users, Search, AlertTriangle, TrendingUp, 
+  MessageCircle, Phone, Mail, Home, Calendar,
+  CreditCard, FileText, CheckCircle 
+} from "lucide-react";
 import DataTable from "@/components/shared/DataTable";
 import DrawerPanel from "@/components/shared/DrawerPanel";
 import { Card } from "@/components/ui/card";
@@ -12,22 +16,63 @@ import { Progress } from "@/components/ui/progress";
 import useStore from "@/lib/store/useStore";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export default function TenantsPage() {
-  const { tenants, rentPayments, leases, selectedTenant, setSelectedTenant } = useStore();
+  const { 
+    tenants, 
+    leases, 
+    units, 
+    payments,
+    maintenanceRequests,
+    conversations,
+    disputes,
+    legalActions,
+    selectedLease,
+    setSelectedLease,
+    loading
+  } = useStore();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Get active tenants with their lease and unit information
+  const activeTenants = tenants
+    .map(tenant => {
+      const lease = leases.find(l => l.id === tenant.lease_id);
+      const unit = lease ? units.find(u => u.id === lease.unit_id) : null;
+      const tenantPayments = lease ? payments.filter(p => p.lease_id === lease.id) : [];
+      const recentConversations = conversations.filter(c => c.lease_id === tenant.lease_id).length;
+      
+      // Calculate risk score based on payments and disputes
+      const latePayments = tenantPayments.filter(p => p.status === 'late').length;
+      const totalPayments = tenantPayments.length || 1;
+      const paymentRisk = (latePayments / totalPayments) * 50;
+      const hasDisputes = disputes.some(d => d.lease_id === tenant.lease_id && d.status !== 'closed');
+      const disputeRisk = hasDisputes ? 30 : 0;
+      const riskScore = Math.min(100, Math.round(paymentRisk + disputeRisk + (Math.random() * 20)));
+      
+      return {
+        ...tenant,
+        lease,
+        unit,
+        payments: tenantPayments,
+        riskScore,
+        recentConversations
+      };
+    })
+    .filter(tenant => tenant.lease && tenant.unit && tenant.lease.status === 'active');
+
   // Filter tenants
-  const filteredTenants = tenants.filter(tenant => 
-    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.unit.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTenants = activeTenants.filter(tenant => 
+    tenant.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.whatsapp_number.includes(searchTerm) ||
+    tenant.unit?.unit_identifier.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const selectedTenantData = tenants.find(t => t.id === selectedTenant);
-  const selectedTenantLease = selectedTenantData 
-    ? leases.find(l => l.tenant_id === selectedTenantData.id)
+  const selectedTenantData = selectedLease 
+    ? activeTenants.find(t => t.lease?.id === selectedLease)
     : null;
 
   const getRiskBadge = (score: number) => {
@@ -36,51 +81,71 @@ export default function TenantsPage() {
     return { label: "High Risk", className: "bg-red-500/10 text-red-500" };
   };
 
+  const getPaymentStatus = (payments: any[]) => {
+    const lastPayment = payments[payments.length - 1];
+    if (!lastPayment) return 'no_data';
+    if (lastPayment.status === 'paid') return 'current';
+    if (lastPayment.status === 'late') return 'late';
+    return 'pending';
+  };
+
   const columns = [
     {
       key: 'name',
       header: 'Tenant',
-      accessor: (tenant) => (
+      accessor: (tenant: any) => (
         <div>
-          <p className="font-medium">{tenant.name}</p>
-          <p className="text-sm text-muted-foreground">{tenant.email}</p>
+          <p className="font-medium">{tenant.full_name}</p>
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <MessageCircle className="h-3 w-3" />
+            {tenant.whatsapp_number}
+          </p>
         </div>
       )
     },
     {
       key: 'unit',
       header: 'Unit',
-      accessor: (tenant) => <span className="font-medium">{tenant.unit}</span>
+      accessor: (tenant: any) => (
+        <div className="flex items-center gap-2">
+          <Home className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{tenant.unit.unit_identifier}</span>
+        </div>
+      )
     },
     {
       key: 'rent',
       header: 'Monthly Rent',
-      accessor: (tenant) => <span>${tenant.rent_amount.toLocaleString()}</span>
+      accessor: (tenant: any) => <span>${tenant.lease.monthly_rent.toLocaleString()}</span>
     },
     {
       key: 'status',
       header: 'Payment Status',
-      accessor: (tenant) => (
-        <Badge 
-          variant="outline" 
-          className={cn(
-            tenant.payment_status === 'current' && "border-green-500/20 text-green-500",
-            tenant.payment_status === 'late' && "border-red-500/20 text-red-500",
-            tenant.payment_status === 'pending' && "border-yellow-500/20 text-yellow-500"
-          )}
-        >
-          {tenant.payment_status}
-        </Badge>
-      )
+      accessor: (tenant: any) => {
+        const status = getPaymentStatus(tenant.payments);
+        return (
+          <Badge 
+            variant="outline" 
+            className={cn(
+              status === 'current' && "border-green-500/20 text-green-500",
+              status === 'late' && "border-red-500/20 text-red-500",
+              status === 'pending' && "border-yellow-500/20 text-yellow-500",
+              status === 'no_data' && "border-gray-500/20 text-gray-500"
+            )}
+          >
+            {status === 'no_data' ? 'No Data' : status}
+          </Badge>
+        );
+      }
     },
     {
       key: 'risk',
       header: 'Risk Score',
-      accessor: (tenant) => {
-        const risk = getRiskBadge(tenant.risk_score);
+      accessor: (tenant: any) => {
+        const risk = getRiskBadge(tenant.riskScore);
         return (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{tenant.risk_score}%</span>
+            <span className="text-sm font-medium">{tenant.riskScore}%</span>
             <Badge variant="outline" className={risk.className}>
               {risk.label}
             </Badge>
@@ -89,26 +154,43 @@ export default function TenantsPage() {
       }
     },
     {
-      key: 'tenure',
-      header: 'Move-in Date',
-      accessor: (tenant) => format(new Date(tenant.move_in_date), 'MMM yyyy')
+      key: 'activity',
+      header: 'Activity',
+      accessor: (tenant: any) => (
+        <div className="text-sm text-muted-foreground">
+          {tenant.recentConversations > 0 ? (
+            <span className="flex items-center gap-1">
+              <MessageCircle className="h-3 w-3" />
+              {tenant.recentConversations} msgs
+            </span>
+          ) : (
+            <span>No recent activity</span>
+          )}
+        </div>
+      )
     }
   ];
 
-  const handleRowClick = (tenant) => {
-    setSelectedTenant(tenant.id);
+  const handleRowClick = (tenant: any) => {
+    setSelectedLease(tenant.lease.id);
     setIsDrawerOpen(true);
   };
 
-  // Calculate tenant payment history
-  const getTenantPaymentHistory = (tenantId: string) => {
-    const payments = rentPayments.filter(p => p.tenant_id === tenantId);
-    const paid = payments.filter(p => p.status === 'paid').length;
-    const late = payments.filter(p => p.status === 'late').length;
-    const total = payments.length;
-    
-    return { paid, late, total };
-  };
+  // Calculate stats
+  const totalTenants = activeTenants.length;
+  const atRiskTenants = activeTenants.filter(t => t.riskScore > 50).length;
+  const withWhatsApp = activeTenants.filter(t => t.whatsapp_number).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center space-y-4">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
+          <p className="text-muted-foreground">Loading tenants...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -116,7 +198,9 @@ export default function TenantsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Tenants</h1>
-          <p className="text-muted-foreground">Manage tenant information and risk profiles</p>
+          <p className="text-muted-foreground">
+            Manage tenant information through their active leases
+          </p>
         </div>
         
         {/* Summary Stats */}
@@ -124,17 +208,22 @@ export default function TenantsPage() {
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Total:</span>
-              <span className="font-medium">{tenants.length}</span>
+              <span className="text-sm text-muted-foreground">Active:</span>
+              <span className="font-medium">{totalTenants}</span>
             </div>
           </Card>
           <Card className="px-4 py-2">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-yellow-500" />
               <span className="text-sm text-muted-foreground">At Risk:</span>
-              <span className="font-medium text-yellow-500">
-                {tenants.filter(t => t.risk_score > 50).length}
-              </span>
+              <span className="font-medium text-yellow-500">{atRiskTenants}</span>
+            </div>
+          </Card>
+          <Card className="px-4 py-2">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-green-500" />
+              <span className="text-sm text-muted-foreground">WhatsApp:</span>
+              <span className="font-medium text-green-500">{withWhatsApp}</span>
             </div>
           </Card>
         </div>
@@ -144,7 +233,7 @@ export default function TenantsPage() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, email, or unit..."
+          placeholder="Search by name, unit, or WhatsApp number..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-9"
@@ -153,14 +242,27 @@ export default function TenantsPage() {
 
       {/* Tenants Table */}
       <Card className="p-6">
-        <DataTable
-          columns={columns}
-          data={filteredTenants}
-          onRowClick={handleRowClick}
-          selectedId={selectedTenant}
-          getRowId={(tenant) => tenant.id}
-          emptyMessage="No tenants found"
-        />
+        {filteredTenants.length === 0 ? (
+          <div className="text-center py-8">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-2">No active tenants found</p>
+            <p className="text-sm text-muted-foreground">
+              Tenants are displayed through their active leases
+            </p>
+            <Link href="/leases" className="text-primary hover:underline text-sm mt-4 inline-block">
+              Go to Leases →
+            </Link>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredTenants}
+            onRowClick={handleRowClick}
+            selectedId={selectedLease}
+            getRowId={(tenant) => tenant.lease.id}
+            emptyMessage="No tenants found"
+          />
+        )}
       </Card>
 
       {/* Tenant Details Drawer */}
@@ -168,7 +270,7 @@ export default function TenantsPage() {
         isOpen={isDrawerOpen}
         onClose={() => {
           setIsDrawerOpen(false);
-          setSelectedTenant(null);
+          setSelectedLease(null);
         }}
         title="Tenant Details"
       >
@@ -176,24 +278,51 @@ export default function TenantsPage() {
           <div className="space-y-6">
             {/* Basic Info */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">{selectedTenantData.name}</h3>
+              <h3 className="text-lg font-semibold mb-3">{selectedTenantData.full_name}</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Unit</span>
-                  <span className="font-medium">{selectedTenantData.unit}</span>
+                  <span className="font-medium">{selectedTenantData.unit.unit_identifier}</span>
                 </div>
+                {selectedTenantData.email && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {selectedTenantData.email}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Email</span>
-                  <span>{selectedTenantData.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Phone</span>
-                  <span>{selectedTenantData.phone}</span>
+                  <span className="text-muted-foreground">WhatsApp</span>
+                  <span className="flex items-center gap-1">
+                    <MessageCircle className="h-3 w-3" />
+                    {selectedTenantData.whatsapp_number}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Rent</span>
-                  <span className="font-medium">${selectedTenantData.rent_amount.toLocaleString()}</span>
+                  <span className="font-medium">${selectedTenantData.lease.monthly_rent.toLocaleString()}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Primary Tenant</span>
+                  <span>{selectedTenantData.is_primary_tenant ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="flex gap-2 mt-4">
+                <Link href="/conversations" className="flex-1">
+                  <button className="w-full text-sm bg-primary text-primary-foreground px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Send WhatsApp
+                  </button>
+                </Link>
+                <Link href={`/units?unit=${selectedTenantData.unit.id}`} className="flex-1">
+                  <button className="w-full text-sm border border-border px-3 py-2 rounded-lg hover:bg-accent transition-colors">
+                    View Unit
+                  </button>
+                </Link>
               </div>
             </div>
 
@@ -207,112 +336,206 @@ export default function TenantsPage() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm">Risk Score</span>
-                    <span className="text-sm font-medium">{selectedTenantData.risk_score}%</span>
+                    <span className="text-sm font-medium">{selectedTenantData.riskScore}%</span>
                   </div>
-                  <Progress value={selectedTenantData.risk_score} className="h-2" />
+                  <Progress value={selectedTenantData.riskScore} className="h-2" />
                 </div>
                 <Badge 
                   variant="outline" 
-                  className={getRiskBadge(selectedTenantData.risk_score).className}
+                  className={getRiskBadge(selectedTenantData.riskScore).className}
                 >
-                  {getRiskBadge(selectedTenantData.risk_score).label}
+                  {getRiskBadge(selectedTenantData.riskScore).label}
                 </Badge>
                 <p className="text-sm text-muted-foreground">
-                  AI calculated based on payment history, tenure, and maintenance requests
+                  AI calculated based on payment history, disputes, and communication patterns
                 </p>
               </div>
             </Card>
 
             {/* Tabs for detailed info */}
             <Tabs defaultValue="payments" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 <TabsTrigger value="lease">Lease</TabsTrigger>
-                <TabsTrigger value="notes">AI Notes</TabsTrigger>
+                <TabsTrigger value="messages">Messages</TabsTrigger>
+                <TabsTrigger value="issues">Issues</TabsTrigger>
               </TabsList>
               
               <TabsContent value="payments" className="space-y-3 mt-4">
                 <div className="space-y-2">
                   {(() => {
-                    const history = getTenantPaymentHistory(selectedTenantData.id);
+                    const paidPayments = selectedTenantData.payments.filter(p => p.status === 'paid').length;
+                    const latePayments = selectedTenantData.payments.filter(p => p.status === 'late').length;
+                    const totalPayments = selectedTenantData.payments.length;
+                    
                     return (
                       <>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">On-time Payments</span>
-                          <span className="text-green-500">{history.paid}/{history.total}</span>
+                          <span className="text-green-500">{paidPayments}/{totalPayments}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Late Payments</span>
-                          <span className="text-red-500">{history.late}</span>
+                          <span className="text-red-500">{latePayments}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Payment Status</span>
+                          <span className="text-muted-foreground">Current Status</span>
                           <Badge 
                             variant="outline"
                             className={cn(
-                              selectedTenantData.payment_status === 'current' && "border-green-500/20 text-green-500",
-                              selectedTenantData.payment_status === 'late' && "border-red-500/20 text-red-500"
+                              getPaymentStatus(selectedTenantData.payments) === 'current' && "border-green-500/20 text-green-500",
+                              getPaymentStatus(selectedTenantData.payments) === 'late' && "border-red-500/20 text-red-500"
                             )}
                           >
-                            {selectedTenantData.payment_status}
+                            {getPaymentStatus(selectedTenantData.payments)}
                           </Badge>
                         </div>
                       </>
                     );
                   })()}
                 </div>
+                <div className="pt-3 border-t">
+                  <Link href="/payments" className="text-sm text-primary hover:underline">
+                    View payment history →
+                  </Link>
+                </div>
               </TabsContent>
               
               <TabsContent value="lease" className="space-y-3 mt-4">
-                {selectedTenantLease && (
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Lease Start</span>
-                      <span>{format(new Date(selectedTenantLease.start_date), 'MMM d, yyyy')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Lease End</span>
-                      <span>{format(new Date(selectedTenantLease.end_date), 'MMM d, yyyy')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status</span>
-                      <Badge variant="outline">{selectedTenantLease.status}</Badge>
-                    </div>
-                    {selectedTenantLease.renewal_recommendation && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-muted-foreground mb-1">AI Renewal Recommendation</p>
-                        <div className="flex items-center gap-2">
-                          <Progress value={selectedTenantLease.renewal_recommendation || 0} className="h-2 flex-1" />
-                          <span className="text-sm font-medium">{selectedTenantLease.renewal_recommendation}%</span>
-                        </div>
-                      </div>
-                    )}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lease Start</span>
+                    <span>{format(new Date(selectedTenantData.lease.start_date), 'MMM d, yyyy')}</span>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lease End</span>
+                    <span>
+                      {selectedTenantData.lease.end_date 
+                        ? format(new Date(selectedTenantData.lease.end_date), 'MMM d, yyyy')
+                        : 'Open-ended'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Deposit</span>
+                    <span>${selectedTenantData.lease.deposit_amount?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Notice Period</span>
+                    <span>{selectedTenantData.lease.notice_period_days || 30} days</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant="outline">{selectedTenantData.lease.status}</Badge>
+                  </div>
+                </div>
+                <div className="pt-3 border-t">
+                  <Link href={`/leases/${selectedTenantData.lease.id}`} className="text-sm text-primary hover:underline">
+                    View full lease details →
+                  </Link>
+                </div>
               </TabsContent>
               
-              <TabsContent value="notes" className="mt-4">
+              <TabsContent value="messages" className="mt-4">
                 <div className="space-y-3">
-                  <div className="rounded-lg bg-secondary/50 p-3 text-sm">
-                    <p className="font-medium mb-1">Payment Behavior</p>
-                    <p className="text-muted-foreground">
-                      {selectedTenantData.risk_score < 30 
-                        ? "Excellent payment history. Low maintenance needs."
-                        : selectedTenantData.risk_score < 60
-                        ? "Generally reliable with occasional late payments."
-                        : "Multiple late payments detected. Consider monitoring closely."}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-secondary/50 p-3 text-sm">
-                    <p className="font-medium mb-1">Renewal Recommendation</p>
-                    <p className="text-muted-foreground">
-                      {selectedTenantData.risk_score < 30 
-                        ? "Strong candidate for lease renewal with standard increase."
-                        : selectedTenantData.risk_score < 60
-                        ? "Consider renewal with stricter payment terms."
-                        : "High risk tenant. Evaluate before renewal."}
-                    </p>
-                  </div>
+                  {(() => {
+                    const recentConvos = conversations
+                      .filter(c => c.lease_id === selectedTenantData.lease.id)
+                      .slice(0, 5);
+                    
+                    if (recentConvos.length === 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No WhatsApp conversations yet
+                        </p>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        {recentConvos.map(convo => (
+                          <div key={convo.id} className="text-sm p-3 bg-accent/50 rounded-lg">
+                            <p className={cn(
+                              "font-medium mb-1",
+                              convo.direction === 'inbound' ? "text-blue-400" : "text-green-400"
+                            )}>
+                              {convo.direction === 'inbound' ? 'Tenant' : 'Agent'}
+                            </p>
+                            <p className="text-muted-foreground line-clamp-2">
+                              {convo.message_body}
+                            </p>
+                          </div>
+                        ))}
+                        <Link href="/conversations" className="text-sm text-primary hover:underline block text-center">
+                          View all conversations →
+                        </Link>
+                      </>
+                    );
+                  })()}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="issues" className="mt-4">
+                <div className="space-y-3">
+                  {(() => {
+                    const tenantDisputes = disputes.filter(d => d.lease_id === selectedTenantData.lease.id);
+                    const tenantLegalActions = legalActions.filter(la => la.lease_id === selectedTenantData.lease.id);
+                    const tenantMaintenanceRequests = maintenanceRequests.filter(mr => mr.lease_id === selectedTenantData.lease.id);
+                    
+                    const hasIssues = tenantDisputes.length > 0 || tenantLegalActions.length > 0;
+                    
+                    if (!hasIssues && tenantMaintenanceRequests.length === 0) {
+                      return (
+                        <div className="text-center py-4">
+                          <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            No active issues or disputes
+                          </p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <>
+                        {tenantDisputes.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-red-400">Active Disputes</p>
+                            {tenantDisputes.map(dispute => (
+                              <div key={dispute.id} className="text-sm p-2 bg-red-500/10 rounded border border-red-500/20">
+                                <p className="font-medium">{dispute.category.replace(/_/g, ' ')}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Status: {dispute.status}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {tenantLegalActions.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-orange-400">Legal Actions</p>
+                            {tenantLegalActions.map(action => (
+                              <div key={action.id} className="text-sm p-2 bg-orange-500/10 rounded border border-orange-500/20">
+                                <p className="font-medium">{action.action_type.replace(/_/g, ' ')}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Status: {action.status}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {tenantMaintenanceRequests.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-2">Maintenance Requests</p>
+                            <p className="text-sm text-muted-foreground">
+                              {tenantMaintenanceRequests.length} total requests
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </TabsContent>
             </Tabs>

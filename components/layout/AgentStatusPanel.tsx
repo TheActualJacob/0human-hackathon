@@ -6,15 +6,15 @@ import useStore from "@/lib/store/useStore";
 import { Card } from "@/components/ui/card";
 
 export default function AgentStatusPanel() {
-  const { agentMode, autonomyLevel, activityFeed } = useStore();
+  const { agentMode, autonomyLevel, agentActions } = useStore();
   
   // Count recent AI activities
-  const recentAIActivities = activityFeed
-    .filter(activity => activity.aiGenerated)
-    .filter(activity => {
-      const timeDiff = Date.now() - new Date(activity.timestamp).getTime();
-      return timeDiff < 3600000; // Last hour
-    }).length;
+  const recentAIActivities = agentActions
+    ? agentActions.filter(action => {
+        const timeDiff = Date.now() - new Date(action.timestamp || '').getTime();
+        return timeDiff < 3600000; // Last hour
+      }).length
+    : 0;
 
   return (
     <Card className="p-4 ai-glow">

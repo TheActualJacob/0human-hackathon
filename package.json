@@ -9,6 +9,7 @@
     "check-db": "node scripts/check-supabase-connection.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.98.0",
     "class-variance-authority": "^0.7.1",
@@ -16,17 +17,20 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
+    "pdfkit": "^0.17.2",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.5.0",
+    "twilio": "^5.12.2",
     "vaul": "^1.1.2",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pdfkit": "^0.17.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "shadcn": "^3.8.5",

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useStore from "@/lib/store/useStore";
 import { classifyMaintenanceIssue, selectOptimalVendor, simulateProcessing } from "@/lib/agentEngine";
+import type { MaintenanceTicketInsert } from "@/types";
 
 export default function MaintenancePage() {
   const { 
@@ -22,9 +23,8 @@ export default function MaintenancePage() {
     setSelectedTicket,
     addTicket,
     updateTicket,
-    classifyTicket,
-    assignVendor,
-    addActivity
+    addActivity,
+    loading
   } = useStore();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -64,85 +64,100 @@ export default function MaintenancePage() {
     if (!tenant) return;
 
     // Create the ticket
-    const newTicket = {
-      id: `ticket-${Date.now()}`,
-      tenantId: formData.tenantId,
-      tenantName: tenant.name,
+    const newTicketData: MaintenanceTicketInsert = {
+      tenant_id: formData.tenantId,
+      tenant_name: tenant.name,
       unit: tenant.unit,
       title: formData.title,
       description: formData.description,
-      category: 'general' as const,
-      urgency: 'medium' as const,
-      status: 'open' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      aiClassified: false,
-      aiDecisions: []
+      category: 'general',
+      urgency: 'medium',
+      status: 'open',
+      ai_classified: false,
+      ai_decisions: []
     };
 
-    addTicket(newTicket);
-    setSelectedTicket(newTicket.id);
+    await addTicket(newTicketData);
     setIsCreateDialogOpen(false);
 
-    // Simulate AI processing
-    await simulateProcessing(1500);
-
-    // AI Classification
-    const classification = classifyMaintenanceIssue(formData.description);
-    updateTicket(newTicket.id, {
-      category: classification.category,
-      urgency: classification.urgency,
-      aiClassified: true,
-      aiDecisions: [{
-        timestamp: new Date(),
-        action: "Issue Classification",
-        reasoning: classification.reasoning,
-        confidence: classification.confidence
-      }]
-    });
-
-    addActivity({
-      type: 'maintenance',
-      action: 'AI Classification',
-      details: `Issue classified as ${classification.category} with ${classification.urgency} urgency`,
-      entityId: newTicket.id,
-      aiGenerated: true
-    });
-
-    await simulateProcessing(1000);
-
-    // AI Vendor Assignment
-    const vendorSelection = selectOptimalVendor(
-      { ...newTicket, category: classification.category, urgency: classification.urgency },
-      vendors
-    );
-
-    if (vendorSelection) {
-      const selectedVendorData = vendors.find(v => v.id === vendorSelection.vendorId);
+    // Get the newly created ticket
+    const newTicket = tickets[0]; // Most recent ticket
+    if (newTicket) {
+      setSelectedTicket(newTicket.id);
       
-      updateTicket(newTicket.id, {
-        vendorId: vendorSelection.vendorId,
-        vendorName: selectedVendorData?.name,
-        status: 'assigned',
-        estimatedCost: selectedVendorData?.avgCost,
-        aiDecisions: [
-          ...newTicket.aiDecisions,
-          {
-            timestamp: new Date(),
-            action: "Vendor Assignment",
-            reasoning: vendorSelection.reasoning,
-            confidence: vendorSelection.confidence
-          }
-        ]
+      // Simulate AI processing
+      await simulateProcessing(1500);
+
+      // AI Classification
+      const classification = classifyMaintenanceIssue(formData.description);
+      await updateTicket(newTicket.id, {
+        category: classification.category,
+        urgency: classification.urgency,
+        ai_classified: true,
+        ai_decisions: [{
+          timestamp: new Date(),
+          action: "Issue Classification",
+          reasoning: classification.reasoning,
+          confidence: classification.confidence
+        }]
       });
 
-      addActivity({
-        type: 'vendor',
-        action: 'Vendor Assigned',
-        details: `${selectedVendorData?.name} assigned to ticket #${newTicket.id}`,
-        entityId: newTicket.id,
-        aiGenerated: true
+      await addActivity({
+        type: 'maintenance',
+        action: 'AI Classification',
+        details: `Issue classified as ${classification.category} with ${classification.urgency} urgency`,
+        entity_id: newTicket.id,
+        ai_generated: true
       });
+
+      await simulateProcessing(1000);
+
+      // AI Vendor Assignment
+      const vendorSelection = selectOptimalVendor(
+        { 
+          ...newTicket, 
+          category: classification.category, 
+          urgency: classification.urgency,
+          aiDecisions: [],
+          createdAt: new Date(newTicket.created_at),
+          updatedAt: new Date(newTicket.updated_at)
+        },
+        vendors.map(v => ({
+          ...v,
+          avgResponseTime: v.avg_response_time,
+          avgCost: v.avg_cost,
+          aiPerformanceScore: v.ai_performance_score,
+          isAvailable: v.is_available
+        }))
+      );
+
+      if (vendorSelection) {
+        const selectedVendorData = vendors.find(v => v.id === vendorSelection.vendorId);
+        
+        await updateTicket(newTicket.id, {
+          vendor_id: vendorSelection.vendorId,
+          vendor_name: selectedVendorData?.name,
+          status: 'assigned',
+          estimated_cost: selectedVendorData?.avg_cost,
+          ai_decisions: [
+            ...(newTicket.ai_decisions as any[] || []),
+            {
+              timestamp: new Date(),
+              action: "Vendor Assignment",
+              reasoning: vendorSelection.reasoning,
+              confidence: vendorSelection.confidence
+            }
+          ]
+        });
+
+        await addActivity({
+          type: 'vendor',
+          action: 'Vendor Assigned',
+          details: `${selectedVendorData?.name} assigned to ticket`,
+          entity_id: newTicket.id,
+          ai_generated: true
+        });
+      }
     }
 
     setIsProcessing(false);
@@ -154,6 +169,17 @@ export default function MaintenancePage() {
       description: ""
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center space-y-4">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
+          <p className="text-muted-foreground">Loading maintenance data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex">

@@ -5,13 +5,15 @@ import KPICard from "@/components/dashboard/KPICard";
 import ActivityFeed from "@/components/dashboard/ActivityFeed";
 import AgentStatusPanel from "@/components/layout/AgentStatusPanel";
 import useStore from "@/lib/store/useStore";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { 
     tenants, 
     tickets, 
     rentPayments, 
-    activityFeed 
+    activityFeed,
+    loading
   } = useStore();
 
   // Calculate KPI values
@@ -29,6 +31,17 @@ export default function DashboardPage() {
   const aiResolvedTickets = tickets.filter(t => t.aiClassified && t.status === 'completed').length;
   const totalTickets = tickets.length;
   const aiResolutionRate = totalTickets > 0 ? Math.round((aiResolvedTickets / totalTickets) * 100) : 0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center space-y-4">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -52,10 +65,6 @@ export default function DashboardPage() {
           value={`$${rentCollected.toLocaleString()}`}
           icon={DollarSign}
           description={`of $${rentExpected.toLocaleString()}`}
-          trend={{
-            value: 12,
-            isPositive: true
-          }}
         />
         
         <KPICard
@@ -63,10 +72,6 @@ export default function DashboardPage() {
           value={openTickets}
           icon={Wrench}
           description="Maintenance requests"
-          trend={{
-            value: 8,
-            isPositive: false
-          }}
         />
         
         <KPICard
@@ -100,15 +105,11 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <div className="mt-6 space-y-3">
             <h3 className="font-semibold mb-3">Quick Actions</h3>
-            <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors ai-glow">
-              Create Maintenance Ticket
-            </button>
-            <button className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors">
-              Send Rent Reminders
-            </button>
-            <button className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors">
-              Generate Reports
-            </button>
+            <Link href="/maintenance">
+              <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors ai-glow">
+                Create Maintenance Ticket
+              </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -66,14 +66,13 @@ npm run dev
 - Real-time activity animations
 - High contrast, minimal design
 
-## 📊 Mock Data
+## 🗄️ Database
 
-All data is pre-populated for demo purposes:
-- 8 tenants with varying risk scores
-- 5 maintenance tickets in different states
-- 6 vendors with performance metrics
-- Rent payment history
-- Lease renewal predictions
+This application uses Supabase PostgreSQL database for all data storage:
+- Real-time data fetching and updates
+- Secure database operations
+- No mock data - all data is stored in your database
+- See `SUPABASE_SETUP.md` for configuration details
 
 ## 🤖 AI Features
 
@@ -106,5 +105,6 @@ All data is pre-populated for demo purposes:
 
 ## 🔧 Customization
 
-To adjust mock data, edit files in `/lib/mockData/`
-To modify AI behavior, update `/lib/agentEngine/index.ts`
+- To modify AI behavior, update `/lib/agentEngine/index.ts`
+- To add new features, extend the Supabase schema
+- All data operations go through the Zustand store

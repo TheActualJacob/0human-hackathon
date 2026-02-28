@@ -41,11 +41,11 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
           </div>
         </div>
         
-        {ticket.aiDecisions && ticket.aiDecisions.length > 0 && (
+        {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).length > 0 && (
           <div className="rounded-lg bg-secondary/50 p-3">
-            <p className="text-sm">{ticket.aiDecisions[0].reasoning}</p>
+            <p className="text-sm">{(ticket.ai_decisions as any[])[0].reasoning}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Confidence: {ticket.aiDecisions[0].confidence}%
+              Confidence: {(ticket.ai_decisions as any[])[0].confidence}%
             </p>
           </div>
         )}
@@ -74,10 +74,10 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
             </div>
           </div>
           
-          {ticket.aiDecisions && ticket.aiDecisions.find(d => d.action === 'Vendor Assignment') && (
+          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).find(d => d.action === 'Vendor Assignment') && (
             <div className="rounded-lg bg-secondary/50 p-3">
               <p className="text-sm">
-                {ticket.aiDecisions.find(d => d.action === 'Vendor Assignment')?.reasoning}
+                {(ticket.ai_decisions as any[]).find(d => d.action === 'Vendor Assignment')?.reasoning}
               </p>
             </div>
           )}
@@ -85,7 +85,7 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
       )}
 
       {/* Cost Estimation */}
-      {ticket.estimatedCost && (
+      {ticket.estimated_cost && (
         <div className="space-y-4 border-t pt-4">
           <h4 className="font-medium flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-primary" />
@@ -94,7 +94,7 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
           
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Estimated Cost</span>
-            <span className="text-lg font-semibold">${ticket.estimatedCost}</span>
+            <span className="text-lg font-semibold">${ticket.estimated_cost}</span>
           </div>
         </div>
       )}
@@ -107,7 +107,7 @@ export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps
         </h4>
         
         <div className="space-y-3">
-          {ticket.aiDecisions?.map((decision, index) => (
+          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && (ticket.ai_decisions as any[]).map((decision, index) => (
             <div key={index} className="flex gap-3">
               <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
               <div className="flex-1">

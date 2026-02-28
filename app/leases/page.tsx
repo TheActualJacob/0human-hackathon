@@ -14,7 +14,8 @@ export default function LeasesPage() {
   const { leases, tenants } = useStore();
 
   // Get tenant info for lease
-  const getTenantInfo = (tenantId: string) => {
+  const getTenantInfo = (tenantId: string | null) => {
+    if (!tenantId) return null;
     return tenants.find(t => t.id === tenantId);
   };
 
@@ -33,7 +34,7 @@ export default function LeasesPage() {
       key: 'tenant',
       header: 'Tenant',
       accessor: (lease) => {
-        const tenant = getTenantInfo(lease.tenantId);
+        const tenant = getTenantInfo(lease.tenant_id);
         return tenant ? (
           <div>
             <p className="font-medium">{tenant.name}</p>
@@ -47,21 +48,21 @@ export default function LeasesPage() {
       header: 'Lease Period',
       accessor: (lease) => (
         <div className="text-sm">
-          <p>{format(new Date(lease.startDate), 'MMM d, yyyy')}</p>
-          <p className="text-muted-foreground">to {format(new Date(lease.endDate), 'MMM d, yyyy')}</p>
+          <p>{format(new Date(lease.start_date), 'MMM d, yyyy')}</p>
+          <p className="text-muted-foreground">to {format(new Date(lease.end_date), 'MMM d, yyyy')}</p>
         </div>
       )
     },
     {
       key: 'rent',
       header: 'Monthly Rent',
-      accessor: (lease) => <span className="font-medium">${lease.monthlyRent.toLocaleString()}</span>
+      accessor: (lease) => <span className="font-medium">${lease.monthly_rent.toLocaleString()}</span>
     },
     {
       key: 'status',
       header: 'Status',
       accessor: (lease) => {
-        const daysLeft = getDaysUntilExpiry(lease.endDate);
+        const daysLeft = getDaysUntilExpiry(lease.end_date);
         return (
           <div className="space-y-1">
             <StatusBadge 
@@ -81,11 +82,11 @@ export default function LeasesPage() {
       accessor: (lease) => (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Progress value={lease.renewalRecommendation || 0} className="h-2 w-20" />
-            <span className="text-sm font-medium">{lease.renewalRecommendation || 0}%</span>
+            <Progress value={lease.renewal_recommendation || 0} className="h-2 w-20" />
+            <span className="text-sm font-medium">{lease.renewal_recommendation || 0}%</span>
           </div>
-          {lease.suggestedRentIncrease !== undefined && lease.suggestedRentIncrease > 0 && (
-            <p className="text-xs text-primary">+{lease.suggestedRentIncrease}% suggested</p>
+          {lease.suggested_rent_increase !== undefined && lease.suggested_rent_increase !== null && lease.suggested_rent_increase > 0 && (
+            <p className="text-xs text-primary">+{lease.suggested_rent_increase}% suggested</p>
           )}
         </div>
       )
@@ -154,9 +155,9 @@ export default function LeasesPage() {
             <div>
               <p className="text-sm text-muted-foreground">Avg Renewal Rate</p>
               <h3 className="text-2xl font-bold text-primary">
-                {Math.round(
-                  leases.reduce((sum, l) => sum + (l.renewalRecommendation || 0), 0) / leases.length
-                )}%
+                {leases.length > 0 ? Math.round(
+                  leases.reduce((sum, l) => sum + (l.renewal_recommendation || 0), 0) / leases.length
+                ) : 0}%
               </h3>
             </div>
             <TrendingUp className="h-8 w-8 text-primary" />
@@ -211,10 +212,10 @@ export default function LeasesPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {leases
-            .filter(l => l.status === 'expiring' && l.renewalRecommendation && l.renewalRecommendation > 80)
+            .filter(l => l.status === 'expiring' && l.renewal_recommendation && l.renewal_recommendation > 80)
             .slice(0, 4)
             .map(lease => {
-              const tenant = getTenantInfo(lease.tenantId);
+              const tenant = getTenantInfo(lease.tenant_id);
               return (
                 <div key={lease.id} className="p-4 rounded-lg bg-secondary/50">
                   <div className="flex items-start justify-between">
@@ -223,11 +224,11 @@ export default function LeasesPage() {
                       <p className="text-sm text-muted-foreground">Unit {lease.unit}</p>
                     </div>
                     <Badge className="bg-green-500/10 text-green-500">
-                      {lease.renewalRecommendation}% likely
+                      {lease.renewal_recommendation}% likely
                     </Badge>
                   </div>
                   <p className="text-sm mt-2">
-                    Suggested increase: <span className="font-medium text-primary">{lease.suggestedRentIncrease}%</span>
+                    Suggested increase: <span className="font-medium text-primary">{lease.suggested_rent_increase}%</span>
                   </p>
                 </div>
               );

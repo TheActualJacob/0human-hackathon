@@ -27,7 +27,7 @@ export default function TenantsPage() {
 
   const selectedTenantData = tenants.find(t => t.id === selectedTenant);
   const selectedTenantLease = selectedTenantData 
-    ? leases.find(l => l.tenantId === selectedTenantData.id)
+    ? leases.find(l => l.tenant_id === selectedTenantData.id)
     : null;
 
   const getRiskBadge = (score: number) => {
@@ -55,7 +55,7 @@ export default function TenantsPage() {
     {
       key: 'rent',
       header: 'Monthly Rent',
-      accessor: (tenant) => <span>${tenant.rentAmount.toLocaleString()}</span>
+      accessor: (tenant) => <span>${tenant.rent_amount.toLocaleString()}</span>
     },
     {
       key: 'status',
@@ -64,12 +64,12 @@ export default function TenantsPage() {
         <Badge 
           variant="outline" 
           className={cn(
-            tenant.paymentStatus === 'current' && "border-green-500/20 text-green-500",
-            tenant.paymentStatus === 'late' && "border-red-500/20 text-red-500",
-            tenant.paymentStatus === 'pending' && "border-yellow-500/20 text-yellow-500"
+            tenant.payment_status === 'current' && "border-green-500/20 text-green-500",
+            tenant.payment_status === 'late' && "border-red-500/20 text-red-500",
+            tenant.payment_status === 'pending' && "border-yellow-500/20 text-yellow-500"
           )}
         >
-          {tenant.paymentStatus}
+          {tenant.payment_status}
         </Badge>
       )
     },
@@ -77,10 +77,10 @@ export default function TenantsPage() {
       key: 'risk',
       header: 'Risk Score',
       accessor: (tenant) => {
-        const risk = getRiskBadge(tenant.riskScore);
+        const risk = getRiskBadge(tenant.risk_score);
         return (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{tenant.riskScore}%</span>
+            <span className="text-sm font-medium">{tenant.risk_score}%</span>
             <Badge variant="outline" className={risk.className}>
               {risk.label}
             </Badge>
@@ -91,7 +91,7 @@ export default function TenantsPage() {
     {
       key: 'tenure',
       header: 'Move-in Date',
-      accessor: (tenant) => format(new Date(tenant.moveInDate), 'MMM yyyy')
+      accessor: (tenant) => format(new Date(tenant.move_in_date), 'MMM yyyy')
     }
   ];
 
@@ -102,7 +102,7 @@ export default function TenantsPage() {
 
   // Calculate tenant payment history
   const getTenantPaymentHistory = (tenantId: string) => {
-    const payments = rentPayments.filter(p => p.tenantId === tenantId);
+    const payments = rentPayments.filter(p => p.tenant_id === tenantId);
     const paid = payments.filter(p => p.status === 'paid').length;
     const late = payments.filter(p => p.status === 'late').length;
     const total = payments.length;
@@ -133,7 +133,7 @@ export default function TenantsPage() {
               <AlertTriangle className="h-4 w-4 text-yellow-500" />
               <span className="text-sm text-muted-foreground">At Risk:</span>
               <span className="font-medium text-yellow-500">
-                {tenants.filter(t => t.riskScore > 50).length}
+                {tenants.filter(t => t.risk_score > 50).length}
               </span>
             </div>
           </Card>
@@ -192,7 +192,7 @@ export default function TenantsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Rent</span>
-                  <span className="font-medium">${selectedTenantData.rentAmount.toLocaleString()}</span>
+                  <span className="font-medium">${selectedTenantData.rent_amount.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -207,15 +207,15 @@ export default function TenantsPage() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm">Risk Score</span>
-                    <span className="text-sm font-medium">{selectedTenantData.riskScore}%</span>
+                    <span className="text-sm font-medium">{selectedTenantData.risk_score}%</span>
                   </div>
-                  <Progress value={selectedTenantData.riskScore} className="h-2" />
+                  <Progress value={selectedTenantData.risk_score} className="h-2" />
                 </div>
                 <Badge 
                   variant="outline" 
-                  className={getRiskBadge(selectedTenantData.riskScore).className}
+                  className={getRiskBadge(selectedTenantData.risk_score).className}
                 >
-                  {getRiskBadge(selectedTenantData.riskScore).label}
+                  {getRiskBadge(selectedTenantData.risk_score).label}
                 </Badge>
                 <p className="text-sm text-muted-foreground">
                   AI calculated based on payment history, tenure, and maintenance requests
@@ -250,11 +250,11 @@ export default function TenantsPage() {
                           <Badge 
                             variant="outline"
                             className={cn(
-                              selectedTenantData.paymentStatus === 'current' && "border-green-500/20 text-green-500",
-                              selectedTenantData.paymentStatus === 'late' && "border-red-500/20 text-red-500"
+                              selectedTenantData.payment_status === 'current' && "border-green-500/20 text-green-500",
+                              selectedTenantData.payment_status === 'late' && "border-red-500/20 text-red-500"
                             )}
                           >
-                            {selectedTenantData.paymentStatus}
+                            {selectedTenantData.payment_status}
                           </Badge>
                         </div>
                       </>
@@ -268,22 +268,22 @@ export default function TenantsPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Lease Start</span>
-                      <span>{format(new Date(selectedTenantLease.startDate), 'MMM d, yyyy')}</span>
+                      <span>{format(new Date(selectedTenantLease.start_date), 'MMM d, yyyy')}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Lease End</span>
-                      <span>{format(new Date(selectedTenantLease.endDate), 'MMM d, yyyy')}</span>
+                      <span>{format(new Date(selectedTenantLease.end_date), 'MMM d, yyyy')}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Status</span>
                       <Badge variant="outline">{selectedTenantLease.status}</Badge>
                     </div>
-                    {selectedTenantLease.renewalRecommendation && (
+                    {selectedTenantLease.renewal_recommendation && (
                       <div className="pt-2 border-t">
                         <p className="text-xs text-muted-foreground mb-1">AI Renewal Recommendation</p>
                         <div className="flex items-center gap-2">
-                          <Progress value={selectedTenantLease.renewalRecommendation} className="h-2 flex-1" />
-                          <span className="text-sm font-medium">{selectedTenantLease.renewalRecommendation}%</span>
+                          <Progress value={selectedTenantLease.renewal_recommendation || 0} className="h-2 flex-1" />
+                          <span className="text-sm font-medium">{selectedTenantLease.renewal_recommendation}%</span>
                         </div>
                       </div>
                     )}
@@ -296,9 +296,9 @@ export default function TenantsPage() {
                   <div className="rounded-lg bg-secondary/50 p-3 text-sm">
                     <p className="font-medium mb-1">Payment Behavior</p>
                     <p className="text-muted-foreground">
-                      {selectedTenantData.riskScore < 30 
+                      {selectedTenantData.risk_score < 30 
                         ? "Excellent payment history. Low maintenance needs."
-                        : selectedTenantData.riskScore < 60
+                        : selectedTenantData.risk_score < 60
                         ? "Generally reliable with occasional late payments."
                         : "Multiple late payments detected. Consider monitoring closely."}
                     </p>
@@ -306,9 +306,9 @@ export default function TenantsPage() {
                   <div className="rounded-lg bg-secondary/50 p-3 text-sm">
                     <p className="font-medium mb-1">Renewal Recommendation</p>
                     <p className="text-muted-foreground">
-                      {selectedTenantData.riskScore < 30 
+                      {selectedTenantData.risk_score < 30 
                         ? "Strong candidate for lease renewal with standard increase."
-                        : selectedTenantData.riskScore < 60
+                        : selectedTenantData.risk_score < 60
                         ? "Consider renewal with stricter payment terms."
                         : "High risk tenant. Evaluate before renewal."}
                     </p>

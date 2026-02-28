@@ -24,18 +24,20 @@ import {
 export default function ReportsPage() {
   const { rentPayments, tickets, tenants, vendors } = useStore();
 
-  // Calculate monthly cash flow data
+  // Calculate monthly cash flow data from actual payments
+  const currentMonth = new Date().toLocaleString('default', { month: 'short' });
+  const totalExpected = rentPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalCollected = rentPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+  
   const monthlyData = [
-    { month: 'Jan', collected: 22400, expected: 23200 },
-    { month: 'Feb', collected: 23200, expected: 23200 },
-    { month: 'Mar', collected: 21500, expected: 23200 },
+    { month: currentMonth, collected: totalCollected, expected: totalExpected }
   ];
 
   // Calculate maintenance spend by category
   const maintenanceByCategory = Object.entries(
     tickets.reduce((acc, ticket) => {
-      if (ticket.estimatedCost) {
-        acc[ticket.category] = (acc[ticket.category] || 0) + ticket.estimatedCost;
+      if (ticket.estimated_cost) {
+        acc[ticket.category || 'general'] = (acc[ticket.category || 'general'] || 0) + ticket.estimated_cost;
       }
       return acc;
     }, {} as Record<string, number>)
@@ -50,9 +52,9 @@ export default function ReportsPage() {
 
   // AI efficiency metrics
   const totalTickets = tickets.length;
-  const aiClassifiedTickets = tickets.filter(t => t.aiClassified).length;
-  const aiAssignedVendors = tickets.filter(t => t.vendorId && t.aiClassified).length;
-  const avgResponseTime = vendors.reduce((sum, v) => sum + v.avgResponseTime, 0) / vendors.length;
+  const aiClassifiedTickets = tickets.filter(t => t.ai_classified).length;
+  const aiAssignedVendors = tickets.filter(t => t.vendor_id && t.ai_classified).length;
+  const avgResponseTime = vendors.length > 0 ? vendors.reduce((sum, v) => sum + v.avg_response_time, 0) / vendors.length : 0;
 
   const aiEfficiencyData = [
     { metric: 'Tickets Classified', value: Math.round((aiClassifiedTickets / totalTickets) * 100) },
@@ -144,27 +146,25 @@ export default function ReportsPage() {
 
           {/* Financial Summary */}
           <Card className="p-6">
-            <h3 className="font-semibold mb-4">Q1 2024 Financial Summary</h3>
+            <h3 className="font-semibold mb-4">Current Financial Summary</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">$67,100</p>
-                <p className="text-xs text-green-500">+12% from Q4</p>
+                <p className="text-sm text-muted-foreground">Total Expected</p>
+                <p className="text-2xl font-bold">${totalExpected.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Operating Expenses</p>
-                <p className="text-2xl font-bold">$12,450</p>
-                <p className="text-xs text-red-500">+5% from Q4</p>
+                <p className="text-sm text-muted-foreground">Total Collected</p>
+                <p className="text-2xl font-bold">${totalCollected.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Net Income</p>
-                <p className="text-2xl font-bold">$54,650</p>
-                <p className="text-xs text-green-500">+14% from Q4</p>
+                <p className="text-sm text-muted-foreground">Outstanding</p>
+                <p className="text-2xl font-bold">${(totalExpected - totalCollected).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Collection Rate</p>
-                <p className="text-2xl font-bold">96.5%</p>
-                <p className="text-xs text-green-500">+2% from Q4</p>
+                <p className="text-2xl font-bold">
+                  {totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0}%
+                </p>
               </div>
             </div>
           </Card>
@@ -192,27 +192,27 @@ export default function ReportsPage() {
               </ResponsiveContainer>
             </Card>
 
-            {/* Ticket Volume Trend */}
+            {/* Ticket Volume Summary */}
             <Card className="p-6">
-              <h3 className="font-semibold mb-4">Ticket Volume Trend</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={[
-                  { month: 'Jan', tickets: 12 },
-                  { month: 'Feb', tickets: 8 },
-                  { month: 'Mar', tickets: 5 },
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="month" stroke="#9ca3af" />
-                  <YAxis stroke="#9ca3af" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1f2937', 
-                      border: '1px solid #374151' 
-                    }} 
-                  />
-                  <Line type="monotone" dataKey="tickets" stroke="#3b82f6" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
+              <h3 className="font-semibold mb-4">Ticket Summary</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Tickets</p>
+                  <p className="text-2xl font-bold">{tickets.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Open Tickets</p>
+                  <p className="text-2xl font-bold text-yellow-500">
+                    {tickets.filter(t => ['open', 'assigned', 'in_progress'].includes(t.status || '')).length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-2xl font-bold text-green-500">
+                    {tickets.filter(t => t.status === 'completed').length}
+                  </p>
+                </div>
+              </div>
             </Card>
           </div>
         </TabsContent>
@@ -221,21 +221,18 @@ export default function ReportsPage() {
         <TabsContent value="occupancy" className="space-y-6">
           <Card className="p-6">
             <h3 className="font-semibold mb-4">Occupancy Metrics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-muted-foreground">Occupancy Rate</p>
-                <p className="text-3xl font-bold">100%</p>
-                <p className="text-xs text-green-500">All units occupied</p>
+                <p className="text-sm text-muted-foreground">Total Units</p>
+                <p className="text-3xl font-bold">{tenants.length}</p>
+                <p className="text-xs text-muted-foreground">Currently managed</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Tenant Tenure</p>
-                <p className="text-3xl font-bold">18 months</p>
-                <p className="text-xs text-muted-foreground">Industry avg: 12 months</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Renewal Rate</p>
-                <p className="text-3xl font-bold">85%</p>
-                <p className="text-xs text-green-500">+10% YoY</p>
+                <p className="text-sm text-muted-foreground">Active Leases</p>
+                <p className="text-3xl font-bold">
+                  {tenants.filter(t => t.lease_id).length}
+                </p>
+                <p className="text-xs text-muted-foreground">With lease agreements</p>
               </div>
             </div>
           </Card>
@@ -265,20 +262,6 @@ export default function ReportsPage() {
               ))}
             </div>
 
-            <div className="mt-6 pt-6 border-t space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm">Time Saved Monthly</span>
-                <span className="font-medium">~40 hours</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Cost Reduction</span>
-                <span className="font-medium text-green-500">-18%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Tenant Satisfaction</span>
-                <span className="font-medium">+22%</span>
-              </div>
-            </div>
           </Card>
         </TabsContent>
       </Tabs>

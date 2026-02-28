@@ -1,93 +1,40 @@
-// Main type definitions
-export interface Tenant {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  unit: string;
-  leaseId: string;
-  moveInDate: Date;
-  rentAmount: number;
-  paymentStatus: 'current' | 'late' | 'pending';
-  riskScore: number; // 0-100
-}
+// Re-export types from Supabase
+import type { Database } from '@/lib/supabase/database.types';
 
-export interface MaintenanceTicket {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  unit: string;
-  title: string;
-  description: string;
-  category: 'plumbing' | 'electrical' | 'appliance' | 'hvac' | 'general' | 'emergency';
-  urgency: 'low' | 'medium' | 'high' | 'emergency';
-  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'closed';
-  vendorId?: string;
-  vendorName?: string;
-  estimatedCost?: number;
-  actualCost?: number;
-  createdAt: Date;
-  updatedAt: Date;
-  aiClassified: boolean;
-  aiDecisions: AIDecision[];
-}
+export type Tables = Database['public']['Tables'];
 
-export interface Vendor {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  specialty: string[];
-  avgResponseTime: number; // in hours
-  avgCost: number;
-  rating: number; // 1-5
-  aiPerformanceScore: number; // 0-100
-  isAvailable: boolean;
-}
+// Table row types
+export type Tenant = Tables['tenants']['Row'];
+export type MaintenanceTicket = Tables['maintenance_tickets']['Row'];
+export type Vendor = Tables['vendors']['Row'];
+export type Lease = Tables['leases']['Row'];
+export type RentPayment = Tables['rent_payments']['Row'];
+export type ActivityItem = Tables['activity_feed']['Row'];
 
-export interface Lease {
-  id: string;
-  tenantId: string;
-  unit: string;
-  startDate: Date;
-  endDate: Date;
-  monthlyRent: number;
-  securityDeposit: number;
-  status: 'active' | 'expiring' | 'expired' | 'terminated';
-  renewalRecommendation?: number; // percentage
-  suggestedRentIncrease?: number; // percentage
-}
+// Insert types
+export type TenantInsert = Tables['tenants']['Insert'];
+export type MaintenanceTicketInsert = Tables['maintenance_tickets']['Insert'];
+export type VendorInsert = Tables['vendors']['Insert'];
+export type LeaseInsert = Tables['leases']['Insert'];
+export type RentPaymentInsert = Tables['rent_payments']['Insert'];
+export type ActivityItemInsert = Tables['activity_feed']['Insert'];
 
-export interface RentPayment {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  unit: string;
-  amount: number;
-  dueDate: Date;
-  paidDate?: Date;
-  status: 'paid' | 'late' | 'pending' | 'overdue';
-  lateFee?: number;
-  aiReminded: boolean;
-}
+// Update types
+export type TenantUpdate = Tables['tenants']['Update'];
+export type MaintenanceTicketUpdate = Tables['maintenance_tickets']['Update'];
+export type VendorUpdate = Tables['vendors']['Update'];
+export type LeaseUpdate = Tables['leases']['Update'];
+export type RentPaymentUpdate = Tables['rent_payments']['Update'];
 
-export interface ActivityItem {
-  id: string;
-  timestamp: Date;
-  type: 'maintenance' | 'rent' | 'lease' | 'vendor' | 'system';
-  action: string;
-  details: string;
-  entityId?: string;
-  aiGenerated: boolean;
-}
-
+// Additional types for AI decisions
 export interface AIDecision {
   timestamp: Date;
   action: string;
   reasoning: string;
-  confidence: number; // 0-100
+  confidence: number;
 }
 
+// Dashboard metrics type
 export interface DashboardMetrics {
   totalUnits: number;
   occupiedUnits: number;

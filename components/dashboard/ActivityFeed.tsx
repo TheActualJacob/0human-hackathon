@@ -74,7 +74,7 @@ export default function ActivityFeed({ activities, className }: ActivityFeedProp
                 
                 <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                   <Clock className="h-3 w-3" />
-                  {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(activity.timestamp || ''), { addSuffix: true })}
                 </div>
               </div>
             );

@@ -73,7 +73,7 @@ export const selectOptimalVendor = (
   // Filter available vendors with matching specialty
   const eligibleVendors = vendors.filter(vendor => 
     vendor.isAvailable && 
-    (vendor.specialty.includes(ticket.category) || 
+    (vendor.specialty.includes(ticket.category || '') || 
      (ticket.urgency === 'emergency' && vendor.specialty.includes('emergency')))
   );
   

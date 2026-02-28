@@ -58,10 +58,10 @@ export default function AgentStatusPanel() {
         {/* Escalations */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-yellow-500" />
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Escalations</span>
           </div>
-          <span className="text-sm font-medium text-yellow-500">2 pending</span>
+          <span className="text-sm font-medium">0</span>
         </div>
       </div>
     </Card>

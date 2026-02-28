@@ -12,7 +12,7 @@ export default function VendorsPage() {
 
   // Calculate vendor stats
   const getVendorStats = (vendorId: string) => {
-    const vendorTickets = tickets.filter(t => t.vendorId === vendorId);
+    const vendorTickets = tickets.filter(t => t.vendor_id === vendorId);
     const completed = vendorTickets.filter(t => t.status === 'completed').length;
     const active = vendorTickets.filter(t => ['assigned', 'in_progress'].includes(t.status)).length;
     
@@ -35,7 +35,7 @@ export default function VendorsPage() {
           return (
             <Card key={vendor.id} className={cn(
               "p-6 space-y-4",
-              vendor.aiPerformanceScore > 90 && "ai-glow"
+              vendor.ai_performance_score > 90 && "ai-glow"
             )}>
               {/* Header */}
               <div className="flex items-start justify-between">
@@ -50,10 +50,10 @@ export default function VendorsPage() {
                   </div>
                 </div>
                 <Badge 
-                  variant={vendor.isAvailable ? "default" : "secondary"}
-                  className={vendor.isAvailable ? "bg-green-500/10 text-green-500" : ""}
+                  variant={vendor.is_available ? "default" : "secondary"}
+                  className={vendor.is_available ? "bg-green-500/10 text-green-500" : ""}
                 >
-                  {vendor.isAvailable ? "Available" : "Busy"}
+                  {vendor.is_available ? "Available" : "Busy"}
                 </Badge>
               </div>
 
@@ -71,7 +71,7 @@ export default function VendorsPage() {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Avg Response</span>
                   </div>
-                  <span className="text-sm font-medium">{vendor.avgResponseTime}h</span>
+                  <span className="text-sm font-medium">{vendor.avg_response_time}h</span>
                 </div>
 
                 {/* Average Cost */}
@@ -80,7 +80,7 @@ export default function VendorsPage() {
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Avg Cost</span>
                   </div>
-                  <span className="text-sm font-medium">${vendor.avgCost}</span>
+                  <span className="text-sm font-medium">${vendor.avg_cost}</span>
                 </div>
 
                 {/* Rating */}
@@ -103,11 +103,11 @@ export default function VendorsPage() {
                       <span className="font-medium">AI Performance Score</span>
                     </div>
                     <span className="text-sm font-medium text-primary">
-                      {vendor.aiPerformanceScore}%
+                      {vendor.ai_performance_score}%
                     </span>
                   </div>
                   <Progress 
-                    value={vendor.aiPerformanceScore} 
+                    value={vendor.ai_performance_score} 
                     className="h-2"
                   />
                 </div>
@@ -136,34 +136,35 @@ export default function VendorsPage() {
           </div>
           <div>
             <h3 className="text-lg font-semibold">AI Vendor Insights</h3>
-            <p className="text-sm text-muted-foreground">Performance analysis and recommendations</p>
+            <p className="text-sm text-muted-foreground">Performance analysis based on current data</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <h4 className="font-medium text-green-500">Top Performer</h4>
-            <p className="text-sm">PowerPro Electric</p>
-            <p className="text-xs text-muted-foreground">
-              95% AI score • 0.8h response time • 4.9/5 rating
+        <div className="space-y-4">
+          {vendors.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No vendor data available. Add vendors to see insights.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="font-medium text-yellow-500">Needs Improvement</h4>
-            <p className="text-sm">HandyPro Services</p>
-            <p className="text-xs text-muted-foreground">
-              78% AI score • Consider performance review
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="font-medium text-primary">Recommendation</h4>
-            <p className="text-sm">Add HVAC Specialist</p>
-            <p className="text-xs text-muted-foreground">
-              High demand detected for AC repairs this month
-            </p>
-          </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Vendors</p>
+                <p className="text-2xl font-bold">{vendors.length}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Available Now</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {vendors.filter(v => v.is_available).length}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Average Response Time</p>
+                <p className="text-2xl font-bold">
+                  {avgResponseTime.toFixed(1)}h
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </Card>
     </div>

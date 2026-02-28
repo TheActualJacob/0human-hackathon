@@ -17,7 +17,7 @@ export default function TicketCard({ ticket, isSelected, onClick }: TicketCardPr
       className={cn(
         "p-4 cursor-pointer transition-all hover:shadow-md",
         isSelected && "ring-2 ring-primary ai-glow",
-        ticket.aiClassified && "border-primary/30"
+        ticket.ai_classified && "border-primary/30"
       )}
       onClick={onClick}
     >
@@ -37,7 +37,7 @@ export default function TicketCard({ ticket, isSelected, onClick }: TicketCardPr
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1 text-muted-foreground">
             <User className="h-3 w-3" />
-            {ticket.tenantName}
+              {ticket.tenant_name}
           </div>
           <div className="flex items-center gap-1 text-muted-foreground">
             <MapPin className="h-3 w-3" />
@@ -48,7 +48,7 @@ export default function TicketCard({ ticket, isSelected, onClick }: TicketCardPr
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <StatusBadge status={ticket.status} />
-            {ticket.aiClassified && (
+            {ticket.ai_classified && (
               <div className="flex items-center gap-1 text-xs text-primary">
                 <Brain className="h-3 w-3" />
                 AI Classified
@@ -57,14 +57,14 @@ export default function TicketCard({ ticket, isSelected, onClick }: TicketCardPr
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
-            {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+            {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
           </div>
         </div>
 
-        {ticket.vendorName && (
+        {ticket.vendor_name && (
           <div className="pt-2 border-t border-border">
             <p className="text-xs text-muted-foreground">
-              Assigned to: <span className="font-medium">{ticket.vendorName}</span>
+              Assigned to: <span className="font-medium">{ticket.vendor_name}</span>
             </p>
           </div>
         )}

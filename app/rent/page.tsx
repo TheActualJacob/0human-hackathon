@@ -12,7 +12,7 @@ import useStore from "@/lib/store/useStore";
 import { format } from "date-fns";
 
 export default function RentPage() {
-  const { rentPayments, sendRentReminder, applyLateFee, addActivity } = useStore();
+  const { rentPayments, updateRentPayment, addActivity } = useStore();
   const [autonomousMode, setAutonomousMode] = useState(true);
 
   // Calculate summary stats
@@ -25,28 +25,43 @@ export default function RentPage() {
     .reduce((sum, p) => sum + p.amount, 0);
   const totalLate = rentPayments
     .filter(p => p.status === 'late')
-    .reduce((sum, p) => sum + p.amount + (p.lateFee || 0), 0);
+    .reduce((sum, p) => sum + p.amount + (p.late_fee || 0), 0);
 
   const collectionRate = totalExpected > 0 
     ? Math.round((totalCollected / totalExpected) * 100) 
     : 0;
 
-  const handleSendReminder = (paymentId: string) => {
+  const handleSendReminder = async (paymentId: string) => {
     const payment = rentPayments.find(p => p.id === paymentId);
     if (!payment) return;
 
-    sendRentReminder(payment.tenantId);
-    
     // Update payment to show reminder sent
-    useStore.getState().updateRentPayment(paymentId, { aiReminded: true });
+    await updateRentPayment(paymentId, { ai_reminded: true });
+    
+    // Add activity
+    await addActivity({
+      type: 'rent',
+      action: 'Rent Reminder Sent',
+      details: `AI sent rent reminder to ${payment.tenant_name} at unit ${payment.unit}`,
+      entity_id: payment.tenant_id,
+      ai_generated: true
+    });
   };
 
-  const handleApplyLateFee = (paymentId: string) => {
+  const handleApplyLateFee = async (paymentId: string) => {
     const payment = rentPayments.find(p => p.id === paymentId);
-    if (!payment || payment.lateFee) return;
+    if (!payment || payment.late_fee) return;
 
     const fee = Math.round(payment.amount * 0.05); // 5% late fee
-    applyLateFee(paymentId, fee);
+    await updateRentPayment(paymentId, { late_fee: fee });
+    
+    await addActivity({
+      type: 'rent',
+      action: 'Late Fee Applied',
+      details: `$${fee} late fee applied to ${payment.tenant_name}'s rent payment`,
+      entity_id: paymentId,
+      ai_generated: true
+    });
   };
 
   const columns = [
@@ -55,7 +70,7 @@ export default function RentPage() {
       header: 'Tenant',
       accessor: (payment) => (
         <div>
-          <p className="font-medium">{payment.tenantName}</p>
+          <p className="font-medium">{payment.tenant_name}</p>
           <p className="text-sm text-muted-foreground">Unit {payment.unit}</p>
         </div>
       )
@@ -66,9 +81,9 @@ export default function RentPage() {
       accessor: (payment) => (
         <div>
           <p className="font-medium">${payment.amount.toLocaleString()}</p>
-          {payment.lateFee && (
+          {payment.late_fee && (
             <p className="text-sm text-destructive">
-              +${payment.lateFee} late fee
+              +${payment.late_fee} late fee
             </p>
           )}
         </div>
@@ -77,7 +92,7 @@ export default function RentPage() {
     {
       key: 'dueDate',
       header: 'Due Date',
-      accessor: (payment) => format(new Date(payment.dueDate), 'MMM d, yyyy')
+      accessor: (payment) => format(new Date(payment.due_date), 'MMM d, yyyy')
     },
     {
       key: 'status',
@@ -95,11 +110,11 @@ export default function RentPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => handleSendReminder(payment.id)}
-                disabled={payment.aiReminded}
+                disabled={payment.ai_reminded}
               >
-                {payment.aiReminded ? 'Reminded' : 'Send Reminder'}
+                {payment.ai_reminded ? 'Reminded' : 'Send Reminder'}
               </Button>
-              {payment.status === 'late' && !payment.lateFee && (
+              {payment.status === 'late' && !payment.late_fee && (
                 <Button
                   size="sm"
                   variant="destructive"

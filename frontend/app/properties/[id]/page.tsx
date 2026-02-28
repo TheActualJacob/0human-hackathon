@@ -185,15 +185,7 @@ export default function PropertyDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Title + address */}
             <div>
-              <div className="flex items-start justify-between gap-4 mb-2">
-                <h1 className="text-3xl font-black text-white leading-tight">{unit.unit_identifier}</h1>
-                <div className="flex-shrink-0 text-right">
-                  <div className="text-3xl font-black text-white">
-                    {unit.rent_amount ? `£${unit.rent_amount.toLocaleString()}` : 'POA'}
-                  </div>
-                  <div className="text-white/40 text-sm">/month</div>
-                </div>
-              </div>
+              <h1 className="text-3xl font-black text-white leading-tight mb-2">{unit.unit_identifier}</h1>
               <div className="flex items-center gap-1.5 text-white/40 text-sm">
                 <MapPin className="h-4 w-4 flex-shrink-0" />
                 <span>{unit.address}, {unit.city}{unit.postcode ? ` ${unit.postcode}` : ''}</span>

@@ -8,60 +8,6 @@ import {
   ChevronDown, Globe, Lock, BarChart3
 } from 'lucide-react';
 
-// ─── Animated counter ────────────────────────────────────────────────────────
-function Counter({ to, prefix = '', suffix = '', duration = 2000 }: {
-  to: number; prefix?: string; suffix?: string; duration?: number;
-}) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !started.current) {
-        started.current = true;
-        const start = Date.now();
-        const tick = () => {
-          const elapsed = Date.now() - start;
-          const progress = Math.min(elapsed / duration, 1);
-          const ease = 1 - Math.pow(1 - progress, 3);
-          setCount(Math.floor(ease * to));
-          if (progress < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }
-    }, { threshold: 0.3 });
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [to, duration]);
-
-  return <span ref={ref}>{prefix}{count.toLocaleString()}{suffix}</span>;
-}
-
-// ─── Mini sparkline ──────────────────────────────────────────────────────────
-function Sparkline({ data, color = '#6366f1' }: { data: number[]; color?: string }) {
-  const w = 120, h = 40;
-  const min = Math.min(...data), max = Math.max(...data);
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / (max - min || 1)) * h;
-    return `${x},${y}`;
-  }).join(' ');
-  const area = `M0,${h} L${pts.split(' ').join(' L')} L${w},${h} Z`;
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
-      <defs>
-        <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#sg-${color.replace('#','')})`} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // ─── Floating house icon ─────────────────────────────────────────────────────
 function FloatingHouse({ size = 24, style = {} }: { size?: number; style?: React.CSSProperties }) {
   return (
@@ -332,39 +278,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Traction / metrics ── */}
-      <section id="traction" className="py-24 relative">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-indigo-400 text-sm font-medium uppercase tracking-widest mb-3">Traction</p>
-            <h2 className="text-4xl md:text-5xl font-bold">Numbers that matter</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12">
-            {[
-              { label: 'Properties Managed', to: 12400, suffix: '+', trend: '↑ 340% YoY' },
-              { label: 'Revenue Processed', prefix: '£', to: 48, suffix: 'M+', trend: '↑ 280% YoY' },
-              { label: 'Hours Saved / Month', to: 94000, suffix: '+', trend: 'Per landlord' },
-              { label: 'AI Resolution Rate', to: 97, suffix: '%', trend: 'vs 45% industry avg' },
-            ].map(m => (
-              <div key={m.label} className="bg-white/3 border border-white/8 rounded-2xl p-6 text-center card-hover">
-                <p className="text-4xl md:text-5xl font-black text-white mb-1">
-                  <Counter to={m.to} prefix={m.prefix} suffix={m.suffix} />
-                </p>
-                <p className="text-white/40 text-sm mb-2">{m.label}</p>
-                <p className="text-emerald-400 text-xs font-medium">{m.trend}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Live metric pills */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-            <MetricPill label="Monthly Active Landlords" value="3,284" trend="↑ 12% this month" data={[20,35,28,45,52,48,65,72,68,85,90,98]} />
-            <MetricPill label="Avg. Maintenance Resolution" value="4.2h" trend="↓ 68% vs traditional" data={[90,75,68,60,52,48,40,38,32,28,24,18]} />
-            <MetricPill label="Tenant Satisfaction Score" value="4.8/5" trend="↑ from 3.2 industry avg" data={[30,35,40,42,45,50,58,65,70,78,85,92]} />
           </div>
         </div>
       </section>

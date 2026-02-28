@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signIn, getCurrentUser } from '@/lib/auth/client';
+import useAuthStore from '@/lib/store/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -29,8 +31,10 @@ export default function LoginPage() {
 
       console.log('Sign in successful, determining user role...');
 
-      // Get user role to redirect to the correct dashboard
+      // Get user with entity data and persist to store so all pages have it immediately
       const user = await getCurrentUser();
+      if (user) setUser(user);
+
       if (user?.role === 'tenant') {
         window.location.href = '/tenant/dashboard';
       } else {

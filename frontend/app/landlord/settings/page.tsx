@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 // import { useToast } from '@/components/ui/use-toast';
 import useAuthStore from '@/lib/store/auth';
+import { getCurrentUser } from '@/lib/auth/client';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LandlordSettingsPage() {
@@ -22,8 +23,18 @@ export default function LandlordSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const supabase = createClient();
+
+  // Ensure user with entity data is loaded (handles direct navigation or stale store)
+  useEffect(() => {
+    if (!user?.entity) {
+      getCurrentUser().then((currentUser) => {
+        if (currentUser) setUser(currentUser);
+        else setIsLoading(false);
+      });
+    }
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({

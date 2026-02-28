@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useLandlordStore from "@/lib/store/landlord";
+import useAuthStore from "@/lib/store/auth";
+import { getCurrentUser } from "@/lib/auth/client";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +29,22 @@ export default function LandlordLeasesPage() {
     loading,
     fetchLandlordData
   } = useLandlordStore();
+  const { user, setUser } = useAuthStore();
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showNewLeaseDialog, setShowNewLeaseDialog] = useState(false);
   const [selectedLease, setSelectedLease] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchLandlordData();
+    const load = async () => {
+      let landlordId = user?.entityId;
+      if (!landlordId) {
+        const currentUser = await getCurrentUser();
+        if (currentUser) { setUser(currentUser); landlordId = currentUser.entityId; }
+      }
+      if (landlordId) fetchLandlordData(landlordId);
+    };
+    load();
   }, []);
 
   // Get unit info for lease
@@ -52,8 +63,11 @@ export default function LandlordLeasesPage() {
     return differenceInDays(new Date(endDate), new Date());
   };
 
+  // Deduplicate leases (guard against Strict Mode double-fetch edge cases)
+  const uniqueLeases = leases.filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i);
+
   // Filter leases
-  const filteredLeases = leases.filter(lease => {
+  const filteredLeases = uniqueLeases.filter(lease => {
     if (filterStatus === 'all') return true;
     return lease.status === filterStatus;
   });

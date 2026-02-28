@@ -43,6 +43,8 @@ export default function PropertiesPage() {
   const [selectedUnit, setSelectedUnit] = useState<UnitWithAttributes | null>(null);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [chatFilteredIds, setChatFilteredIds] = useState<string[] | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
   const router = useRouter();
   const supabase = createClient();
 
@@ -151,6 +153,11 @@ export default function PropertiesPage() {
     if (filters.petFriendly) c++;
     return c;
   }, [filters]);
+
+  // Reset to page 1 whenever the filtered list changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters, chatFilteredIds]);
 
   const clearFilters = () => {
     setFilters(defaultFilters);
@@ -574,9 +581,12 @@ export default function PropertiesPage() {
           </div>
         )}
 
-        {!loading && !fetchError && units.length > 0 && (
+        {!loading && !fetchError && units.length > 0 && (() => {
+          const totalPages = Math.ceil(units.length / PAGE_SIZE);
+          const pagedUnits = units.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+          return (<>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {units.map((unit, i) => {
+            {pagedUnits.map((unit, i) => {
               const beds = getBeds(unit);
               const baths = getBaths(unit);
               const unitTags = tags(unit);
@@ -592,7 +602,7 @@ export default function PropertiesPage() {
                 >
                   {unit.images && unit.images.length > 0 ? (
                     <div className="h-52 relative overflow-hidden">
-                      <img src={unit.images[0]} alt={unit.unit_identifier} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <img src={unit.images[0]} alt={unit.unit_identifier} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       {unit.images.length > 1 && (
                         <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-xs font-medium">
                           +{unit.images.length - 1} photos
@@ -678,7 +688,58 @@ export default function PropertiesPage() {
               );
             })}
           </div>
-        )}
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/5">
+              <p className="text-white/30 text-sm">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, units.length)} of {units.length} properties
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg text-sm border border-white/10 text-white/50 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← Prev
+                </button>
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p =>
+                    p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1
+                  ).reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && typeof arr[idx - 1] === 'number' && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, []).map((p, i) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-white/20 text-sm">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p as number)}
+                        className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === p
+                            ? 'bg-indigo-600 text-white'
+                            : 'text-white/50 hover:text-white hover:bg-white/5 border border-white/10'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg text-sm border border-white/10 text-white/50 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+          </>);
+        })()}
       </div>
 
       <PropertyChatbot

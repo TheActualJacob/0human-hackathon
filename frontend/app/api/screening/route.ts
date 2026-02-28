@@ -102,7 +102,7 @@ Consider factors like:
 
     // Call Claude API
     const message = await anthropic.messages.create({
-      model: 'claude-3-sonnet-20240229',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1500,
       temperature: 0.3,
       system: "You are an expert property manager with 20 years of experience in tenant screening. You are thorough, fair, and skilled at identifying both positive indicators and potential risks. Always provide balanced, objective assessments.",

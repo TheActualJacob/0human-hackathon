@@ -14,6 +14,7 @@ import type { Database } from '@/lib/supabase/database.types';
 import type { UnitWithAttributes } from '@/components/properties/MapView';
 
 const MapView = dynamic(() => import('@/components/properties/MapView'), { ssr: false });
+const PropertyChatbot = dynamic(() => import('@/components/properties/PropertyChatbot'), { ssr: false });
 
 type Unit = Database['public']['Tables']['units']['Row'];
 type UnitAttributes = Database['public']['Tables']['unit_attributes']['Row'];
@@ -41,6 +42,7 @@ export default function PropertiesPage() {
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<UnitWithAttributes | null>(null);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [chatFilteredIds, setChatFilteredIds] = useState<string[] | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -98,6 +100,11 @@ export default function PropertiesPage() {
   }, []);
 
   const units = useMemo(() => {
+    // When Claude has made an explicit selection, show only those properties
+    if (chatFilteredIds !== null) {
+      const idSet = new Set(chatFilteredIds);
+      return allUnits.filter(u => idSet.has(u.id));
+    }
     let data = allUnits;
     if (searchTerm.trim()) {
       const s = searchTerm.toLowerCase();
@@ -130,7 +137,7 @@ export default function PropertiesPage() {
       u.unit_attributes.pet_policy !== 'No Pets'
     );
     return data;
-  }, [allUnits, searchTerm, filters, getBeds, getBaths]);
+  }, [allUnits, searchTerm, filters, getBeds, getBaths, chatFilteredIds]);
 
   const activeFilterCount = useMemo(() => {
     let c = 0;
@@ -145,7 +152,17 @@ export default function PropertiesPage() {
     return c;
   }, [filters]);
 
-  const clearFilters = () => setFilters(defaultFilters);
+  const clearFilters = () => {
+    setFilters(defaultFilters);
+    setChatFilteredIds(null);
+  };
+
+  const handleChatFilterToIds = useCallback((ids: string[] | null) => {
+    setChatFilteredIds(ids);
+    // Highlight the first matched property on the map
+    if (ids && ids.length > 0) setHighlightedId(ids[0]);
+    else setHighlightedId(null);
+  }, []);
 
   const formatDate = (date: string | null) => {
     if (!date) return 'Immediately';
@@ -663,6 +680,13 @@ export default function PropertiesPage() {
           </div>
         )}
       </div>
+
+      <PropertyChatbot
+        units={allUnits}
+        filteredCount={units.length}
+        onFilterToIds={handleChatFilterToIds}
+        onResetFilters={clearFilters}
+      />
 
       <footer className="border-t border-white/5 py-8 mt-10">
         <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">

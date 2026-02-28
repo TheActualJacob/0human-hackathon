@@ -874,6 +874,117 @@ export interface Database {
           created_at?: string | null
         }
       }
+      maintenance_workflows: {
+        Row: {
+          id: string
+          maintenance_request_id: string
+          current_state: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
+          ai_analysis: any
+          owner_response: 'approved' | 'denied' | 'question' | null
+          owner_response_message: string | null
+          vendor_message: string | null
+          vendor_eta: string | null
+          vendor_notes: string | null
+          state_history: any
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          maintenance_request_id: string
+          current_state?: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
+          ai_analysis?: any
+          owner_response?: 'approved' | 'denied' | 'question' | null
+          owner_response_message?: string | null
+          vendor_message?: string | null
+          vendor_eta?: string | null
+          vendor_notes?: string | null
+          state_history?: any
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          maintenance_request_id?: string
+          current_state?: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
+          ai_analysis?: any
+          owner_response?: 'approved' | 'denied' | 'question' | null
+          owner_response_message?: string | null
+          vendor_message?: string | null
+          vendor_eta?: string | null
+          vendor_notes?: string | null
+          state_history?: any
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      workflow_communications: {
+        Row: {
+          id: string
+          workflow_id: string
+          sender_type: 'tenant' | 'owner' | 'vendor' | 'system'
+          sender_id: string | null
+          sender_name: string | null
+          message: string
+          metadata: any
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workflow_id: string
+          sender_type: 'tenant' | 'owner' | 'vendor' | 'system'
+          sender_id?: string | null
+          sender_name?: string | null
+          message: string
+          metadata?: any
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workflow_id?: string
+          sender_type?: 'tenant' | 'owner' | 'vendor' | 'system'
+          sender_id?: string | null
+          sender_name?: string | null
+          message?: string
+          metadata?: any
+          created_at?: string
+        }
+      }
+      vendor_bids: {
+        Row: {
+          id: string
+          workflow_id: string
+          contractor_id: string
+          bid_amount: number
+          estimated_completion_time: number | null
+          message: string | null
+          is_selected: boolean | null
+          ai_score: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workflow_id: string
+          contractor_id: string
+          bid_amount: number
+          estimated_completion_time?: number | null
+          message?: string | null
+          is_selected?: boolean | null
+          ai_score?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workflow_id?: string
+          contractor_id?: string
+          bid_amount?: number
+          estimated_completion_time?: number | null
+          message?: string | null
+          is_selected?: boolean | null
+          ai_score?: number | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

@@ -116,3 +116,36 @@ export interface DisputeWithDetails extends Dispute {
   lease?: LeaseWithTenants;
   legal_actions?: LegalAction[];
 }
+
+// Workflow types
+export type MaintenanceWorkflow = Tables['maintenance_workflows']['Row'];
+export type WorkflowCommunication = Tables['workflow_communications']['Row'];
+export type VendorBid = Tables['vendor_bids']['Row'];
+
+export type MaintenanceWorkflowInsert = Tables['maintenance_workflows']['Insert'];
+export type WorkflowCommunicationInsert = Tables['workflow_communications']['Insert'];
+export type VendorBidInsert = Tables['vendor_bids']['Insert'];
+
+export type MaintenanceWorkflowUpdate = Tables['maintenance_workflows']['Update'];
+export type WorkflowCommunicationUpdate = Tables['workflow_communications']['Update'];
+export type VendorBidUpdate = Tables['vendor_bids']['Update'];
+
+// Workflow state type
+export type WorkflowState = MaintenanceWorkflow['current_state'];
+
+// AI Analysis structure
+export interface AIAnalysis {
+  category: string;
+  urgency: 'low' | 'medium' | 'high' | 'emergency';
+  estimated_cost_range: 'low' | 'medium' | 'high';
+  vendor_required: boolean;
+  reasoning: string;
+  confidence_score: number;
+}
+
+// Complete workflow with relationships
+export interface MaintenanceWorkflowWithDetails extends MaintenanceWorkflow {
+  maintenance_request?: MaintenanceRequestWithDetails;
+  communications?: WorkflowCommunication[];
+  vendor_bids?: VendorBid[];
+}

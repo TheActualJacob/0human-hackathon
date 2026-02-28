@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PropAI - Property Management Platform",
-  description: "AI-powered property management system",
+  title: "PropAI - AI-Powered Property Management",
+  description: "Streamline your property operations with autonomous AI agents",
 };
 
 export default function RootLayout({

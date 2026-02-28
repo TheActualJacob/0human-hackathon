@@ -7,7 +7,12 @@ import StoreProvider from "@/components/providers/StoreProvider";
 
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPublicPage = pathname.startsWith('/apply') || pathname.startsWith('/sign');
+  const isPublicPage =
+    pathname === '/' ||
+    pathname.startsWith('/apply') ||
+    pathname.startsWith('/sign') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/demo');
 
   if (isPublicPage) {
     return <>{children}</>;

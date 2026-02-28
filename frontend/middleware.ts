@@ -111,8 +111,8 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/unauthorized', request.url));
       }
 
-      // Redirect authenticated users away from auth pages
-      if (isPublicRoute && request.nextUrl.pathname !== '/') {
+      // Redirect authenticated users away from auth pages (but not /properties)
+      if (isPublicRoute && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/properties')) {
         if (authUser.role === 'landlord') {
           return NextResponse.redirect(new URL('/landlord/dashboard', request.url));
         } else if (authUser.role === 'tenant') {

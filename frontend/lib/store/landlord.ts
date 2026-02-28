@@ -150,23 +150,36 @@ const useLandlordStore = create<LandlordState>()(
           throw new Error('You must be logged in to create a property');
         }
         
-        // Get the landlord ID from the auth_users table
-        const { data: authUserData, error: authError } = await supabase
+        // Get the landlord ID — try auth_users mapping first, fall back to landlords.auth_user_id
+        let landlordId: string | null = null;
+
+        const { data: authUserData } = await supabase
           .from('auth_users')
           .select('entity_id')
           .eq('id', authUser.id)
           .eq('role', 'landlord')
           .single();
-          
-        if (authError || !authUserData) {
-          console.error('Auth user lookup error:', authError);
+
+        if (authUserData?.entity_id) {
+          landlordId = authUserData.entity_id;
+        } else {
+          // Fallback: look up landlord directly by auth_user_id
+          const { data: landlordData } = await supabase
+            .from('landlords')
+            .select('id')
+            .eq('auth_user_id', authUser.id)
+            .single();
+          landlordId = landlordData?.id ?? null;
+        }
+
+        if (!landlordId) {
           throw new Error('Could not find your landlord profile. Please contact support.');
         }
-        
+
         // Ensure landlord_id is set
         const unitData = {
           ...unit,
-          landlord_id: authUserData.entity_id
+          landlord_id: landlordId
         };
         
         console.log('Creating unit with data:', unitData);
@@ -186,7 +199,7 @@ const useLandlordStore = create<LandlordState>()(
         console.log('Unit created successfully:', data);
         
         // Refetch data to include the new unit
-        get().fetchLandlordData(authUserData.entity_id);
+        get().fetchLandlordData(landlordId);
         
         return data;
       },

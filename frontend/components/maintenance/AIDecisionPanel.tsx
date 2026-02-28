@@ -1,136 +1,201 @@
-import { Card } from "@/components/ui/card";
-import { Brain, Clock, Zap, User, DollarSign } from "lucide-react";
-import { MaintenanceTicket, Contractor } from "@/types";
-import { format } from "date-fns";
-import StatusBadge from "@/components/shared/StatusBadge";
+'use client';
 
-type AiDecision = { action?: string; reasoning?: string; confidence?: number; timestamp?: string };
-type TicketAny = MaintenanceTicket & { ai_decisions?: AiDecision[] | null; estimated_cost?: number | null };
+import { motion } from 'framer-motion';
+import { 
+  Brain, 
+  Zap, 
+  DollarSign, 
+  Wrench, 
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Info
+} from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import type { AIAnalysis } from '@/types';
 
 interface AIDecisionPanelProps {
-  ticket: TicketAny;
-  vendor?: Contractor;
+  analysis: AIAnalysis | null;
+  isLoading?: boolean;
 }
 
-export default function AIDecisionPanel({ ticket, vendor }: AIDecisionPanelProps) {
+export function AIDecisionPanel({ analysis, isLoading = false }: AIDecisionPanelProps) {
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="rounded-lg bg-primary/10 p-3"
+          >
+            <Brain className="h-6 w-6 text-primary" />
+          </motion.div>
+          <div>
+            <h3 className="text-lg font-semibold">AI Analysis</h3>
+            <p className="text-sm text-muted-foreground">Analyzing maintenance request...</p>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="h-4 bg-muted rounded animate-pulse" />
+          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+          <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!analysis) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="rounded-lg bg-muted p-3">
+            <Brain className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">AI Analysis</h3>
+            <p className="text-sm text-muted-foreground">No analysis available</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const getCategoryIcon = (category: string) => {
+    const icons: Record<string, JSX.Element> = {
+      plumbing: <Wrench className="h-5 w-5" />,
+      electrical: <Zap className="h-5 w-5" />,
+      hvac: <Info className="h-5 w-5" />,
+      appliance: <Info className="h-5 w-5" />,
+      structural: <AlertTriangle className="h-5 w-5" />,
+      pest: <Info className="h-5 w-5" />,
+      cosmetic: <Info className="h-5 w-5" />,
+      other: <Info className="h-5 w-5" />
+    };
+    return icons[category] || <Info className="h-5 w-5" />;
+  };
+
+  const getUrgencyColor = (urgency: string) => {
+    switch (urgency) {
+      case 'emergency':
+        return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'high':
+        return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
+      case 'medium':
+        return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+      case 'low':
+        return 'text-green-500 bg-green-500/10 border-green-500/20';
+      default:
+        return 'text-muted-foreground bg-muted';
+    }
+  };
+
+  const getCostEstimate = (range: string) => {
+    switch (range) {
+      case 'low':
+        return '< $200';
+      case 'medium':
+        return '$200 - $800';
+      case 'high':
+        return '> $800';
+      default:
+        return 'Unknown';
+    }
+  };
+
   return (
-    <Card className="p-6 space-y-6 ai-glow">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-card border border-primary/20 rounded-lg p-6 ai-glow"
+    >
+      <div className="flex items-center gap-3 mb-6">
         <div className="rounded-lg bg-primary/10 p-3">
           <Brain className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold">AI Decision Panel</h3>
-          <p className="text-sm text-muted-foreground">Automated analysis and actions</p>
+          <h3 className="text-lg font-semibold">AI Decision Analysis</h3>
+          <p className="text-sm text-muted-foreground">Claude&apos;s assessment of the issue</p>
         </div>
       </div>
 
-      {/* Classification Section */}
       <div className="space-y-4">
-        <h4 className="font-medium flex items-center gap-2">
-          <Zap className="h-4 w-4 text-primary" />
-          Issue Classification
-        </h4>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Category</p>
-            <p className="font-medium capitalize">{ticket.category}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Urgency</p>
-            <StatusBadge status={(ticket.urgency ?? 'medium') as 'medium'} />
+        {/* Category */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Category</span>
+          <div className="flex items-center gap-2">
+            {getCategoryIcon(analysis.category)}
+            <span className="font-medium capitalize">{analysis.category}</span>
           </div>
         </div>
-        
-        {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).length > 0 && (
-          <div className="rounded-lg bg-secondary/50 p-3">
-            <p className="text-sm">{((ticket.ai_decisions ?? []) as AiDecision[])[0].reasoning}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Confidence: {((ticket.ai_decisions ?? []) as AiDecision[])[0].confidence}%
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* Vendor Assignment Section */}
-      {vendor && (
-        <div className="space-y-4 border-t pt-4">
-          <h4 className="font-medium flex items-center gap-2">
-            <User className="h-4 w-4 text-primary" />
-            Vendor Assignment
-          </h4>
-          
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Selected Vendor</span>
-              <span className="font-medium">{vendor.name}</span>
-            </div>
-            {vendor.phone && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Phone</span>
-                <span className="text-sm">{vendor.phone}</span>
-              </div>
+        {/* Urgency */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Urgency</span>
+          <Badge 
+            variant="outline" 
+            className={cn("capitalize", getUrgencyColor(analysis.urgency))}
+          >
+            {analysis.urgency}
+          </Badge>
+        </div>
+
+        {/* Cost Estimate */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Estimated Cost</span>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-green-500" />
+            <span className="font-medium">{getCostEstimate(analysis.estimated_cost_range)}</span>
+          </div>
+        </div>
+
+        {/* Vendor Required */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Vendor Required</span>
+          <div className="flex items-center gap-2">
+            {analysis.vendor_required ? (
+              <>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <Badge variant="default" className="bg-green-500/10 text-green-500">
+                  Yes
+                </Badge>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-4 w-4 text-red-500" />
+                <Badge variant="outline" className="text-red-500">
+                  No
+                </Badge>
+              </>
             )}
           </div>
-          
-          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).find(d => d.action === 'Vendor Assignment') && (
-            <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-sm">
-                {((ticket.ai_decisions ?? []) as AiDecision[]).find(d => d.action === 'Vendor Assignment')?.reasoning}
-              </p>
-            </div>
-          )}
         </div>
-      )}
 
-      {/* Cost Estimation */}
-      {ticket.estimated_cost && (
-        <div className="space-y-4 border-t pt-4">
-          <h4 className="font-medium flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-primary" />
-            Cost Estimation
-          </h4>
-          
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Estimated Cost</span>
-            <span className="text-lg font-semibold">${ticket.estimated_cost}</span>
+        {/* Reasoning */}
+        <div className="pt-3 border-t border-border">
+          <p className="text-sm font-medium text-muted-foreground mb-2">AI Reasoning</p>
+          <p className="text-sm bg-muted/50 rounded-lg p-3">
+            {analysis.reasoning}
+          </p>
+        </div>
+
+        {/* Confidence Score */}
+        <div className="pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Confidence Score</span>
+            <span className="text-sm font-medium">
+              {Math.round(analysis.confidence_score * 100)}%
+            </span>
           </div>
-        </div>
-      )}
-
-      {/* AI Actions Timeline */}
-      <div className="space-y-4 border-t pt-4">
-        <h4 className="font-medium flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" />
-          AI Actions Timeline
-        </h4>
-        
-        <div className="space-y-3">
-          {ticket.ai_decisions && Array.isArray(ticket.ai_decisions) && ((ticket.ai_decisions ?? []) as AiDecision[]).map((decision, index) => (
-            <div key={index} className="flex gap-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{decision.action}</p>
-                <p className="text-xs text-muted-foreground">
-                  {decision.timestamp ? format(new Date(decision.timestamp), 'MMM d, h:mm a') : '—'}
-                </p>
-              </div>
-            </div>
-          ))}
+          <Progress 
+            value={analysis.confidence_score * 100} 
+            className="h-2"
+          />
         </div>
       </div>
-
-      {/* Action Buttons */}
-      <div className="space-y-2 pt-4">
-        <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-          Owner Notified
-        </button>
-        <button className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors">
-          View Full History
-        </button>
-      </div>
-    </Card>
+    </motion.div>
   );
 }

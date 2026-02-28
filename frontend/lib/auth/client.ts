@@ -41,20 +41,39 @@ export async function signUpLandlord(data: {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // 2. Create landlord record WITH auth_user_id from the start
-    const { data: landlord, error: landlordError } = await supabase
+    // 2. Create landlord record, or link to existing one if email already exists
+    let landlord;
+    const { data: existingLandlord } = await supabase
       .from('landlords')
-      .insert({
-        auth_user_id: authData.user.id,  // Set this from the beginning!
-        full_name: data.fullName,
-        email: data.email,
-        phone: data.phone,
-        whatsapp_number: data.whatsappNumber
-      })
       .select()
+      .eq('email', data.email)
       .single();
 
-    if (landlordError) throw landlordError;
+    if (existingLandlord) {
+      // Link auth user to the existing landlord record
+      const { data: updated, error: updateErr } = await supabase
+        .from('landlords')
+        .update({ auth_user_id: authData.user.id })
+        .eq('id', existingLandlord.id)
+        .select()
+        .single();
+      if (updateErr) throw updateErr;
+      landlord = updated;
+    } else {
+      const { data: newLandlord, error: landlordError } = await supabase
+        .from('landlords')
+        .insert({
+          auth_user_id: authData.user.id,
+          full_name: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          whatsapp_number: data.whatsappNumber
+        })
+        .select()
+        .single();
+      if (landlordError) throw landlordError;
+      landlord = newLandlord;
+    }
 
     // 3. Create auth_users mapping
     const { error: mappingError } = await supabase
@@ -66,16 +85,6 @@ export async function signUpLandlord(data: {
       });
 
     if (mappingError) throw mappingError;
-
-    // 4. Update landlord record with auth_user_id to ensure it's linked
-    const { error: updateError } = await supabase
-      .from('landlords')
-      .update({ auth_user_id: authData.user.id })
-      .eq('id', landlord.id);
-      
-    if (updateError) {
-      console.error('Failed to update landlord auth_user_id:', updateError);
-    }
 
     return { user: authData.user, landlord };
   } catch (error: any) {

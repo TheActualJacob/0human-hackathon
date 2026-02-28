@@ -5,33 +5,60 @@ import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import StoreProvider from '@/components/providers/StoreProvider';
-import { onAuthStateChange, getCurrentUser, type UserRole } from '@/lib/auth/client';
+import { createClient } from '@/lib/supabase/client';
+import type { UserRole } from '@/lib/auth/client';
+
+const supabase = createClient();
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPublicPage = pathname.startsWith('/pay/');
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>(
-    pathname.startsWith('/tenant/') ? 'tenant' : 'landlord'
-  );
+
+  // Public pages — never show sidebar, never block on auth check
+  const isPublicPage =
+    pathname === '/' ||
+    pathname.startsWith('/pay/') ||
+    pathname.startsWith('/properties') ||
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/demo');
+
+  // Derive role directly from current pathname on every render — fully reactive
+  const userRole: UserRole = pathname.startsWith('/tenant/') ? 'tenant' : 'landlord';
+
+  const [ready, setReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = onAuthStateChange(async (_event, session) => {
+    // Fast: use local session cache — no network round-trip
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setIsLoggedIn(!!session);
-      if (session) {
-        const user = await getCurrentUser();
-        if (user) setUserRole(user.role);
-      }
+      setReady(true);
     });
+
+    // Keep in sync if user logs in/out in another tab
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+      setReady(true);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  if (isPublicPage || isLoggedIn === false) {
+  // Public pages render instantly — no auth check needed
+  if (isPublicPage) {
+    return <div className="min-h-full bg-background">{children}</div>;
+  }
+
+  // Protected pages — wait only for the session cache (fast)
+  if (!ready) {
     return (
-      <div className="min-h-full bg-background">
-        {children}
+      <div className="flex h-screen w-full items-center justify-center bg-[#05050a]">
+        <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
       </div>
     );
+  }
+
+  if (!isLoggedIn) {
+    return <div className="min-h-full bg-background">{children}</div>;
   }
 
   return (

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { createClient } from '@/lib/supabase/client';
-import { submitMaintenanceRequest, createTestWorkflow, checkTables } from '@/lib/api/maintenance';
 import type { Database } from '@/lib/supabase/database.types';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
@@ -30,6 +29,7 @@ import type {
   WorkflowCommunication,
   VendorBid,
   MaintenanceWorkflowWithDetails,
+  AutoApprovalPolicy,
 } from '@/types';
 
 type Tables = Database['public']['Tables'];
@@ -140,9 +140,10 @@ interface AppState {
   getWorkflowWithDetails: (workflowId: string) => MaintenanceWorkflowWithDetails | null;
   
   // Workflow Actions
-  submitMaintenanceWorkflow: (leaseId: string, description: string) => Promise<void>;
+  submitMaintenanceWorkflow: (leaseId: string, description: string, policy?: AutoApprovalPolicy) => Promise<void>;
   handleOwnerResponse: (workflowId: string, response: 'approved' | 'denied' | 'question', message?: string) => Promise<void>;
-  handleVendorResponse: (workflowId: string, vendorId: string, eta: Date, notes?: string) => Promise<void>;
+  handleVendorResponse: (workflowId: string, vendorId: string | null, eta: Date, notes?: string) => Promise<void>;
+  completeMaintenanceWorkflow: (workflowId: string) => Promise<void>;
   
   // Selection Actions for workflows
   setSelectedWorkflow: (workflowId: string | null) => void;
@@ -901,100 +902,106 @@ const useStore = create<AppState>((set, get) => ({
     
     return {
       ...workflow,
-      maintenance_request: state.getMaintenanceRequestWithDetails(maintenanceRequest.id),
+      maintenance_request: state.getMaintenanceRequestWithDetails(maintenanceRequest.id) ?? undefined,
       communications: state.workflowCommunications.filter(c => c.workflow_id === workflowId),
       vendor_bids: state.vendorBids.filter(b => b.workflow_id === workflowId)
     };
   },
   
   // Workflow Actions
-  submitMaintenanceWorkflow: async (leaseId, description) => {
+  submitMaintenanceWorkflow: async (leaseId, description, policy) => {
     try {
-      // First, try the main endpoint
-      const response = await submitMaintenanceRequest({
-        lease_id: leaseId,
-        description,
+      const response = await fetch('/api/maintenance/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lease_id: leaseId, description, auto_approval_policy: policy ?? null }),
       });
-      
-      if (!response.success) {
-        // Main endpoint fails because backend can't connect to DB
-        // This is expected, use test endpoint as fallback
-        
-        const testResponse = await createTestWorkflow(leaseId, description);
-        
-        if (!testResponse.success) {
-          throw new Error(testResponse.error || 'Failed to create workflow');
-        }
-        
-        // Successfully created via test endpoint
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit maintenance request');
       }
-      
-      // Wait a moment for the database to sync
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Refresh data to get the new workflow
+
       await get().fetchData();
-      
-      // Select the first workflow if available
-      const workflows = get().maintenanceWorkflows;
-      if (workflows.length > 0) {
-        set({ selectedWorkflow: workflows[0].id });
+
+      if (data.workflow_id) {
+        set({ selectedWorkflow: data.workflow_id });
       }
     } catch (error: any) {
-      // Handle the database connection error silently
-      // The frontend works fine without backend persistence
-      if (error.message?.includes('nodename nor servname provided')) {
-        // This is expected - backend can't connect to DB
-        // Don't set error or throw - just continue
-        return;
-      }
-      
-      // For other errors, set the error but don't throw
+      console.error('Error submitting maintenance workflow:', error);
       set({ error: error.message });
+      throw error;
     }
   },
-  
+
   handleOwnerResponse: async (workflowId, response, message) => {
     try {
-      const apiResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/maintenance/${workflowId}/owner-response`, {
+      const apiResponse = await fetch('/api/maintenance/owner-response', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ response, message }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: workflowId, response, message }),
       });
-      
-      if (!apiResponse.ok) throw new Error('Failed to submit owner response');
-      
-      // Refresh data
+
+      const data = await apiResponse.json();
+
+      if (!apiResponse.ok) {
+        throw new Error(data.error || 'Failed to submit owner response');
+      }
+
       await get().fetchData();
     } catch (error: any) {
       console.error('Error handling owner response:', error);
       set({ error: error.message });
+      throw error;
     }
   },
-  
-  handleVendorResponse: async (workflowId, vendorId, eta, notes) => {
+
+  handleVendorResponse: async (workflowId, _vendorId, eta, notes) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/maintenance/${workflowId}/vendor-response`, {
+      const response = await fetch('/api/maintenance/vendor-response', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendor_id: vendorId,
+          workflow_id: workflowId,
           eta: eta.toISOString(),
-          notes
+          notes,
         }),
       });
-      
-      if (!response.ok) throw new Error('Failed to submit vendor response');
-      
-      // Refresh data
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit vendor response');
+      }
+
       await get().fetchData();
     } catch (error: any) {
       console.error('Error handling vendor response:', error);
       set({ error: error.message });
+      throw error;
+    }
+  },
+
+  completeMaintenanceWorkflow: async (workflowId) => {
+    try {
+      const response = await fetch('/api/maintenance/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: workflowId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to complete workflow');
+      }
+
+      await get().fetchData();
+    } catch (error: any) {
+      console.error('Error completing workflow:', error);
+      set({ error: error.message });
+      throw error;
     }
   }
 }));

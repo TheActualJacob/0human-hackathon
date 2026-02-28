@@ -82,8 +82,15 @@ export default function TopBar({ userRole }: TopBarProps) {
             <DropdownMenuItem 
               onClick={async () => {
                 setLoading(true);
-                await signOut();
-                router.push('/');
+                try {
+                  await signOut();
+                  // Force a hard reload to clear all states and stores
+                  window.location.href = '/';
+                } catch (error) {
+                  console.error('Sign out error:', error);
+                  // Fallback if signOut fails
+                  window.location.href = '/';
+                }
               }}
               className="text-destructive"
             >

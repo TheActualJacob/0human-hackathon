@@ -68,10 +68,14 @@ const useTenantStore = create<TenantState>()(
               )
             `)
             .eq('id', tenantId)
-            .single();
+            .maybeSingle();
 
           if (tenantsError) throw tenantsError;
-          if (!tenant) throw new Error('Tenant not found');
+          // No tenant record found — show empty dashboard rather than crashing
+          if (!tenant) {
+            set({ tenantInfo: null, payments: [], maintenanceRequests: [], maintenanceWorkflows: [], loading: false });
+            return;
+          }
 
           let payments: Payment[] = [];
           let maintenanceRequests: MaintenanceRequest[] = [];
@@ -79,22 +83,20 @@ const useTenantStore = create<TenantState>()(
 
           // Only fetch lease-related data if tenant has an active lease
           if (tenant.lease_id) {
-            const { data: payData, error: paymentsError } = await supabase
+            const { data: payData } = await supabase
               .from('payments')
               .select('*')
               .eq('lease_id', tenant.lease_id)
               .order('due_date', { ascending: false });
 
-            if (paymentsError) throw paymentsError;
             payments = payData || [];
 
-            const { data: maintData, error: maintenanceError } = await supabase
+            const { data: maintData } = await supabase
               .from('maintenance_requests')
               .select('*')
               .eq('lease_id', tenant.lease_id)
               .order('created_at', { ascending: false });
 
-            if (maintenanceError) throw maintenanceError;
             maintenanceRequests = maintData || [];
 
             const requestIds = maintenanceRequests.map(r => r.id);

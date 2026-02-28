@@ -26,20 +26,26 @@ export default function TenantDashboard() {
   // Fetch authenticated user and their data
   useEffect(() => {
     async function loadUserData() {
-      if (!user) {
+      // Use a local variable so we can call fetchTenantData immediately
+      // without waiting for the next render (stale closure fix)
+      let activeUser = user;
+
+      if (!activeUser) {
         const currentUser = await getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
+          activeUser = currentUser;
         }
       }
-      
-      if (user?.entityId) {
-        fetchTenantData(user.entityId);
+
+      if (activeUser?.entityId) {
+        fetchTenantData(activeUser.entityId);
       }
     }
-    
+
     loadUserData();
-  }, [user, setUser, fetchTenantData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Calculate metrics
   const nextPaymentDue = payments
@@ -86,9 +92,20 @@ export default function TenantDashboard() {
   if (!tenantInfo) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center space-y-4">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
-          <p className="text-muted-foreground">Unable to load tenant information</p>
+        <div className="text-center space-y-4 max-w-md mx-auto p-6">
+          <Home className="h-12 w-12 text-muted-foreground mx-auto" />
+          <h2 className="text-xl font-semibold">No tenant profile found</h2>
+          <p className="text-muted-foreground text-sm">
+            Your account doesn't have a tenant profile linked yet. Browse available properties to apply, or contact your landlord.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <a href="/properties" className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 transition-colors">
+              Browse Properties
+            </a>
+            <a href="/auth/login" className="px-4 py-2 border rounded-lg text-sm hover:bg-accent transition-colors">
+              Switch Account
+            </a>
+          </div>
         </div>
       </div>
     );

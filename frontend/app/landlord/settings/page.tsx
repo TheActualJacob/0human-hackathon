@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User, Bell, Shield, Key, Globe, Palette, 
   Building, CreditCard, Save, Check
@@ -14,22 +14,124 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 // import { useToast } from '@/components/ui/use-toast';
+import useAuthStore from '@/lib/store/auth';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LandlordSettingsPage() {
   // const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthStore();
+  const supabase = createClient();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    whatsappNumber: '',
+    companyName: '',
+    portfolioSize: '5-10',
+    paymentTerms: ''
+  });
+
+  // Load user data on mount
+  useEffect(() => {
+    if (user?.entity) {
+      const fullName = user.entity.full_name || '';
+      const [firstName, ...lastNameParts] = fullName.split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      // Get additional data from notification_preferences JSON if stored there
+      const notificationPrefs = user.entity.notification_preferences || {};
+      
+      setFormData({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        email: user.email || '',
+        phone: user.entity.phone || '',
+        whatsappNumber: user.entity.whatsapp_number || '',
+        companyName: notificationPrefs.company_name || '',
+        portfolioSize: notificationPrefs.portfolio_size || '5-10',
+        paymentTerms: notificationPrefs.payment_terms || ''
+      });
+      setIsLoading(false);
+    } else if (user === null) {
+      // User is not logged in or data failed to load
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const handleSave = async () => {
+    if (!user?.entityId) return;
+    
     setSaving(true);
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
-    // toast({
-    //   title: "Settings saved",
-    //   description: "Your changes have been saved successfully.",
-    // });
-    alert('Settings saved successfully!');
+    try {
+      // Get current notification preferences
+      const currentPrefs = user.entity?.notification_preferences || {
+        email: true,
+        whatsapp: true,
+        digest_frequency: 'daily'
+      };
+
+      // Merge with additional profile data
+      const updatedNotificationPreferences = {
+        ...currentPrefs,
+        company_name: formData.companyName,
+        portfolio_size: formData.portfolioSize,
+        payment_terms: formData.paymentTerms
+      };
+
+      // Update landlord data in the database
+      const { error } = await supabase
+        .from('landlords')
+        .update({
+          full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          phone: formData.phone || null,
+          whatsapp_number: formData.whatsappNumber || null,
+          notification_preferences: updatedNotificationPreferences
+        })
+        .eq('id', user.entityId);
+
+      if (error) throw error;
+
+      // Update the user's email if it changed
+      if (formData.email !== user.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: formData.email
+        });
+        if (authError) throw authError;
+      }
+
+      // Refresh the user data in the auth store
+      const { data: updatedLandlord } = await supabase
+        .from('landlords')
+        .select('*')
+        .eq('id', user.entityId)
+        .single();
+
+      if (updatedLandlord) {
+        useAuthStore.getState().setUser({
+          ...user,
+          email: formData.email,
+          entity: updatedLandlord
+        });
+      }
+
+      // toast({
+      //   title: "Settings saved",
+      //   description: "Your changes have been saved successfully.",
+      // });
+      alert('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Error saving settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -58,30 +160,61 @@ export default function LandlordSettingsPage() {
               <User className="h-5 w-5" />
               Personal Information
             </h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>First Name</Label>
-                  <Input defaultValue="John" />
+                  <Input 
+                    value={formData.firstName} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Last Name</Label>
-                  <Input defaultValue="Doe" />
+                  <Input 
+                    value={formData.lastName} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" defaultValue="landlord@test.com" />
+                <Input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Phone Number</Label>
-                <Input defaultValue="+44 7123 456789" />
+                <Input 
+                  value={formData.phone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp Number</Label>
+                <Input 
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
+                  placeholder="Same as phone or different"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Company Name (Optional)</Label>
-                <Input placeholder="Acme Properties Ltd" />
+                <Input 
+                  placeholder="Acme Properties Ltd" 
+                  value={formData.companyName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                />
               </div>
             </div>
+            )}
           </Card>
 
           <Card className="p-6">
@@ -89,13 +222,21 @@ export default function LandlordSettingsPage() {
               <Building className="h-5 w-5" />
               Property Management
             </h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Portfolio Size</p>
                   <p className="text-sm text-muted-foreground">Number of properties you manage</p>
                 </div>
-                <Select defaultValue="5-10">
+                <Select 
+                  value={formData.portfolioSize}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, portfolioSize: value }))}
+                >
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -112,9 +253,12 @@ export default function LandlordSettingsPage() {
                 <Textarea 
                   placeholder="Payment is due on the 1st of each month..."
                   rows={3}
+                  value={formData.paymentTerms}
+                  onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
                 />
               </div>
             </div>
+            )}
           </Card>
         </TabsContent>
 

@@ -550,32 +550,38 @@ export interface Database {
       tenants: {
         Row: {
           id: string
-          lease_id: string
+          lease_id: string | null
           full_name: string
           email: string | null
           whatsapp_number: string
           id_document_url: string | null
           is_primary_tenant: boolean | null
+          profile_data: Json | null
+          auth_user_id: string | null
           created_at: string | null
         }
         Insert: {
           id?: string
-          lease_id: string
+          lease_id?: string | null
           full_name: string
           email?: string | null
           whatsapp_number: string
           id_document_url?: string | null
           is_primary_tenant?: boolean | null
+          profile_data?: Json | null
+          auth_user_id?: string | null
           created_at?: string | null
         }
         Update: {
           id?: string
-          lease_id?: string
+          lease_id?: string | null
           full_name?: string
           email?: string | null
           whatsapp_number?: string
           id_document_url?: string | null
           is_primary_tenant?: boolean | null
+          profile_data?: Json | null
+          auth_user_id?: string | null
           created_at?: string | null
         }
       }
@@ -649,6 +655,8 @@ export interface Database {
           has_balcony: boolean | null
           has_parking: boolean | null
           has_lift: boolean | null
+          furnished_status: string | null
+          pet_policy: string | null
           gas_provider: string | null
           electricity_provider: string | null
           water_provider: string | null
@@ -851,7 +859,21 @@ export interface Database {
           city: string
           country: string | null
           jurisdiction: string | null
+          listing_status: 'not_listed' | 'public' | 'private' | null
+          listing_description: string | null
+          listing_created_at: string | null
+          listing_expires_at: string | null
+          rent_amount: number | null
+          security_deposit: number | null
+          available_date: string | null
           created_at: string | null
+          images: string[] | null
+          unit_type: string | null
+          bedrooms: number | null
+          bathrooms: number | null
+          square_footage: number | null
+          postcode: string | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
@@ -861,7 +883,21 @@ export interface Database {
           city: string
           country?: string | null
           jurisdiction?: string | null
+          listing_status?: 'not_listed' | 'public' | 'private' | null
+          listing_description?: string | null
+          listing_created_at?: string | null
+          listing_expires_at?: string | null
+          rent_amount?: number | null
+          security_deposit?: number | null
+          available_date?: string | null
           created_at?: string | null
+          images?: string[] | null
+          unit_type?: string | null
+          bedrooms?: number | null
+          bathrooms?: number | null
+          square_footage?: number | null
+          postcode?: string | null
+          updated_at?: string | null
         }
         Update: {
           id?: string
@@ -871,7 +907,21 @@ export interface Database {
           city?: string
           country?: string | null
           jurisdiction?: string | null
+          listing_status?: 'not_listed' | 'public' | 'private' | null
+          listing_description?: string | null
+          listing_created_at?: string | null
+          listing_expires_at?: string | null
+          rent_amount?: number | null
+          security_deposit?: number | null
+          available_date?: string | null
           created_at?: string | null
+          images?: string[] | null
+          unit_type?: string | null
+          bedrooms?: number | null
+          bathrooms?: number | null
+          square_footage?: number | null
+          postcode?: string | null
+          updated_at?: string | null
         }
       }
       maintenance_workflows: {
@@ -983,6 +1033,79 @@ export interface Database {
           is_selected?: boolean | null
           ai_score?: number | null
           created_at?: string
+        }
+      }
+      property_applications: {
+        Row: {
+          id: string
+          unit_id: string
+          tenant_id: string | null
+          applicant_data: Json
+          status: 'pending' | 'ai_screening' | 'under_review' | 'accepted' | 'rejected' | 'withdrawn' | null
+          ai_screening_result: Json | null
+          ai_screening_score: number | null
+          landlord_notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          unit_id: string
+          tenant_id?: string | null
+          applicant_data: Json
+          status?: 'pending' | 'ai_screening' | 'under_review' | 'accepted' | 'rejected' | 'withdrawn' | null
+          ai_screening_result?: Json | null
+          ai_screening_score?: number | null
+          landlord_notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          unit_id?: string
+          tenant_id?: string | null
+          applicant_data?: Json
+          status?: 'pending' | 'ai_screening' | 'under_review' | 'accepted' | 'rejected' | 'withdrawn' | null
+          ai_screening_result?: Json | null
+          ai_screening_score?: number | null
+          landlord_notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+      }
+      property_invites: {
+        Row: {
+          id: string
+          unit_id: string
+          landlord_id: string
+          email: string
+          message: string | null
+          token: string
+          expires_at: string | null
+          used_at: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          unit_id: string
+          landlord_id: string
+          email: string
+          message?: string | null
+          token?: string
+          expires_at?: string | null
+          used_at?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          unit_id?: string
+          landlord_id?: string
+          email?: string
+          message?: string | null
+          token?: string
+          expires_at?: string | null
+          used_at?: string | null
+          created_at?: string | null
         }
       }
     }

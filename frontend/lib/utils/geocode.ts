@@ -1,6 +1,5 @@
-const clientCache = new Map<string, { lat: number; lng: number } | null>();
-// Deduplicates concurrent requests for the same query so StrictMode
-// double-invocations share one in-flight fetch instead of two.
+// Only cache successes — nulls are never stored so transient failures are retried.
+const clientCache = new Map<string, { lat: number; lng: number }>();
 const inFlight = new Map<string, Promise<{ lat: number; lng: number } | null>>();
 
 async function fetchGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
@@ -13,11 +12,9 @@ async function fetchGeocode(query: string): Promise<{ lat: number; lng: number }
       return res.json() as Promise<{ lat: number; lng: number } | null>;
     })
     .catch(() => null)
-    .finally(() => {
-      inFlight.delete(query);
-    })
     .then(result => {
-      clientCache.set(query, result);
+      inFlight.delete(query);
+      if (result) clientCache.set(query, result);
       return result;
     });
 

@@ -1,6 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { Database } from './database.types'
 
+// Regular client with user auth
 export async function createClient() {
   const cookieStore = await cookies()
 
@@ -33,4 +36,18 @@ export async function createClient() {
       },
     }
   )
+}
+
+// Service-role client — bypasses RLS, for server-side agent use only
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+
+if (supabaseServiceRoleKey && supabaseUrl) {
+  // Only create admin client if service role key is available
+  export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }

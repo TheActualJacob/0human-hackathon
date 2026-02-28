@@ -58,6 +58,7 @@ def build_system_prompt(ctx: TenantContext) -> str:
         ctx.conversation_context.summary if ctx.conversation_context and ctx.conversation_context.summary
         else "No prior conversation history."
     )
+    lease_agreement_section = _build_lease_agreement_section(ctx)
 
     return f"""You are an autonomous AI property manager operating on behalf of a landlord. You communicate directly with tenants via WhatsApp.
 
@@ -95,6 +96,7 @@ You are the property management system for this tenancy. You are not a human —
 ## CONVERSATION HISTORY SUMMARY
 {conversation_summary}
 
+{lease_agreement_section}
 ## JURISDICTION RULES (USE THESE DATES — DO NOT INVENT OTHERS)
 {jurisdiction_rules}
 
@@ -156,6 +158,18 @@ def _build_maintenance_summary(ctx: TenantContext) -> str:
             f"[{(m.urgency or 'UNKNOWN').upper()}] {m.category}: {m.description} — status: {m.status} ({age} days old)"
         )
     return "\n".join(lines)
+
+
+def _build_lease_agreement_section(ctx: TenantContext) -> str:
+    special_terms = ctx.lease.raw.get("special_terms")
+    if not special_terms or not special_terms.strip():
+        return ""
+    return f"""## LEASE AGREEMENT TERMS
+The following are the agreed terms of the tenancy agreement for this property. Reference these when the tenant asks about their rights, obligations, or specific clauses.
+
+{special_terms.strip()}
+
+"""
 
 
 def _build_legal_summary(ctx: TenantContext) -> str:

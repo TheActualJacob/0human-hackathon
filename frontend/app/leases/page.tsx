@@ -1,17 +1,84 @@
 'use client';
 
-import { FileText, Calendar, TrendingUp, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, Calendar, TrendingUp, AlertCircle, Bot, ChevronDown, ChevronUp, Save, ExternalLink } from "lucide-react";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import useStore from "@/lib/store/useStore";
 import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
+const EXAMPLE_LEASE_TEMPLATE = `ASSURED SHORTHOLD TENANCY AGREEMENT
+
+Parties
+- Landlord: [Landlord Name]
+- Tenant(s): [Tenant Name(s)]
+- Property: [Full Property Address]
+
+Term
+- Start Date: [Start Date]
+- End Date: [End Date] (fixed term)
+- Monthly Rent: £[Amount], payable in advance on the [Day] of each month
+
+Deposit
+- Deposit Amount: £[Amount]
+- Deposit Scheme: [Scheme Name, e.g. DPS / TDS / mydeposits]
+- Deposit Reference: [Reference Number]
+
+Key Obligations — Tenant
+1. Pay rent on time each month.
+2. Keep the property clean and in good condition.
+3. Report maintenance issues promptly.
+4. Not sublet or assign without prior written consent.
+5. Not make alterations to the property without written consent.
+6. Allow access for inspections with 24 hours written notice.
+7. Not cause nuisance to neighbours.
+
+Key Obligations — Landlord
+1. Keep the structure and exterior in repair.
+2. Ensure all gas, electrical, and heating systems are safe and serviced annually.
+3. Protect the deposit in an approved scheme within 30 days.
+4. Respond to urgent repair requests within 24 hours.
+5. Respond to routine repair requests within 28 days.
+
+Notice Periods
+- Tenant must give [X] weeks written notice to end the tenancy.
+- Landlord must follow statutory notice procedures (Section 8 or Section 21).
+
+Special Conditions
+[Add any additional agreed terms here, e.g. pets allowed, parking arrangements, gardening responsibilities, etc.]
+
+Governing Law: England & Wales`;
+
 export default function LeasesPage() {
-  const { leases, tenants } = useStore();
+  const { leases, tenants, updateLease } = useStore();
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string | null>(null);
+  const [agreementText, setAgreementText] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const selectedLease = leases.find(l => l.id === selectedLeaseId) || null;
+
+  useEffect(() => {
+    if (selectedLease) {
+      setAgreementText(selectedLease.special_terms || EXAMPLE_LEASE_TEMPLATE);
+      setSaveSuccess(false);
+    }
+  }, [selectedLeaseId]);
+
+  const handleSave = async () => {
+    if (!selectedLeaseId) return;
+    setSaving(true);
+    setSaveSuccess(false);
+    await updateLease(selectedLeaseId, { special_terms: agreementText });
+    setSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
 
   // Get tenant info for lease
   const getTenantInfo = (tenantId: string | null) => {
@@ -95,17 +162,34 @@ export default function LeasesPage() {
       key: 'action',
       header: 'Action',
       accessor: (lease) => {
-        if (lease.status === 'expired') {
-          return <Badge variant="destructive">Expired</Badge>;
-        }
-        if (lease.status === 'expiring') {
-          return (
-            <button className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90 transition-colors">
-              Renew
+        const isSelected = selectedLeaseId === lease.id;
+        const hasAgreement = !!(lease.special_terms && lease.special_terms.trim());
+        return (
+          <div className="flex items-center gap-2">
+            {lease.status === 'expired' ? (
+              <Badge variant="destructive">Expired</Badge>
+            ) : lease.status === 'expiring' ? (
+              <button className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90 transition-colors">
+                Renew
+              </button>
+            ) : (
+              <span className="text-sm text-muted-foreground">Active</span>
+            )}
+            <button
+              onClick={() => setSelectedLeaseId(isSelected ? null : lease.id)}
+              className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors",
+                isSelected
+                  ? "bg-primary/20 text-primary"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
+            >
+              <FileText className="h-3 w-3" />
+              {hasAgreement ? "Edit Agreement" : "Add Agreement"}
+              {isSelected ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
             </button>
-          );
-        }
-        return <span className="text-sm text-muted-foreground">Active</span>;
+          </div>
+        );
       }
     }
   ];
@@ -235,6 +319,85 @@ export default function LeasesPage() {
             })}
         </div>
       </Card>
+
+      {/* Lease Agreement Editor */}
+      {selectedLease && (
+        <Card className="p-6 border-primary/30">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Lease Agreement
+                {selectedLease.special_terms && (
+                  <Badge className="bg-green-500/10 text-green-500 text-xs">Saved</Badge>
+                )}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {(() => {
+                  const tenant = getTenantInfo(selectedLease.tenant_id);
+                  return tenant
+                    ? `${tenant.name} — Unit ${selectedLease.unit_identifier || selectedLease.unit_id}`
+                    : `Lease ${selectedLease.id.slice(0, 8)}`;
+                })()}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedLease.lease_document_url && (
+                <a
+                  href={selectedLease.lease_document_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View PDF
+                </a>
+              )}
+              <button
+                onClick={() => setSelectedLeaseId(null)}
+                className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded hover:bg-secondary/80 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {/* Agent visibility indicator */}
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
+            <Bot className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-primary">The WhatsApp agent reads this.</span>{" "}
+              Whatever you write here will be included in the agent's context every time it talks to this tenant — it can cite clauses, reference obligations, and answer lease-related questions.
+            </p>
+          </div>
+
+          <Textarea
+            value={agreementText}
+            onChange={(e) => { setAgreementText(e.target.value); setSaveSuccess(false); }}
+            className="min-h-[400px] font-mono text-sm resize-y"
+            placeholder="Enter the lease agreement terms here..."
+          />
+
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-xs text-muted-foreground">
+              Plain text only. The agent will read this verbatim as context.
+            </p>
+            <div className="flex items-center gap-3">
+              {saveSuccess && (
+                <span className="text-xs text-green-500">Saved — agent will use the updated terms.</span>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save Agreement"}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

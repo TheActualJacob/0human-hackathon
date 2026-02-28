@@ -475,7 +475,7 @@ export default function PropertiesPage() {
                     address: formData.get('address') as string,
                     city: formData.get('city') as string,
                     country: formData.get('country') as string || 'UK',
-                    jurisdiction: formData.get('jurisdiction') as string || null
+                    jurisdiction: formData.get('jurisdiction') as string || 'england_wales'
                   });
                   
                   setShowAddModal(false);

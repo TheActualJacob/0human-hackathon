@@ -58,6 +58,8 @@ const useLandlordStore = create<LandlordState>()(
         const supabase = createClient();
 
         try {
+          console.log('Fetching data for landlordId:', landlordId);
+
           // Fetch units for this landlord only
           const { data: units, error: unitsError } = await supabase
             .from('units')
@@ -65,78 +67,88 @@ const useLandlordStore = create<LandlordState>()(
             .eq('landlord_id', landlordId)
             .order('created_at', { ascending: false });
 
-          if (unitsError) throw unitsError;
+          if (unitsError) {
+            console.error('units query failed:', unitsError.message, unitsError.code, unitsError.details, unitsError.hint);
+            throw unitsError;
+          }
+          console.log('Units fetched:', units?.length);
 
-          // Fetch leases for landlord's units
           const unitIds = units?.map(u => u.id) || [];
-          const { data: leases, error: leasesError } = await supabase
-            .from('leases')
-            .select('*')
-            .in('unit_id', unitIds)
-            .order('created_at', { ascending: false });
 
-          if (leasesError) throw leasesError;
+          // Only fetch dependent data if there are units
+          let leases: any[] = [];
+          let tenants: any[] = [];
+          let payments: any[] = [];
+          let maintenanceRequests: any[] = [];
+          let maintenanceWorkflows: any[] = [];
 
-          // Fetch tenants for landlord's leases
-          const leaseIds = leases?.map(l => l.id) || [];
-          const { data: tenants, error: tenantsError } = await supabase
-            .from('tenants')
-            .select('*')
-            .in('lease_id', leaseIds);
+          if (unitIds.length > 0) {
+            const { data: leasesData, error: leasesError } = await supabase
+              .from('leases')
+              .select('*')
+              .in('unit_id', unitIds)
+              .order('created_at', { ascending: false });
 
-          if (tenantsError) throw tenantsError;
+            if (leasesError) throw leasesError;
+            leases = leasesData || [];
 
-          // Fetch payments
-          const { data: payments, error: paymentsError } = await supabase
-            .from('payments')
-            .select('*')
-            .in('lease_id', leaseIds)
-            .order('created_at', { ascending: false });
+            const leaseIds = leases.map(l => l.id);
 
-          if (paymentsError) throw paymentsError;
+            if (leaseIds.length > 0) {
+              const [tenantsRes, paymentsRes, maintenanceRes] = await Promise.all([
+                supabase.from('tenants').select('*').in('lease_id', leaseIds),
+                supabase.from('payments').select('*').in('lease_id', leaseIds).order('created_at', { ascending: false }),
+                supabase.from('maintenance_requests').select('*').in('lease_id', leaseIds).order('created_at', { ascending: false }),
+              ]);
 
-          // Fetch maintenance requests
-          const { data: maintenanceRequests, error: maintenanceError } = await supabase
-            .from('maintenance_requests')
-            .select('*')
-            .in('lease_id', leaseIds)
-            .order('created_at', { ascending: false });
+              if (tenantsRes.error) throw tenantsRes.error;
+              if (paymentsRes.error) throw paymentsRes.error;
+              if (maintenanceRes.error) throw maintenanceRes.error;
 
-          if (maintenanceError) throw maintenanceError;
+              tenants = tenantsRes.data || [];
+              payments = paymentsRes.data || [];
+              maintenanceRequests = maintenanceRes.data || [];
 
-          // Fetch maintenance workflows
-          const requestIds = maintenanceRequests?.map(r => r.id) || [];
-          const { data: maintenanceWorkflows, error: workflowsError } = await supabase
-            .from('maintenance_workflows')
-            .select('*')
-            .in('maintenance_request_id', requestIds)
-            .order('created_at', { ascending: false });
+              const requestIds = maintenanceRequests.map(r => r.id);
+              if (requestIds.length > 0) {
+                const { data: workflowsData, error: workflowsError } = await supabase
+                  .from('maintenance_workflows')
+                  .select('*')
+                  .in('maintenance_request_id', requestIds)
+                  .order('created_at', { ascending: false });
 
-          if (workflowsError) throw workflowsError;
+                if (workflowsError) throw workflowsError;
+                maintenanceWorkflows = workflowsData || [];
+              }
+            }
+          }
 
-          // Fetch contractors for this landlord
+          // Fetch contractors for this landlord (independent of units)
           const { data: contractors, error: contractorsError } = await supabase
             .from('contractors')
             .select('*')
             .eq('landlord_id', landlordId)
             .order('created_at', { ascending: false });
 
-          if (contractorsError) throw contractorsError;
+          if (contractorsError) {
+            console.error('contractors query failed:', contractorsError.message, contractorsError.code, contractorsError.details, contractorsError.hint);
+            throw contractorsError;
+          }
 
           set({
             units: units || [],
-            leases: leases || [],
-            tenants: tenants || [],
-            payments: payments || [],
-            maintenanceRequests: maintenanceRequests || [],
-            maintenanceWorkflows: maintenanceWorkflows || [],
+            leases,
+            tenants,
+            payments,
+            maintenanceRequests,
+            maintenanceWorkflows,
             contractors: contractors || [],
             loading: false
           });
 
         } catch (error: any) {
-          console.error('Error fetching landlord data:', error);
-          set({ error: error.message, loading: false });
+          console.error('Error fetching landlord data:', JSON.stringify(error, null, 2), 'message:', error?.message, 'code:', error?.code, 'details:', error?.details);
+          set({ error: error?.message || 'Failed to fetch data', loading: false });
         }
       },
 
@@ -178,7 +190,7 @@ const useLandlordStore = create<LandlordState>()(
           .single();
         
         if (error) {
-          console.error('Error creating unit:', error);
+          console.error('Error creating unit:', error.message, error.code, error.details, error.hint);
           set({ error: error.message });
           throw error;
         }

@@ -30,12 +30,7 @@ export async function getUserWithRole() {
 
   if (roleError || !authUser) {
     console.warn('getUserWithRole: No role mapping found for user:', user.id);
-    // Fallback for debugging: if user exists but no role mapping, return user with landlord role
-    return {
-      ...user,
-      role: 'landlord' as UserRole,
-      entityId: '00000000-0000-0000-0000-000000000000'
-    };
+    return null;
   }
 
   return {

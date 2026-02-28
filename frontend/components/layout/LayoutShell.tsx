@@ -11,7 +11,9 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const isPublicPage = pathname.startsWith('/pay/');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('landlord');
+  const [userRole, setUserRole] = useState<UserRole>(
+    pathname.startsWith('/tenant/') ? 'tenant' : 'landlord'
+  );
 
   useEffect(() => {
     const { data: { subscription } } = onAuthStateChange(async (_event, session) => {

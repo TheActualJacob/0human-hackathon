@@ -67,7 +67,8 @@ export default function TenantDashboard() {
   ).length;
 
   // Calculate days until lease end
-  const daysUntilLeaseEnd = tenantInfo?.leases 
+  const hasLease = !!tenantInfo?.leases;
+  const daysUntilLeaseEnd = hasLease
     ? Math.floor((new Date(tenantInfo.leases.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
@@ -99,7 +100,10 @@ export default function TenantDashboard() {
       <div>
         <h1 className="text-2xl font-bold">Welcome back, {tenantInfo.full_name}</h1>
         <p className="text-muted-foreground">
-          {tenantInfo.leases?.units?.name} - {tenantInfo.leases?.units?.address}
+          {hasLease
+            ? `${tenantInfo.leases?.units?.name} - ${tenantInfo.leases?.units?.address}`
+            : 'No active lease — browse available properties or wait for an invite from your landlord'
+          }
         </p>
       </div>
 
@@ -121,11 +125,11 @@ export default function TenantDashboard() {
         
         <KPICard
           title="Monthly Rent"
-          value={`$${tenantInfo.leases?.rent_amount?.toLocaleString() || 0}`}
+          value={hasLease ? `$${tenantInfo.leases?.rent_amount?.toLocaleString() || 0}` : 'N/A'}
           icon={DollarSign}
-          description={`Paid: $${totalPaidThisYear.toLocaleString()} this year`}
+          description={hasLease ? `Paid: $${totalPaidThisYear.toLocaleString()} this year` : 'No active lease'}
         />
-        
+
         <KPICard
           title="Maintenance Requests"
           value={activeMaintenanceRequests}
@@ -133,13 +137,13 @@ export default function TenantDashboard() {
           description={`${completedRequests} completed`}
           highlight={activeMaintenanceRequests > 0}
         />
-        
+
         <KPICard
           title="Lease Status"
-          value={daysUntilLeaseEnd > 90 ? 'Active' : 'Ending Soon'}
+          value={hasLease ? (daysUntilLeaseEnd > 90 ? 'Active' : 'Ending Soon') : 'No Lease'}
           icon={FileText}
-          description={`${daysUntilLeaseEnd} days remaining`}
-          className={daysUntilLeaseEnd < 90 ? "border-orange-500/50" : ""}
+          description={hasLease ? `${daysUntilLeaseEnd} days remaining` : 'Apply for a property'}
+          className={hasLease && daysUntilLeaseEnd < 90 ? "border-orange-500/50" : ""}
         />
       </div>
 
@@ -148,39 +152,48 @@ export default function TenantDashboard() {
         {/* Property Details - Takes 2 columns */}
         <div className="lg:col-span-2 space-y-6">
           {/* Lease Information */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Lease Information</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Property</p>
-                <p className="font-medium">{tenantInfo.leases?.units?.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Address</p>
-                <p className="font-medium">{tenantInfo.leases?.units?.address}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Lease Start</p>
-                <p className="font-medium">
-                  {format(new Date(tenantInfo.leases?.start_date || ''), 'MMM d, yyyy')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Lease End</p>
-                <p className="font-medium">
-                  {format(new Date(tenantInfo.leases?.end_date || ''), 'MMM d, yyyy')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                <p className="font-medium">${tenantInfo.leases?.rent_amount?.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Security Deposit</p>
-                <p className="font-medium">${tenantInfo.leases?.security_deposit?.toLocaleString()}</p>
+          {hasLease ? (
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4">Lease Information</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Property</p>
+                  <p className="font-medium">{tenantInfo.leases?.units?.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Address</p>
+                  <p className="font-medium">{tenantInfo.leases?.units?.address}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Lease Start</p>
+                  <p className="font-medium">
+                    {format(new Date(tenantInfo.leases!.start_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Lease End</p>
+                  <p className="font-medium">
+                    {format(new Date(tenantInfo.leases!.end_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Monthly Rent</p>
+                  <p className="font-medium">${tenantInfo.leases?.rent_amount?.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Security Deposit</p>
+                  <p className="font-medium">${tenantInfo.leases?.security_deposit?.toLocaleString()}</p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-card border border-border rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4">Lease Information</h2>
+              <p className="text-muted-foreground text-center py-4">
+                No active lease. Browse available properties or contact your landlord for an invite.
+              </p>
+            </div>
+          )}
 
           {/* Recent Payments */}
           <div className="bg-card border border-border rounded-lg p-6">
@@ -286,7 +299,7 @@ export default function TenantDashboard() {
           )}
 
           {/* Alerts */}
-          {(overduePayments > 0 || daysUntilLeaseEnd < 90) && (
+          {(overduePayments > 0 || (hasLease && daysUntilLeaseEnd < 90)) && (
             <div className="bg-card border border-orange-500/50 rounded-lg p-6">
               <h3 className="font-semibold mb-4 text-orange-400">Important Notices</h3>
               <div className="space-y-3">
@@ -298,7 +311,7 @@ export default function TenantDashboard() {
                     </div>
                   </Link>
                 )}
-                {daysUntilLeaseEnd < 90 && daysUntilLeaseEnd > 0 && (
+                {hasLease && daysUntilLeaseEnd < 90 && daysUntilLeaseEnd > 0 && (
                   <Link href="/tenant/my-lease" className="block">
                     <div className="flex items-center gap-2 text-sm hover:text-primary transition-colors">
                       <Clock className="h-4 w-4 text-orange-400" />

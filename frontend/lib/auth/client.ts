@@ -94,27 +94,13 @@ export async function signUpLandlord(data: {
   }
 }
 
-// Sign up as tenant with invite code
+// Sign up as tenant (with or without invite code)
 export async function signUpTenant(data: {
   email: string;
   password: string;
   fullName: string;
   whatsappNumber: string;
-  inviteCode?: string; // Now optional for backward compatibility
-  profileData?: {
-    employmentStatus?: string;
-    monthlyIncome?: string;
-    currentEmployer?: string;
-    employmentDuration?: string;
-    hasRentalHistory?: boolean;
-    currentAddress?: string;
-    reasonForMoving?: string;
-    hasPets?: boolean;
-    petDetails?: string;
-    preferredMoveInDate?: string;
-    emergencyContactName?: string;
-    emergencyContactPhone?: string;
-  };
+  inviteCode?: string;
 }) {
   try {
     // If invite code is provided, use the old flow
@@ -206,22 +192,15 @@ export async function signUpTenant(data: {
     if (!authData.user) throw new Error('Failed to create user');
 
     // 2. Create tenant record without lease_id
-    const tenantData: any = {
-      auth_user_id: authData.user.id,
-      full_name: data.fullName,
-      email: data.email,
-      whatsapp_number: data.whatsappNumber,
-      is_primary_tenant: true
-    };
-
-    // Store profile data if provided (might need a new column or separate table)
-    if (data.profileData) {
-      tenantData.profile_data = data.profileData;
-    }
-
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .insert(tenantData)
+      .insert({
+        auth_user_id: authData.user.id,
+        full_name: data.fullName,
+        email: data.email,
+        whatsapp_number: data.whatsappNumber,
+        is_primary_tenant: true
+      })
       .select()
       .single();
 

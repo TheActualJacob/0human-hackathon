@@ -94,6 +94,7 @@ async def submit_signature(token: str, body: SignRequest):
     if prospect_id:
         sb.table("prospects").update({"status": "signed", "updated_at": signed_at}).eq("id", prospect_id).execute()
 
+    _activate_lease_from_signing(row, sb)
     _notify_landlord_signed(row, pdf_url)
     await _send_signed_confirmation(row, pdf_url)
 
@@ -177,6 +178,108 @@ def _decode_signature_image(data_url: str) -> io.BytesIO | None:
         return io.BytesIO(base64.b64decode(encoded))
     except Exception:
         return None
+
+
+def _activate_lease_from_signing(token_row: dict, sb) -> None:
+    """
+    After a lease is signed (web or conversational), create the live records:
+      - leases row with status='active'
+      - tenants row for the new tenant
+      - unit_status upsert → 'occupied'
+
+    The unit is identified via: signing_tokens.application_id
+                                → lease_applications.unit_id
+    """
+    try:
+        application_id = token_row.get("application_id")
+        if not application_id:
+            print("[Signing] No application_id on token — skipping lease activation")
+            return
+
+        app_res = (
+            sb.table("lease_applications")
+            .select("unit_id, full_name, email, monthly_income")
+            .eq("id", application_id)
+            .maybe_single()
+            .execute()
+        )
+        if not app_res or not app_res.data:
+            print(f"[Signing] Application {application_id} not found — skipping activation")
+            return
+
+        app = app_res.data
+        unit_id = app.get("unit_id")
+        if not unit_id:
+            print("[Signing] Application has no unit_id — skipping lease activation")
+            return
+
+        # Fetch landlord_id from the unit
+        unit_res = sb.table("units").select("landlord_id").eq("id", unit_id).maybe_single().execute()
+        landlord_id = unit_res.data.get("landlord_id") if (unit_res and unit_res.data) else None
+
+        today = datetime.now(timezone.utc).date()
+        end_date = today.replace(year=today.year + 1)
+
+        monthly_rent = token_row.get("monthly_rent")
+        deposit = float(monthly_rent) * 5 / 52 * 4 if monthly_rent else None  # ~4 weeks deposit
+
+        # Create the active lease
+        lease_res = sb.table("leases").insert({
+            "unit_id": unit_id,
+            "start_date": today.isoformat(),
+            "end_date": end_date.isoformat(),
+            "monthly_rent": float(monthly_rent) if monthly_rent else None,
+            "deposit_amount": round(deposit, 2) if deposit else None,
+            "status": "active",
+            "renewal_status": "pending",
+        }).execute()
+
+        if not lease_res.data:
+            print("[Signing] Failed to insert lease — skipping tenant/unit_status creation")
+            return
+
+        lease_id = lease_res.data[0]["id"]
+        prospect_phone = token_row.get("prospect_phone", "")
+
+        # Create the tenant record
+        sb.table("tenants").insert({
+            "lease_id": lease_id,
+            "full_name": token_row.get("prospect_name") or app.get("full_name", ""),
+            "email": app.get("email", ""),
+            "whatsapp_number": prospect_phone or None,
+            "is_primary_tenant": True,
+        }).execute()
+
+        # Mark the unit as occupied (upsert in case a row already exists)
+        sb.table("unit_status").upsert({
+            "unit_id": unit_id,
+            "occupancy_status": "occupied",
+            "move_in_date": today.isoformat(),
+        }, on_conflict="unit_id").execute()
+
+        # Notify landlord if we have their ID
+        if landlord_id:
+            tenant_name = token_row.get("prospect_name") or app.get("full_name", "Tenant")
+            unit_address = token_row.get("unit_address", "")
+            try:
+                sb.table("landlord_notifications").insert({
+                    "landlord_id": landlord_id,
+                    "lease_id": lease_id,
+                    "notification_type": "general",
+                    "message": (
+                        f"{tenant_name} has signed their tenancy agreement"
+                        + (f" for {unit_address}" if unit_address else "")
+                        + ". The unit has been marked as occupied and the lease is now active."
+                    ),
+                    "requires_signature": False,
+                }).execute()
+            except Exception as notify_exc:
+                print(f"[Signing] Landlord notification error: {notify_exc}")
+
+        print(f"[Signing] Lease {lease_id} activated for unit {unit_id}")
+
+    except Exception as exc:
+        print(f"[Signing] Lease activation error: {exc}")
 
 
 def _notify_landlord_signed(token_row: dict, pdf_url: str | None) -> None:

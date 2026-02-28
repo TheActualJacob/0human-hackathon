@@ -52,6 +52,26 @@ PROSPECT_AGENT_TOOLS = [
             "required": ["unit_id", "unit_description"],
         },
     },
+    {
+        "name": "sign_lease_agreement",
+        "description": (
+            "Completes the lease signing on behalf of the prospect when they have explicitly confirmed "
+            "they accept all terms of the tenancy agreement. Only call this after the prospect has "
+            "clearly and unambiguously stated they agree to the lease — do not call it based on vague "
+            "responses. There must be a pending lease agreement (shown in PENDING LEASE AGREEMENT section). "
+            "Records the prospect's digital consent and generates a signed PDF."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "consent_statement": {
+                    "type": "string",
+                    "description": "The exact words the prospect used to confirm their agreement to the lease.",
+                },
+            },
+            "required": ["consent_statement"],
+        },
+    },
 ]
 
 
@@ -64,6 +84,8 @@ async def execute_prospect_tool(
         return await _get_property_listings(tool_input, ctx)
     elif tool_name == "send_application_link":
         return await _send_application_link(tool_input, ctx)
+    elif tool_name == "sign_lease_agreement":
+        return await _sign_lease_agreement(tool_input, ctx)
     else:
         return ProspectToolResult(success=False, error=f"Unknown tool: {tool_name}")
 
@@ -118,5 +140,108 @@ async def _send_application_link(inp: dict[str, Any], ctx: ProspectContext) -> P
             "application_link": application_link,
             "unit_id": unit_id,
             "message": f"Application link sent for {unit_description}. The prospect should visit: {application_link}",
+        },
+    )
+
+
+async def _sign_lease_agreement(inp: dict[str, Any], ctx: ProspectContext) -> ProspectToolResult:
+    """
+    Conversational lease signing — called when the prospect confirms agreement via
+    WhatsApp or Instagram DM instead of the web signing page.
+    """
+    if not ctx.pending_signing_token:
+        return ProspectToolResult(
+            success=False,
+            error="No pending lease agreement found for this prospect.",
+        )
+
+    token_row = ctx.pending_signing_token
+    token_id = token_row.get("id")
+    consent_statement = inp.get("consent_statement", "")
+    channel = ctx.source_channel  # 'whatsapp' or 'instagram_dm'
+
+    from datetime import datetime, timezone
+    from app.routes.signing import _generate_signed_lease_pdf, _activate_lease_from_signing
+
+    sb = _sb()
+    signed_at = datetime.now(timezone.utc).isoformat()
+
+    # Build a text-based signature data URL that records the consent
+    channel_label = "WhatsApp" if channel == "whatsapp" else "Instagram DM"
+    sig_text = (
+        f"Digitally signed via {channel_label} on {datetime.now(timezone.utc).strftime('%d %B %Y at %H:%M UTC')}.\n"
+        f"Consent statement: \"{consent_statement}\""
+    )
+    # Encode as a plain-text data URL so the PDF renderer can display it
+    import base64
+    sig_b64 = base64.b64encode(sig_text.encode()).decode()
+    signature_data_url = f"data:text/plain;base64,{sig_b64}"
+
+    # Generate the signed PDF
+    pdf_url: str | None = None
+    try:
+        pdf_bytes = _generate_signed_lease_pdf(token_row, signature_data_url)
+        filename = f"signed_lease_{token_id[:8]}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        upload_res = sb.storage.from_("leases-signed").upload(
+            filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "false"}
+        )
+        if upload_res:
+            pdf_url = sb.storage.from_("leases-signed").get_public_url(filename)
+    except Exception as exc:
+        print(f"[ProspectTool] Signed PDF error: {exc}")
+
+    # Mark the token as signed
+    sb.table("signing_tokens").update({
+        "signature_data_url": signature_data_url,
+        "signed_at": signed_at,
+        "pdf_url": pdf_url,
+    }).eq("id", token_id).execute()
+
+    # Update prospect status
+    sb.table("prospects").update({
+        "status": "signed",
+        "updated_at": signed_at,
+    }).eq("id", ctx.prospect_id).execute()
+
+    # Activate the lease — creates leases, tenants, unit_status records
+    # Merge signed_at into token_row for the activation function
+    _activate_lease_from_signing({**token_row, "signed_at": signed_at}, sb)
+
+    # Send the signed PDF back to the prospect if we have a URL
+    if pdf_url:
+        try:
+            if channel == "whatsapp":
+                from app.services.twilio_service import send_whatsapp_media
+                prospect_phone = token_row.get("prospect_phone", "")
+                if prospect_phone:
+                    wa_number = prospect_phone if prospect_phone.startswith("whatsapp:") else f"whatsapp:{prospect_phone}"
+                    await send_whatsapp_media(
+                        wa_number,
+                        f"Your signed tenancy agreement is attached. Welcome — we'll be in touch with next steps!",
+                        pdf_url,
+                    )
+            elif channel == "instagram_dm":
+                from app.services.instagram_dm_service import send_instagram_dm
+                # Instagram DMs can't send files, so just mention the PDF link
+                await send_instagram_dm(
+                    ctx.phone_number.removeprefix("ig:"),
+                    f"Your lease has been signed! Your signed copy is available here: {pdf_url}",
+                )
+        except Exception as exc:
+            print(f"[ProspectTool] Error sending signed PDF: {exc}")
+
+    unit_address = token_row.get("unit_address", "the property")
+    monthly_rent = token_row.get("monthly_rent")
+    rent_str = f" (£{float(monthly_rent):.0f}/month)" if monthly_rent else ""
+
+    return ProspectToolResult(
+        success=True,
+        data={
+            "signed": True,
+            "pdf_url": pdf_url,
+            "message": (
+                f"Lease signed successfully for {unit_address}{rent_str}. "
+                f"The unit has been marked as occupied and a signed copy has been sent."
+            ),
         },
     )

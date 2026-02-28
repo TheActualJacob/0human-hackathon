@@ -14,9 +14,10 @@ class Settings(BaseSettings):
     APP_URL: str = ""  # public URL for Twilio signature validation (backend)
     FRONTEND_URL: str = "http://localhost:3000"  # public URL for the Next.js frontend
     GEMINI_API_KEY: str = ""  # Google Gemini API key (Imagen 3 image generation)
-    INSTAGRAM_ACCESS_TOKEN: str = ""  # Instagram Graph API access token
+    INSTAGRAM_ACCESS_TOKEN: str = ""  # Instagram Graph API access token (posting + DM)
+    INSTAGRAM_VERIFY_TOKEN: str = ""  # Custom token for Meta webhook hub verification
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": (".env", ".env.local"), "extra": "ignore"}
 
 
 settings = Settings()

@@ -64,12 +64,14 @@ export async function middleware(request: NextRequest) {
     '/auth/signup/landlord',
     '/auth/signup/tenant',
     '/demo',
+    '/properties',
   ];
 
   const isPublicRoute = publicRoutes.some(route => 
     request.nextUrl.pathname === route || 
     request.nextUrl.pathname.startsWith('/auth/') ||
-    request.nextUrl.pathname.startsWith('/demo')
+    request.nextUrl.pathname.startsWith('/demo') ||
+    request.nextUrl.pathname.startsWith('/properties')
   );
 
   // If not authenticated and trying to access protected route
@@ -133,7 +135,6 @@ export const config = {
      * - public folder
      * - api routes
      */
-    // Temporarily disabled middleware to debug login loop
-    // '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
   ],
 };

@@ -50,10 +50,7 @@ def build_system_prompt(ctx: TenantContext) -> str:
     lease_end = (
         _fmt_date(ctx.lease.end_date) if ctx.lease.end_date else "Periodic tenancy (no fixed end date)"
     )
-    renewal_status = ctx.lease.raw.get("renewal_status")
-    renewal_inquiry_sent = ctx.lease.raw.get("renewal_inquiry_sent_at")
 
-    renewal_section = _build_renewal_section(renewal_status, renewal_inquiry_sent, ctx.lease.end_date)
     payment_summary = _build_payment_summary(ctx)
     maintenance_summary = _build_maintenance_summary(ctx)
     legal_summary = _build_legal_summary(ctx)
@@ -83,7 +80,6 @@ You are the property management system for this tenancy. You are not a human —
 - Monthly Rent: £{ctx.lease.monthly_rent}
 - Lease Status: {ctx.lease.status or "unknown"}
 - Lease End: {lease_end}
-- Lease ID: {ctx.lease.id} (use this exact value for all tool calls)
 
 ## CURRENT ESCALATION LEVEL: {ctx.escalation_level}/4
 {escalation_desc}
@@ -104,7 +100,7 @@ You are the property management system for this tenancy. You are not a human —
 ## JURISDICTION RULES (USE THESE DATES — DO NOT INVENT OTHERS)
 {jurisdiction_rules}
 
-{renewal_section}## AVAILABLE TOOLS
+## AVAILABLE TOOLS
 Use tools to take real actions. Always use a tool if an action is warranted — do not just promise to do something. After using a tool, inform the tenant of the outcome concisely.
 
 ## RESPONSE FORMAT
@@ -112,40 +108,6 @@ Use tools to take real actions. Always use a tool if an action is warranted — 
 - Use plain text only — no markdown, no bullet points with asterisks (use plain hyphens or numbers if needed)
 - Be direct and professional
 - End with a clear next step or ask if they need anything else"""
-
-
-def _build_renewal_section(
-    renewal_status: str | None,
-    renewal_inquiry_sent: str | None,
-    end_date: str | None,
-) -> str:
-    if not renewal_status and not renewal_inquiry_sent:
-        return ""
-
-    end_display = _fmt_date(end_date) if end_date else "the upcoming expiry date"
-
-    if renewal_status == "pending":
-        return f"""## LEASE RENEWAL — ACTION REQUIRED
-IMPORTANT: The database shows renewal_status is still "pending" — no formal decision has been recorded yet.
-The tenant has been asked whether they will renew their lease expiring on {end_display}.
-If the tenant's current message contains any clear YES or NO answer about renewal, you MUST call the `record_renewal_decision` tool immediately — do NOT just reply with text.
-This is mandatory even if earlier conversation history appears to show a prior answer. The database is authoritative: pending = not yet recorded.
-- YES / renewing → call record_renewal_decision with decision="renewing"
-- NO / moving out / not renewing / "no" → call record_renewal_decision with decision="not_renewing"
-If the current message is ambiguous, ask once for clarification. If it is clear, call the tool first, then reply.
-
-"""
-    if renewal_status == "renewing":
-        return f"""## LEASE RENEWAL STATUS
-The tenant has confirmed they ARE renewing their lease (expires {end_display}). No further action needed on this topic.
-
-"""
-    if renewal_status == "not_renewing":
-        return f"""## LEASE RENEWAL STATUS
-The tenant has confirmed they are NOT renewing their lease (expires {end_display}). The property has been listed for re-letting. Focus on the end-of-tenancy process (checkout date, deposit return, key handover).
-
-"""
-    return ""
 
 
 def _fmt_date(iso: str) -> str:

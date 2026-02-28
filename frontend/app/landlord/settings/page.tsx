@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { 
   User, Bell, Shield, Key, Globe, Palette, 
-  Building, CreditCard, Save
+  Building, CreditCard, Save, Check
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,88 +13,135 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// import { useToast } from '@/components/ui/use-toast';
 import useAuthStore from '@/lib/store/auth';
-import { getCurrentUser } from '@/lib/auth/client';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LandlordSettingsPage() {
-  const { user } = useAuthStore();
+  // const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthStore();
+  const supabase = createClient();
 
-  const [profile, setProfile] = useState({
-    full_name: '',
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
-    whatsapp_number: '',
+    whatsappNumber: '',
+    companyName: '',
+    portfolioSize: '5-10',
+    paymentTerms: ''
   });
-  const [profileLoaded, setProfileLoaded] = useState(false);
 
+  // Load user data on mount
   useEffect(() => {
-    async function loadProfile() {
-      let currentUser = user;
-      if (!currentUser) {
-        currentUser = await getCurrentUser();
-        if (currentUser) useAuthStore.getState().setUser(currentUser);
-      }
-      if (!currentUser?.entityId) return;
-
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('landlords')
-        .select('full_name, email, phone, whatsapp_number')
-        .eq('id', currentUser.entityId)
-        .single();
-
-      if (data) {
-        setProfile({
-          full_name: data.full_name ?? '',
-          email: data.email ?? currentUser.email ?? '',
-          phone: data.phone ?? '',
-          whatsapp_number: data.whatsapp_number ?? '',
-        });
-        setProfileLoaded(true);
-      }
+    if (user?.entity) {
+      const fullName = user.entity.full_name || '';
+      const [firstName, ...lastNameParts] = fullName.split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      // Get additional data from notification_preferences JSON if stored there
+      const notificationPrefs = user.entity.notification_preferences || {};
+      
+      setFormData({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        email: user.email || '',
+        phone: user.entity.phone || '',
+        whatsappNumber: user.entity.whatsapp_number || '',
+        companyName: notificationPrefs.company_name || '',
+        portfolioSize: notificationPrefs.portfolio_size || '5-10',
+        paymentTerms: notificationPrefs.payment_terms || ''
+      });
+      setIsLoading(false);
+    } else if (user === null) {
+      // User is not logged in or data failed to load
+      setIsLoading(false);
     }
-    loadProfile();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
 
   const handleSave = async () => {
+    if (!user?.entityId) return;
+    
     setSaving(true);
     try {
-      let currentUser = user;
-      if (!currentUser) currentUser = await getCurrentUser();
-      if (!currentUser?.entityId) throw new Error('Not logged in');
+      // Get current notification preferences
+      const currentPrefs = user.entity?.notification_preferences || {
+        email: true,
+        whatsapp: true,
+        digest_frequency: 'daily'
+      };
 
-      const supabase = createClient();
+      // Merge with additional profile data
+      const updatedNotificationPreferences = {
+        ...currentPrefs,
+        company_name: formData.companyName,
+        portfolio_size: formData.portfolioSize,
+        payment_terms: formData.paymentTerms
+      };
+
+      // Update landlord data in the database
       const { error } = await supabase
         .from('landlords')
         .update({
-          full_name: profile.full_name,
-          email: profile.email,
-          phone: profile.phone || null,
-          whatsapp_number: profile.whatsapp_number || null,
+          full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          phone: formData.phone || null,
+          whatsapp_number: formData.whatsappNumber || null,
+          notification_preferences: updatedNotificationPreferences
         })
-        .eq('id', currentUser.entityId);
+        .eq('id', user.entityId);
 
       if (error) throw error;
+
+      // Update the user's email if it changed
+      if (formData.email !== user.email) {
+        const { error: authError } = await supabase.auth.updateUser({
+          email: formData.email
+        });
+        if (authError) throw authError;
+      }
+
+      // Refresh the user data in the auth store
+      const { data: updatedLandlord } = await supabase
+        .from('landlords')
+        .select('*')
+        .eq('id', user.entityId)
+        .single();
+
+      if (updatedLandlord) {
+        useAuthStore.getState().setUser({
+          ...user,
+          email: formData.email,
+          entity: updatedLandlord
+        });
+      }
+
+      // toast({
+      //   title: "Settings saved",
+      //   description: "Your changes have been saved successfully.",
+      // });
       alert('Settings saved successfully!');
-    } catch (err: any) {
-      alert('Failed to save: ' + err.message);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Error saving settings. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const firstName = profile.full_name.split(' ')[0] ?? '';
-  const lastName = profile.full_name.split(' ').slice(1).join(' ') ?? '';
-
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your account and preferences</p>
+        <p className="text-muted-foreground">
+          Manage your account and preferences
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -113,57 +160,60 @@ export default function LandlordSettingsPage() {
               <User className="h-5 w-5" />
               Personal Information
             </h3>
-            {!profileLoaded ? (
-              <p className="text-sm text-muted-foreground">Loading...</p>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>First Name</Label>
-                    <Input
-                      value={firstName}
-                      onChange={e => setProfile(p => ({
-                        ...p,
-                        full_name: [e.target.value, lastName].filter(Boolean).join(' ')
-                      }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Last Name</Label>
-                    <Input
-                      value={lastName}
-                      onChange={e => setProfile(p => ({
-                        ...p,
-                        full_name: [firstName, e.target.value].filter(Boolean).join(' ')
-                      }))}
-                    />
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={profile.email}
-                    onChange={e => setProfile(p => ({ ...p, email: e.target.value }))}
+                  <Label>First Name</Label>
+                  <Input 
+                    value={formData.firstName} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone Number</Label>
-                  <Input
-                    value={profile.phone}
-                    onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
-                    placeholder="+44 7123 456789"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>WhatsApp Number</Label>
-                  <Input
-                    value={profile.whatsapp_number}
-                    onChange={e => setProfile(p => ({ ...p, whatsapp_number: e.target.value }))}
-                    placeholder="+44 7123 456789"
+                  <Label>Last Name</Label>
+                  <Input 
+                    value={formData.lastName} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone Number</Label>
+                <Input 
+                  value={formData.phone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp Number</Label>
+                <Input 
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
+                  placeholder="Same as phone or different"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Company Name (Optional)</Label>
+                <Input 
+                  placeholder="Acme Properties Ltd" 
+                  value={formData.companyName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                />
+              </div>
+            </div>
             )}
           </Card>
 
@@ -172,32 +222,43 @@ export default function LandlordSettingsPage() {
               <Building className="h-5 w-5" />
               Property Management
             </h3>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Portfolio Size</p>
                   <p className="text-sm text-muted-foreground">Number of properties you manage</p>
                 </div>
-                <Select defaultValue="1-5">
+                <Select 
+                  value={formData.portfolioSize}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, portfolioSize: value }))}
+                >
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1-5">1–5</SelectItem>
-                    <SelectItem value="5-10">5–10</SelectItem>
-                    <SelectItem value="10-20">10–20</SelectItem>
+                    <SelectItem value="1-5">1-5</SelectItem>
+                    <SelectItem value="5-10">5-10</SelectItem>
+                    <SelectItem value="10-20">10-20</SelectItem>
                     <SelectItem value="20+">20+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Default Payment Terms</Label>
-                <Textarea
+                <Textarea 
                   placeholder="Payment is due on the 1st of each month..."
                   rows={3}
+                  value={formData.paymentTerms}
+                  onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
                 />
               </div>
             </div>
+            )}
           </Card>
         </TabsContent>
 
@@ -209,38 +270,54 @@ export default function LandlordSettingsPage() {
               Email Notifications
             </h3>
             <div className="space-y-4">
-              {[
-                { label: 'Payment Updates', desc: 'Receive emails when payments are made' },
-                { label: 'Late Payment Alerts', desc: 'Get notified about overdue payments' },
-                { label: 'Maintenance Requests', desc: 'New maintenance requests from tenants' },
-                { label: 'Lease Expiry Reminders', desc: 'Reminders before leases expire' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{item.label}</p>
-                    <p className="text-sm text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <Switch defaultChecked />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Payment Updates</p>
+                  <p className="text-sm text-muted-foreground">Receive emails when payments are made</p>
                 </div>
-              ))}
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Late Payment Alerts</p>
+                  <p className="text-sm text-muted-foreground">Get notified about overdue payments</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Maintenance Requests</p>
+                  <p className="text-sm text-muted-foreground">New maintenance requests from tenants</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Lease Expiry Reminders</p>
+                  <p className="text-sm text-muted-foreground">Reminders before leases expire</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
             </div>
           </Card>
 
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">WhatsApp Notifications</h3>
             <div className="space-y-4">
-              {[
-                { label: 'Urgent Maintenance', desc: 'Emergency maintenance requests' },
-                { label: 'Tenant Messages', desc: 'Direct messages from tenants' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{item.label}</p>
-                    <p className="text-sm text-muted-foreground">{item.desc}</p>
-                  </div>
-                  <Switch defaultChecked />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Urgent Maintenance</p>
+                  <p className="text-sm text-muted-foreground">Emergency maintenance requests</p>
                 </div>
-              ))}
+                <Switch defaultChecked />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Tenant Messages</p>
+                  <p className="text-sm text-muted-foreground">Direct messages from tenants</p>
+                </div>
+                <Switch defaultChecked />
+              </div>
             </div>
           </Card>
         </TabsContent>
@@ -400,28 +477,26 @@ export default function LandlordSettingsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Save Button — only relevant for Profile tab */}
-      {activeTab === 'profile' && (
-        <div className="flex justify-end pt-6">
-          <Button
-            onClick={handleSave}
-            disabled={saving || !profileLoaded}
-            className="min-w-32"
-          >
-            {saving ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-2" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </>
-            )}
-          </Button>
-        </div>
-      )}
+      {/* Save Button */}
+      <div className="flex justify-end pt-6">
+        <Button 
+          onClick={handleSave}
+          disabled={saving}
+          className="min-w-32"
+        >
+          {saving ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-2" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

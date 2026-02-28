@@ -19,11 +19,13 @@
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
+    "pdfkit": "^0.17.2",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.5.0",
+    "twilio": "^5.12.2",
     "vaul": "^1.1.2",
     "zustand": "^5.0.11"
   },

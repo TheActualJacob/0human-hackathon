@@ -31,6 +31,9 @@ yarn-error.log*
 # env files
 .env*
 
+# scraper (keep off github)
+scraper/
+
 # python
 __pycache__/
 *.pyc

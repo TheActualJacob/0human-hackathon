@@ -13,10 +13,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
-  FileText, MapPin, Calendar, DollarSign, User,
+  FileText, MapPin, DollarSign,
   Clock, CheckCircle, XCircle, AlertCircle, Brain,
-  Home, Phone, Briefcase, TrendingUp, TrendingDown,
-  Shield, MessageSquare, Mail, ChevronRight
+  Home, Phone, TrendingUp, TrendingDown,
+  MessageSquare, Mail, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Database } from '@/lib/supabase/database.types';
@@ -38,7 +38,23 @@ export default function LandlordApplicationsPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [screeningId, setScreeningId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState('all');
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const notify = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   
   const supabase = createClient();
 
@@ -87,6 +103,7 @@ export default function LandlordApplicationsPage() {
           )
         `)
         .in('unit_id', unitIds)
+        .order('ai_screening_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -132,12 +149,62 @@ export default function LandlordApplicationsPage() {
       // TODO: Send acceptance notification to tenant
 
       await loadApplications();
-      alert('Application accepted! The tenant will be notified.');
+      notify('success', 'Application accepted — lease created successfully.');
     } catch (err) {
       console.error('Error accepting application:', err);
-      alert('Failed to accept application');
+      notify('error', 'Failed to accept application. Please try again.');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleScreenApplication = async (application: ApplicationWithDetails) => {
+    setScreeningId(application.id);
+    try {
+      const appData = application.applicant_data as any;
+      const unit = application.units as any;
+
+      const response = await fetch('/api/screening', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: application.id,
+          applicationData: {
+            fullName:               appData?.fullName       || 'Unknown',
+            email:                  appData?.email          || '',
+            whatsappNumber:         appData?.whatsappNumber || '',
+            employmentStatus:       appData?.employmentStatus || 'unknown',
+            monthlyIncome:          appData?.monthlyIncome  || '0',
+            currentEmployer:        appData?.currentEmployer,
+            employmentDuration:     appData?.employmentDuration,
+            hasRentalHistory:       appData?.hasRentalHistory ?? false,
+            currentAddress:         appData?.currentAddress,
+            reasonForMoving:        appData?.reasonForMoving,
+            hasPets:                appData?.hasPets ?? false,
+            petDetails:             appData?.petDetails,
+            preferredMoveInDate:    appData?.preferredMoveInDate || new Date().toISOString(),
+            numberOfOccupants:      appData?.numberOfOccupants,
+            previousLandlordContact: appData?.previousLandlordContact,
+            coverLetter:            appData?.coverLetter,
+          },
+          propertyRequirements: {
+            rentAmount:      unit?.rent_amount      || 0,
+            securityDeposit: unit?.security_deposit || 0,
+            availableDate:   unit?.available_date   || new Date().toISOString(),
+            petPolicy:       unit?.pet_policy       || 'case_by_case',
+            address:         unit?.address,
+            city:            unit?.city,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Screening request failed');
+      await loadApplications();
+    } catch (err) {
+      console.error('Screening error:', err);
+      notify('error', 'AI screening failed — please try again.');
+    } finally {
+      setScreeningId(null);
     }
   };
 
@@ -165,7 +232,7 @@ export default function LandlordApplicationsPage() {
       setSelectedApplication(null);
     } catch (err) {
       console.error('Error rejecting application:', err);
-      alert('Failed to reject application');
+      notify('error', 'Failed to reject application. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -196,7 +263,7 @@ export default function LandlordApplicationsPage() {
     if (!score) return null;
     
     const percentage = Math.round(score * 100);
-    const Icon = percentage >= 75 ? TrendingUp : percentage >= 50 ? ChevronRight : TrendingDown;
+    const Icon = percentage >= 75 ? TrendingUp : percentage >= 50 ? TrendingUp : TrendingDown;
     const color = percentage >= 75 ? 'text-green-500' : percentage >= 50 ? 'text-yellow-500' : 'text-red-500';
     
     return (
@@ -241,6 +308,24 @@ export default function LandlordApplicationsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {notification && (
+        <div className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium shadow-sm border ${
+          notification.type === 'success'
+            ? 'bg-green-500/10 border-green-500/20 text-green-400'
+            : 'bg-red-500/10 border-red-500/20 text-red-400'
+        }`}>
+          <div className="flex items-center gap-2">
+            {notification.type === 'success'
+              ? <CheckCircle className="h-4 w-4 shrink-0" />
+              : <XCircle className="h-4 w-4 shrink-0" />}
+            {notification.message}
+          </div>
+          <button onClick={() => setNotification(null)} className="ml-4 opacity-60 hover:opacity-100 transition-opacity">
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold">Rental Applications</h1>
         <p className="text-muted-foreground">
@@ -273,262 +358,202 @@ export default function LandlordApplicationsPage() {
             filteredApplications.map((application) => {
               const appData = application.applicant_data as any;
               const screeningResult = application.ai_screening_result as any;
+              const displayName  = application.tenants?.full_name  || appData?.fullName || 'Unknown Applicant';
+              const displayEmail = application.tenants?.email      || appData?.email    || '—';
+              const displayPhone = application.tenants?.whatsapp_number || appData?.whatsappNumber || '—';
+              const isScreening  = screeningId === application.id;
+              const isExpanded   = expandedIds.has(application.id);
+
               return (
-              <Card key={application.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-xl">
-                        {application.tenants?.full_name || 'Unknown Applicant'}
-                      </CardTitle>
-                      <CardDescription className="space-y-1 mt-2">
-                        <div className="flex items-center gap-4">
-                          <span className="flex items-center gap-1">
-                            <Home className="h-3 w-3" />
-                            {application.units?.unit_identifier}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {application.units?.address}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {application.tenants?.email}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {application.tenants?.whatsapp_number}
-                          </span>
-                        </div>
-                      </CardDescription>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {getStatusBadge(application.status || 'pending')}
-                      {application.ai_screening_score !== null && (
-                        <div className="text-sm">
-                          AI Score: {getScoreIndicator(application.ai_screening_score)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Application Summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Applied</p>
-                      <p className="font-medium">
-                        {formatDistanceToNow(new Date(application.created_at!), { addSuffix: true })}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Monthly Income</p>
-                      <p className="font-medium">
-                        {appData?.monthlyIncome || 'Not provided'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Employment</p>
-                      <p className="font-medium">
-                        {appData?.employmentStatus?.replace(/_/g, ' ') || 'Not provided'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Move-in Date</p>
-                      <p className="font-medium">
-                        {appData?.preferredMoveInDate 
-                          ? format(new Date(appData.preferredMoveInDate), 'MMM d, yyyy')
-                          : 'ASAP'}
-                      </p>
-                    </div>
+              <Card key={application.id} className="overflow-hidden">
+                {/* ── Collapsed row (always visible) ── */}
+                <button
+                  className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-muted/30 transition-colors"
+                  onClick={() => toggleExpanded(application.id)}
+                >
+                  {/* Name + property */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{displayName}</p>
+                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                      <Home className="h-3 w-3 shrink-0" />
+                      {application.units?.unit_identifier || '—'}
+                    </p>
                   </div>
 
-                  {/* AI Screening Results */}
-                  {screeningResult && (
-                    <Alert className="bg-primary/5">
-                      <Brain className="h-4 w-4" />
-                      <AlertDescription>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium">AI Screening Summary</p>
-                            {screeningResult.details?.aiProvider && (
-                              <Badge variant="outline" className="text-xs">
-                                {screeningResult.details.aiProvider === 'claude-3-sonnet' ? 'Claude AI' : 'Rule-based'}
-                              </Badge>
+                  {/* Income */}
+                  <div className="hidden sm:block text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Income</p>
+                    <p className="text-sm font-medium">
+                      £{appData?.monthlyIncome || '—'}<span className="text-muted-foreground">/mo</span>
+                    </p>
+                  </div>
+
+                  {/* AI Score */}
+                  <div className="shrink-0 text-right">
+                    {application.ai_screening_score !== null
+                      ? getScoreIndicator(application.ai_screening_score)
+                      : <span className="text-xs text-muted-foreground">No score</span>
+                    }
+                  </div>
+
+                  {/* Status badge */}
+                  <div className="shrink-0">{getStatusBadge(application.status || 'pending')}</div>
+
+                  {/* Chevron */}
+                  <div className="shrink-0 text-muted-foreground">
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </div>
+                </button>
+
+                {/* ── Expanded details ── */}
+                {isExpanded && (
+                  <div className="border-t border-border px-5 py-4 space-y-4">
+                    {/* Contact + meta */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Email</p>
+                        <p className="font-medium truncate">{displayEmail}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Phone</p>
+                        <p className="font-medium">{displayPhone}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Employment</p>
+                        <p className="font-medium capitalize">{appData?.employmentStatus?.replace(/_/g, ' ') || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Move-in</p>
+                        <p className="font-medium">
+                          {appData?.preferredMoveInDate
+                            ? format(new Date(appData.preferredMoveInDate), 'MMM d, yyyy')
+                            : 'ASAP'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* AI Screening Results */}
+                    {screeningResult && (
+                      <Alert className="bg-primary/5">
+                        <Brain className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium">AI Screening Summary</p>
+                              {screeningResult.details?.aiProvider && (
+                                <Badge variant="outline" className="text-xs">
+                                  {screeningResult.details.aiProvider === 'claude-3-sonnet' ? 'Claude AI' : 'Rule-based'}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm">{screeningResult.summary}</p>
+
+                            {screeningResult.riskFactors && (
+                              <div className="flex gap-4 text-sm flex-wrap">
+                                {(['financialRisk','stabilityRisk','propertyRisk'] as const).map(key => (
+                                  <div key={key} className="flex items-center gap-1">
+                                    <span className="font-medium capitalize">{key.replace('Risk','')}: </span>
+                                    <Badge variant={screeningResult.riskFactors[key] === 'low' ? 'default' : screeningResult.riskFactors[key] === 'medium' ? 'secondary' : 'destructive'} className="text-xs">
+                                      {screeningResult.riskFactors[key]}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {screeningResult.strengths?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-green-600">Strengths:</p>
+                                <ul className="text-sm list-disc list-inside space-y-0.5">
+                                  {screeningResult.strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                                </ul>
+                              </div>
+                            )}
+
+                            {screeningResult.concerns?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-yellow-600">Concerns:</p>
+                                <ul className="text-sm list-disc list-inside space-y-0.5">
+                                  {screeningResult.concerns.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                                </ul>
+                              </div>
+                            )}
+
+                            {screeningResult.details?.verificationNeeded?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-blue-600">Verification Required:</p>
+                                <ul className="text-sm list-disc list-inside space-y-0.5">
+                                  {screeningResult.details.verificationNeeded.map((v: string, i: number) => <li key={i}>{v}</li>)}
+                                </ul>
+                              </div>
+                            )}
+
+                            {screeningResult.details?.additionalInsights && (
+                              <div className="bg-muted/50 p-3 rounded text-sm">
+                                <p className="font-medium mb-1">Additional Insights:</p>
+                                <p>{screeningResult.details.additionalInsights}</p>
+                              </div>
+                            )}
+
+                            {screeningResult.details?.suggestedQuestions?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium text-purple-600">Suggested Questions:</p>
+                                <ul className="text-sm list-disc list-inside space-y-0.5">
+                                  {screeningResult.details.suggestedQuestions.map((q: string, i: number) => <li key={i}>{q}</li>)}
+                                </ul>
+                              </div>
                             )}
                           </div>
-                          <p className="text-sm">{screeningResult.summary}</p>
-                          
-                          {/* Risk Factors */}
-                          {screeningResult.details?.riskFactors && (
-                            <div className="flex gap-4 text-sm">
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Financial:</span>
-                                <Badge 
-                                  variant={
-                                    screeningResult.details.riskFactors.financialRisk === 'low' ? 'default' :
-                                    screeningResult.details.riskFactors.financialRisk === 'medium' ? 'secondary' : 'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {screeningResult.details.riskFactors.financialRisk}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Stability:</span>
-                                <Badge 
-                                  variant={
-                                    screeningResult.details.riskFactors.stabilityRisk === 'low' ? 'default' :
-                                    screeningResult.details.riskFactors.stabilityRisk === 'medium' ? 'secondary' : 'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {screeningResult.details.riskFactors.stabilityRisk}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Property:</span>
-                                <Badge 
-                                  variant={
-                                    screeningResult.details.riskFactors.propertyRisk === 'low' ? 'default' :
-                                    screeningResult.details.riskFactors.propertyRisk === 'medium' ? 'secondary' : 'destructive'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {screeningResult.details.riskFactors.propertyRisk}
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {screeningResult.strengths?.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-green-600">Strengths:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {screeningResult.strengths.map((strength: string, i: number) => (
-                                  <li key={i}>{strength}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {screeningResult.concerns?.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-yellow-600">Concerns:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {screeningResult.concerns.map((concern: string, i: number) => (
-                                  <li key={i}>{concern}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {/* Verification Needed */}
-                          {screeningResult.details?.verificationNeeded?.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-blue-600">Verification Required:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {screeningResult.details.verificationNeeded.map((item: string, i: number) => (
-                                  <li key={i}>{item}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {/* Additional Insights */}
-                          {screeningResult.details?.additionalInsights && (
-                            <div className="bg-muted/50 p-3 rounded text-sm">
-                              <p className="font-medium mb-1">Additional Insights:</p>
-                              <p>{screeningResult.details.additionalInsights}</p>
-                            </div>
-                          )}
-                          
-                          {/* Suggested Questions */}
-                          {screeningResult.details?.suggestedQuestions?.length > 0 && (
-                            <div>
-                              <p className="text-sm font-medium text-purple-600">Suggested Follow-up Questions:</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {screeningResult.details.suggestedQuestions.map((question: string, i: number) => (
-                                  <li key={i}>{question}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
-                  {/* Cover Letter */}
-                  {appData?.coverLetter && (
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <p className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Cover Letter
-                      </p>
-                      <p className="text-sm">{appData?.coverLetter}</p>
-                    </div>
-                  )}
+                    {/* Cover Letter */}
+                    {appData?.coverLetter && (
+                      <div className="bg-muted/50 p-4 rounded-lg">
+                        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" />Cover Letter
+                        </p>
+                        <p className="text-sm">{appData.coverLetter}</p>
+                      </div>
+                    )}
 
-                  {/* Actions */}
-                  {['pending', 'ai_screening', 'under_review'].includes(application.status || '') && (
-                    <div className="flex gap-2 pt-2">
-                      <Button 
-                        size="sm"
-                        onClick={() => handleAcceptApplication(application)}
-                        disabled={processing}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Accept Application
-                      </Button>
-                      <Button 
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          setSelectedApplication(application);
-                          setShowRejectDialog(true);
-                        }}
-                        disabled={processing}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          // TODO: Implement view full application
-                          alert('View full application coming soon');
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  )}
-
-                  {application.status === 'accepted' && (
-                    <Alert className="bg-green-500/10">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <AlertDescription>
-                        Application accepted on {format(new Date(application.updated_at!), 'MMM d, yyyy')}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {application.status === 'rejected' && (
-                    <Alert className="bg-red-500/10">
-                      <XCircle className="h-4 w-4 text-red-500" />
-                      <AlertDescription>
-                        Application rejected on {format(new Date(application.updated_at!), 'MMM d, yyyy')}
-                        {application.landlord_notes && (
-                          <p className="mt-1 text-sm">Reason: {application.landlord_notes}</p>
+                    {/* Actions */}
+                    {['pending', 'ai_screening', 'under_review'].includes(application.status || '') && (
+                      <div className="flex gap-2 flex-wrap">
+                        {!application.ai_screening_result && (
+                          <Button size="sm" variant="outline" onClick={() => handleScreenApplication(application)} disabled={isScreening || processing}>
+                            <Brain className={`h-4 w-4 mr-2 ${isScreening ? 'animate-pulse' : ''}`} />
+                            {isScreening ? 'Screening...' : 'Screen with AI'}
+                          </Button>
                         )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </CardContent>
+                        <Button size="sm" onClick={() => handleAcceptApplication(application)} disabled={processing || isScreening}>
+                          <CheckCircle className="h-4 w-4 mr-2" />Accept
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => { setSelectedApplication(application); setShowRejectDialog(true); }} disabled={processing || isScreening}>
+                          <XCircle className="h-4 w-4 mr-2" />Reject
+                        </Button>
+                      </div>
+                    )}
+
+                    {application.status === 'accepted' && (
+                      <Alert className="bg-green-500/10">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <AlertDescription>Accepted on {format(new Date(application.updated_at!), 'MMM d, yyyy')}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {application.status === 'rejected' && (
+                      <Alert className="bg-red-500/10">
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <AlertDescription>
+                          Rejected on {format(new Date(application.updated_at!), 'MMM d, yyyy')}
+                          {application.landlord_notes && <p className="mt-1 text-sm">Reason: {application.landlord_notes}</p>}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
               </Card>
               );
             })

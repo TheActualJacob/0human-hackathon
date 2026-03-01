@@ -24,6 +24,7 @@ import type { WorkflowState } from '@/types';
 export default function LandlordMaintenancePage() {
   const {
     maintenanceRequests,
+    maintenanceWorkflows,
     units,
     tenants,
     leases,
@@ -32,7 +33,6 @@ export default function LandlordMaintenancePage() {
   } = useLandlordStore();
 
   const {
-    maintenanceWorkflows,
     workflowCommunications,
     vendorBids,
     selectedWorkflow,

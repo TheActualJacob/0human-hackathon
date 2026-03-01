@@ -163,6 +163,126 @@ async function buildPDF(
   return pdfDoc.save();
 }
 
+// ── Post-signing: provision tenant account ────────────────────────────────────
+async function activateNewTenant(
+  supabase: ReturnType<typeof createClient>,
+  token: Record<string, unknown>,
+  signedAt: Date,
+  pdfUrl: string | null,
+) {
+  const email = token.prospect_email as string | null;
+  const name = token.prospect_name as string | null;
+  const unitId = token.unit_id as string | null;
+  const monthlyRent = token.monthly_rent as number | null;
+
+  // 1. Create tenant record
+  const { data: tenantRow, error: tenantErr } = await supabase
+    .from('tenants')
+    .insert({
+      full_name: name ?? 'New Tenant',
+      email: email ?? null,
+      phone: (token.prospect_phone as string | null) ?? null,
+      lease_start_date: signedAt.toISOString().slice(0, 10),
+      rent_amount: monthlyRent ?? 0,
+    })
+    .select('id')
+    .single();
+
+  if (tenantErr) {
+    console.error('Failed to create tenant record:', tenantErr);
+    return;
+  }
+  const tenantId = tenantRow.id as string;
+
+  // 2. Activate the lease — find most recent pending lease for this unit
+  if (unitId) {
+    const { data: pendingLease } = await supabase
+      .from('leases')
+      .select('id')
+      .eq('unit_id', unitId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingLease) {
+      await supabase
+        .from('leases')
+        .update({ status: 'active', tenant_id: tenantId })
+        .eq('id', pendingLease.id);
+    }
+  }
+
+  // 3. Create Supabase auth account if we have an email
+  let tempPassword: string | null = null;
+  if (email) {
+    // Generate a readable temp password
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    tempPassword = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+    const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: name },
+    });
+
+    if (!authErr && authUser?.user) {
+      // Update tenant with auth link
+      await supabase.from('tenants').update({ auth_user_id: authUser.user.id }).eq('id', tenantId);
+
+      // Insert into auth_users bridge
+      await supabase.from('auth_users').insert({
+        id: authUser.user.id,
+        role: 'tenant',
+        entity_id: tenantId,
+      }).onConflict('id').merge();
+    } else if (authErr) {
+      console.warn('Auth user creation failed:', authErr.message);
+    }
+  }
+
+  // 4. Send welcome email
+  if (email) {
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://energetic-transformation-production-c907.up.railway.app'}/auth/login`;
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'PropAI <onboarding@resend.dev>',
+          to: [email],
+          subject: 'Your tenancy is confirmed — welcome! 🏠',
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0f0f0f;color:#e5e5e5;padding:32px;border-radius:12px">
+              <div style="border-bottom:1px solid #27272a;padding-bottom:24px;margin-bottom:24px">
+                <h1 style="color:#22c55e;font-size:22px;margin:0">Welcome to your new home</h1>
+              </div>
+              <p style="font-size:16px">Hi <strong>${name ?? 'there'}</strong>,</p>
+              <p style="color:#a1a1aa">Your lease for <strong style="color:#e5e5e5">${token.unit_address ?? 'the property'}</strong> has been signed and is now active.</p>
+              ${pdfUrl ? `
+              <div style="margin:20px 0">
+                <a href="${pdfUrl}" style="display:inline-block;background:#27272a;color:#e5e5e5;padding:10px 18px;border-radius:6px;text-decoration:none;font-size:14px">📄 Download Signed Lease (PDF)</a>
+              </div>` : ''}
+              ${tempPassword ? `
+              <div style="background:#18181b;border:1px solid #22c55e;border-radius:8px;padding:20px;margin:24px 0">
+                <p style="margin:0 0 12px;color:#a1a1aa;font-size:14px">Your tenant portal account has been created. Log in to view payments, maintenance requests, and your lease:</p>
+                <p style="margin:4px 0;font-size:14px"><strong>Email:</strong> ${email}</p>
+                <p style="margin:4px 0;font-size:14px"><strong>Password:</strong> <code style="background:#27272a;padding:2px 6px;border-radius:4px">${tempPassword}</code></p>
+                <div style="margin-top:16px">
+                  <a href="${loginUrl}" style="display:inline-block;background:#22c55e;color:#000;font-weight:bold;padding:10px 20px;border-radius:6px;text-decoration:none">Log In to Tenant Portal →</a>
+                </div>
+              </div>` : ''}
+              <p style="color:#71717a;font-size:13px;margin-top:32px">This message was sent via PropAI Property Management.</p>
+            </div>
+          `,
+        }),
+      });
+    }
+  }
+}
+
 // ── GET — fetch token ──────────────────────────────────────────────────────────
 export async function GET(
   _req: NextRequest,
@@ -266,6 +386,13 @@ export async function POST(
       .eq('id', token);
 
     if (updateErr) return NextResponse.json({ detail: `Failed to record signature: ${updateErr.message}` }, { status: 500 });
+
+    // ── Post-signing: create tenant + activate lease ──────────────────────────
+    try {
+      await activateNewTenant(supabase, existing, signedAt, pdfUrl);
+    } catch (activateErr) {
+      console.warn('Post-signing activation failed (non-fatal):', activateErr);
+    }
 
     return NextResponse.json({ success: true, pdf_url: pdfUrl });
   } catch (err) {

@@ -200,6 +200,8 @@ This agreement is governed by the laws of England and Wales.`;
             monthly_rent: monthlyRent,
             lease_content: leaseContent,
             prospect_phone: appData?.whatsappNumber || null,
+            prospect_email: application.tenants?.email || appData?.email || null,
+            unit_id: application.unit_id || null,
           }),
         });
         if (tokenRes.ok) {

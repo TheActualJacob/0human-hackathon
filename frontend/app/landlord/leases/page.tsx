@@ -405,17 +405,11 @@ export default function LandlordLeasesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {t.signed_at ? (
-                    t.pdf_url ? (
-                      <a href={t.pdf_url} target="_blank" rel="noreferrer">
-                        <Button size="sm" variant="outline" className="gap-1.5 text-green-600 border-green-500/30 hover:bg-green-500/10">
-                          <Download className="h-3.5 w-3.5" />PDF
-                        </Button>
-                      </a>
-                    ) : (
-                      <Badge variant="outline" className="text-green-500 border-green-500/30 gap-1">
-                        <CheckCircle2 className="h-3 w-3" />Signed
-                      </Badge>
-                    )
+                    <a href={`/api/sign/${t.id}/pdf`} target="_blank" rel="noreferrer">
+                      <Button size="sm" variant="outline" className="gap-1.5 text-green-600 border-green-500/30 hover:bg-green-500/10">
+                        <Download className="h-3.5 w-3.5" />Download PDF
+                      </Button>
+                    </a>
                   ) : (
                     <Button
                       size="sm"

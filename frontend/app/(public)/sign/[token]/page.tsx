@@ -144,13 +144,11 @@ export default function SignPage() {
             You'll receive a confirmation shortly.
           </p>
         </div>
-        {pdfUrl && (
-          <a href={pdfUrl} target="_blank" rel="noreferrer" className="block">
-            <Button variant="outline" className="w-full gap-2">
-              <Download className="h-4 w-4" />Download Signed Agreement (PDF)
-            </Button>
-          </a>
-        )}
+        <a href={`/api/sign/${token}/pdf`} target="_blank" rel="noreferrer" className="block">
+          <Button variant="outline" className="w-full gap-2">
+            <Download className="h-4 w-4" />Download Signed Agreement (PDF)
+          </Button>
+        </a>
         <div className="rounded-xl border border-border bg-card p-4 text-left space-y-2">
           {leaseData.unit_address && (
             <div className="flex items-center gap-2 text-sm">

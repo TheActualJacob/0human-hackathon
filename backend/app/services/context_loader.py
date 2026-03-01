@@ -339,20 +339,26 @@ async def log_conversation(
     intent_classification: str | None = None,
 ) -> str | None:
     sb = _get_supabase()
-    res = (
-        sb.table("conversations")
-        .insert({
-            "lease_id": lease_id,
-            "direction": direction,
-            "message_body": message_body,
-            "whatsapp_message_id": whatsapp_message_id,
-            "intent_classification": intent_classification,
-        })
-        .execute()
-    )
-    if res.data:
-        return res.data[0]["id"]
-    return None
+    try:
+        res = (
+            sb.table("conversations")
+            .insert({
+                "lease_id": lease_id,
+                "direction": direction,
+                "message_body": message_body,
+                "whatsapp_message_id": whatsapp_message_id,
+                "intent_classification": intent_classification,
+            })
+            .execute()
+        )
+        print(f"[log_conversation] insert response data={res.data}")
+        if res.data:
+            return res.data[0]["id"]
+        print(f"[log_conversation] WARNING: insert returned no data (no error raised). lease_id={lease_id}")
+        return None
+    except Exception as exc:
+        print(f"[log_conversation] ERROR inserting conversation: {exc!r} lease_id={lease_id} direction={direction}")
+        return None
 
 
 async def log_agent_action(

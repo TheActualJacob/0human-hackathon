@@ -58,7 +58,9 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
     # Strip whatsapp: prefix for DB lookup
     phone_number = from_number.removeprefix("whatsapp:")
 
+    print(f"[webhook] Inbound message from {phone_number!r}: {message_body!r}")
     ctx = await load_tenant_context(phone_number)
+    print(f"[webhook] load_tenant_context result: {'FOUND tenant ' + ctx.tenant.full_name if ctx else 'NOT FOUND — routing to prospect'}")
 
     if ctx is None:
         # Unknown number — route through the prospect agent

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
@@ -8,6 +9,8 @@ from supabase import create_client
 
 from app.config import settings
 from app.services.context_loader import TenantContext, log_agent_action, update_conversation_context
+
+logger = logging.getLogger(__name__)
 
 
 def _sb():
@@ -37,10 +40,8 @@ AGENT_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
-            },
-            "required": ["lease_id"],
+            "properties": {},
+            "required": [],
         },
     },
     {
@@ -53,7 +54,6 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
                 "category": {
                     "type": "string",
                     "enum": ["plumbing", "electrical", "structural", "appliance", "heating", "pest", "damp", "access", "other"],
@@ -72,7 +72,7 @@ AGENT_TOOLS = [
                     ),
                 },
             },
-            "required": ["lease_id", "category", "description", "urgency"],
+            "required": ["category", "description", "urgency"],
         },
     },
     {
@@ -86,7 +86,6 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
                 "notice_type": {
                     "type": "string",
                     "enum": [
@@ -108,7 +107,7 @@ AGENT_TOOLS = [
                     "description": "Brief explanation of why this notice is being issued. This is logged as agent_reasoning.",
                 },
             },
-            "required": ["lease_id", "notice_type", "reason"],
+            "required": ["notice_type", "reason"],
         },
     },
     {
@@ -121,7 +120,6 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
                 "new_level": {
                     "type": "number",
                     "enum": [1, 2, 3, 4],
@@ -132,7 +130,7 @@ AGENT_TOOLS = [
                     "description": "Reason for the escalation level change. This is permanently logged.",
                 },
             },
-            "required": ["lease_id", "new_level", "reason"],
+            "required": ["new_level", "reason"],
         },
     },
 ]
@@ -161,7 +159,7 @@ async def execute_tool(tool_name: str, tool_input: dict[str, Any], ctx: TenantCo
 
 async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
 
     payments_res = (
         sb.table("payments")
@@ -222,7 +220,7 @@ async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResul
 
 async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id  # always use context — never trust Claude's lease_id input
     category = inp["category"]
     description = inp["description"]
     urgency = inp["urgency"]
@@ -242,23 +240,55 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
         eligible = [c for c in contractors if c.get("emergency_available")] if is_emergency else contractors
         selected = (eligible or contractors)[0]
 
-    request_res = (
-        sb.table("maintenance_requests")
-        .insert({
-            "lease_id": lease_id,
-            "category": category,
-            "description": description,
-            "urgency": urgency,
-            "status": "assigned" if selected else "open",
-            "contractor_id": selected["id"] if selected else None,
-        })
-        .execute()
-    )
+    insert_payload = {
+        "lease_id": lease_id,
+        "category": category,
+        "description": description,
+        "urgency": urgency,
+        "status": "assigned" if selected else "open",
+        "contractor_id": selected["id"] if selected else None,
+    }
+    import sys
+    sys.stderr.write(f"[schedule_maintenance] PAYLOAD: {insert_payload}\n")
+    sys.stderr.flush()
+    try:
+        request_res = (
+            sb.table("maintenance_requests")
+            .insert(insert_payload)
+            .execute()
+        )
+        sys.stderr.write(f"[schedule_maintenance] INSERT OK: {request_res.data}\n")
+        sys.stderr.flush()
+    except Exception as exc:
+        sys.stderr.write(f"[schedule_maintenance] INSERT ERROR: {type(exc).__name__}: {exc}\n")
+        sys.stderr.flush()
+        return ToolResult(success=False, error=f"Failed to create maintenance request: {exc}")
 
     if not request_res.data:
+        sys.stderr.write("[schedule_maintenance] INSERT returned no data\n")
+        sys.stderr.flush()
         return ToolResult(success=False, error="Failed to create maintenance request")
 
     request_id = request_res.data[0]["id"]
+
+    # Send email notification to maintenance company
+    import asyncio
+    from app.services.email_service import send_maintenance_email
+    MAINTENANCE_EMAIL = "perfecttouchphotoshopping@gmail.com"
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: send_maintenance_email(
+            to_email=MAINTENANCE_EMAIL,
+            property_address=ctx.unit.address,
+            unit_identifier=ctx.unit.unit_identifier,
+            tenant_name=ctx.tenant.full_name,
+            category=category,
+            urgency=urgency,
+            description=description,
+            request_id=request_id,
+            contractor_name=selected["name"] if selected else None,
+        ),
+    )
 
     await log_agent_action(
         lease_id=lease_id,
@@ -313,7 +343,7 @@ async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolRe
     from app.services.pdf_generator import generate_legal_notice
 
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
     notice_type = inp["notice_type"]
     reason = inp["reason"]
 
@@ -402,7 +432,7 @@ async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolRe
 
 
 async def _update_escalation_level(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
     new_level = int(inp["new_level"])
     reason = inp["reason"]
 

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""  # Google Gemini API key (Imagen 3 image generation)
     INSTAGRAM_ACCESS_TOKEN: str = ""  # Instagram Graph API access token (posting + DM)
     INSTAGRAM_VERIFY_TOKEN: str = ""  # Custom token for Meta webhook hub verification
+    GMAIL_ADDRESS: str = ""  # Gmail address to send maintenance emails from
+    GMAIL_APP_PASSWORD: str = ""  # Gmail App Password (16-char, from Google Account → Security → App Passwords)
 
     model_config = {"env_file": (".env", ".env.local"), "extra": "ignore"}
 

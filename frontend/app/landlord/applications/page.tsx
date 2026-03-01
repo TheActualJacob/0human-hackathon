@@ -191,21 +191,24 @@ This agreement is governed by the laws of England and Wales.`;
 
       let signingUrl: string | null = null;
       try {
-        const { data: tokenData } = await supabase
-          .from('signing_tokens')
-          .insert({
+        const tokenRes = await fetch('/api/sign/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             prospect_name: applicantName,
             unit_address: propertyAddress,
             monthly_rent: monthlyRent,
             lease_content: leaseContent,
             prospect_phone: appData?.whatsappNumber || null,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          })
-          .select('id')
-          .single();
-        if (tokenData?.id) {
-          const baseUrl = window.location.origin;
-          signingUrl = `${baseUrl}/sign/${tokenData.id}`;
+          }),
+        });
+        if (tokenRes.ok) {
+          const tokenData = await tokenRes.json();
+          if (tokenData.id) {
+            signingUrl = `${window.location.origin}/sign/${tokenData.id}`;
+          }
+        } else {
+          console.error('sign/create failed:', await tokenRes.text());
         }
       } catch (tokenErr) {
         console.error('Failed to create signing token (non-fatal):', tokenErr);

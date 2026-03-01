@@ -16,7 +16,7 @@ import {
   FileText, MapPin, DollarSign,
   Clock, CheckCircle, XCircle, AlertCircle, Brain,
   Home, Phone, TrendingUp, TrendingDown,
-  MessageSquare, Mail, ChevronDown, ChevronUp
+  MessageSquare, Mail, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Database } from '@/lib/supabase/database.types';
@@ -38,6 +38,7 @@ export default function LandlordApplicationsPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [generatingLease, setGeneratingLease] = useState(false);
   const [screeningId, setScreeningId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState('all');
@@ -154,6 +155,7 @@ export default function LandlordApplicationsPage() {
 
 
       let signingUrl: string | null = null;
+      setGeneratingLease(true);
       try {
         const tokenRes = await fetch('/api/sign/create', {
           method: 'POST',
@@ -179,6 +181,8 @@ export default function LandlordApplicationsPage() {
         }
       } catch (tokenErr) {
         console.error('Failed to create signing token (non-fatal):', tokenErr);
+      } finally {
+        setGeneratingLease(false);
       }
 
       // Send acceptance email with signing link
@@ -402,6 +406,16 @@ export default function LandlordApplicationsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {generatingLease && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+          <div>
+            <span className="font-medium text-foreground">Generating official lease agreement…</span>
+            <span className="text-muted-foreground ml-2">Claude is drafting a tailored UK AST — this takes about 30 seconds.</span>
+          </div>
+        </div>
+      )}
+
       {notification && (
         <div className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium shadow-sm border ${
           notification.type === 'success'
@@ -622,7 +636,16 @@ export default function LandlordApplicationsPage() {
                           </Button>
                         )}
                         <Button size="sm" onClick={() => handleAcceptApplication(application)} disabled={processing || isScreening}>
-                          <CheckCircle className="h-4 w-4 mr-2" />Accept
+                          {generatingLease ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating lease…
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />Accept
+                            </>
+                          )}
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => { setSelectedApplication(application); setShowRejectDialog(true); }} disabled={processing || isScreening}>
                           <XCircle className="h-4 w-4 mr-2" />Reject

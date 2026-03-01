@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from "react";
 import {
-  Receipt, Brain, Download, Plus, Trash2, Loader2,
-  TrendingUp, ShieldCheck, Calculator, AlertTriangle,
-  Building2, FlaskConical,
+  Receipt, Brain, Download, Loader2,
+  TrendingUp, AlertTriangle, Calculator, Building2, FlaskConical,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -21,7 +19,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 type Lease = Database['public']['Tables']['leases']['Row'];
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function activeMonthsInYear(
   lease: { start_date: string; end_date?: string | null },
@@ -42,73 +40,33 @@ function activeMonthsInYear(
   return count;
 }
 
-// Greek rental income tax rates (Article 40, Law 4172/2013 — current as of 2024)
-// Band 1: up to €12,000 → 15%
-// Band 2: €12,001 – €35,000 → 35%
-// Band 3: above €35,000 → 45%
-// No personal allowance on rental income. No USC/PRSI equivalent.
-const GR_BAND_1_LIMIT = 12_000;
-const GR_BAND_2_LIMIT = 35_000;
-const GR_RATE_1 = 0.15;
-const GR_RATE_2 = 0.35;
-const GR_RATE_3 = 0.45;
+// ── Greek rental income tax (Article 40, Law 4172/2013 — current as of 2024) ──
+// Tax is assessed on GROSS rental income. No deductions are permitted.
+// Update this array if Greek tax law changes.
+const GR_TAX_BRACKETS = [
+  { label: 'Band 1: up to €12,000',      from: 0,      to: 12_000,   rate: 0.15 },
+  { label: 'Band 2: €12,001 – €35,000',  from: 12_000, to: 35_000,   rate: 0.35 },
+  { label: 'Band 3: above €35,000',       from: 35_000, to: Infinity, rate: 0.45 },
+] as const;
 
-interface TaxResult {
-  incomeTax: number;
-  usc: number;   // repurposed: stamp duty / surcharge (kept at 0 for Greece)
-  prsi: number;  // repurposed: special solidarity contribution (suspended since 2023)
+interface TaxBreakdown {
+  bands: number[];   // tax owed per bracket, aligned with GR_TAX_BRACKETS
   total: number;
   effectiveRate: number;
 }
 
-function estimateTax(taxableProfit: number): TaxResult {
-  if (taxableProfit <= 0) return { incomeTax: 0, usc: 0, prsi: 0, total: 0, effectiveRate: 0 };
-
-  // Greek progressive rental income tax
-  let incomeTax = 0;
-  if (taxableProfit <= GR_BAND_1_LIMIT) {
-    incomeTax = taxableProfit * GR_RATE_1;
-  } else if (taxableProfit <= GR_BAND_2_LIMIT) {
-    incomeTax = GR_BAND_1_LIMIT * GR_RATE_1 + (taxableProfit - GR_BAND_1_LIMIT) * GR_RATE_2;
-  } else {
-    incomeTax =
-      GR_BAND_1_LIMIT * GR_RATE_1 +
-      (GR_BAND_2_LIMIT - GR_BAND_1_LIMIT) * GR_RATE_2 +
-      (taxableProfit - GR_BAND_2_LIMIT) * GR_RATE_3;
+function computeGreekRentalTax(grossIncome: number): TaxBreakdown {
+  if (grossIncome <= 0) {
+    return { bands: GR_TAX_BRACKETS.map(() => 0), total: 0, effectiveRate: 0 };
   }
-
-  const total = incomeTax;
-  const effectiveRate = taxableProfit > 0 ? (total / taxableProfit) * 100 : 0;
-
-  return {
-    incomeTax: Math.round(incomeTax),
-    usc: 0,
-    prsi: 0,
-    total: Math.round(total),
-    effectiveRate,
-  };
+  const bands = GR_TAX_BRACKETS.map(({ from, to, rate }) => {
+    const taxable = Math.max(0, Math.min(grossIncome, to) - from);
+    return Math.round(taxable * rate);
+  });
+  const total = bands.reduce((s, b) => s + b, 0);
+  const effectiveRate = (total / grossIncome) * 100;
+  return { bands, total, effectiveRate };
 }
-
-// ── types ─────────────────────────────────────────────────────────────────────
-
-interface Deduction {
-  id: string;
-  label: string;
-  amount: number;
-  category: string;
-}
-
-const DEDUCTION_CATEGORIES = [
-  'Mortgage interest',
-  'Agent / management fees',
-  'Repairs & maintenance',
-  'Insurance',
-  'Professional fees',
-  'Council tax / void periods',
-  'Other',
-];
-
-const STORAGE_KEY = 'propai_tax_deductions_v2';
 
 // ── mock landlord data ────────────────────────────────────────────────────────
 
@@ -142,24 +100,13 @@ const MOCK_LEASES = [
   },
 ];
 
-const MOCK_DEDUCTIONS: Deduction[] = [
-  { id: 'm1', label: 'Mortgage interest (Glyfada property)', amount: 2_800, category: 'Mortgage interest' },
-  { id: 'm2', label: 'Property management fees (all)', amount: 1_980, category: 'Agent / management fees' },
-  { id: 'm3', label: 'Plumbing & AC maintenance', amount: 620, category: 'Repairs & maintenance' },
-  { id: 'm4', label: 'Landlord insurance (all properties)', amount: 960, category: 'Insurance' },
-  { id: 'm5', label: 'Accountant / tax advisor fees', amount: 500, category: 'Professional fees' },
-];
-
 // ── PDF export ─────────────────────────────────────────────────────────────────
 
 interface PDFData {
   year: number;
   landlordName: string;
   grossIncome: number;
-  totalDeductions: number;
-  taxableProfit: number;
-  tax: TaxResult;
-  deductions: Deduction[];
+  tax: TaxBreakdown;
   leaseBreakdown: Array<{ address: string; months: number; rent: number; income: number }>;
   isMock: boolean;
 }
@@ -185,20 +132,19 @@ async function exportToPDF(data: PDFData) {
   const red = rgb(0.9, 0.25, 0.25);
   const yellow = rgb(0.95, 0.7, 0.1);
 
-  // WinAnsi standard fonts can't encode characters outside Windows-1252.
-  // Replace the most common Unicode-only characters with safe ASCII equivalents.
+  // WinAnsi standard fonts cannot encode characters outside Windows-1252.
   const sanitize = (s: string) =>
     s
-      .replace(/\u2212/g, '-')   // MINUS SIGN → hyphen
-      .replace(/\u2014/g, '-')   // EM DASH → hyphen
-      .replace(/\u2013/g, '-')   // EN DASH → hyphen
-      .replace(/\u2019/g, "'")   // RIGHT SINGLE QUOTATION → apostrophe
-      .replace(/\u2018/g, "'")   // LEFT SINGLE QUOTATION → apostrophe
-      .replace(/\u201c/g, '"')   // LEFT DOUBLE QUOTATION → quote
-      .replace(/\u201d/g, '"')   // RIGHT DOUBLE QUOTATION → quote
-      .replace(/\u00b7/g, '.')   // MIDDLE DOT → period
-      .replace(/\u20ac/g, 'EUR') // EURO SIGN → EUR (not in WinAnsi)
-      .replace(/[^\x00-\xff]/g, '?'); // catch-all for anything else outside Latin-1
+      .replace(/\u2212/g, '-')
+      .replace(/\u2014/g, '-')
+      .replace(/\u2013/g, '-')
+      .replace(/\u2019/g, "'")
+      .replace(/\u2018/g, "'")
+      .replace(/\u201c/g, '"')
+      .replace(/\u201d/g, '"')
+      .replace(/\u00b7/g, '.')
+      .replace(/\u20ac/g, 'EUR')
+      .replace(/[^\x00-\xff]/g, '?');
 
   const line = (x1: number, y1: number, x2: number, y2: number, color = muted, thickness = 0.5) => {
     page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness, color });
@@ -216,11 +162,9 @@ async function exportToPDF(data: PDFData) {
     const safe = sanitize(str);
     let drawX = x;
     if (align === 'right') {
-      const w = font.widthOfTextAtSize(safe, size);
-      drawX = x - w;
+      drawX = x - font.widthOfTextAtSize(safe, size);
     } else if (align === 'center') {
-      const w = font.widthOfTextAtSize(safe, size);
-      drawX = x - w / 2;
+      drawX = x - font.widthOfTextAtSize(safe, size) / 2;
     }
     page.drawText(safe, { x: drawX, y: yPos, size, font, color });
   };
@@ -236,12 +180,11 @@ async function exportToPDF(data: PDFData) {
   const drawPageHeader = () => {
     rect(0, H - 36, W, 36, dark);
     text('PropAI', margin, H - 24, { size: 14, font: bold, color: white });
-    text(`Tax Report ${data.year}`, margin + 70, H - 24, { size: 10, color: rgb(0.6, 0.6, 0.65) });
-    const dateStr = `Generated ${new Date().toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    text(`Greek Rental Tax Estimate ${data.year}`, margin + 70, H - 24, { size: 10, color: rgb(0.6, 0.6, 0.65) });
+    const dateStr = `Generated ${new Date().toLocaleDateString('en-GR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
     text(dateStr, W - margin, H - 24, { size: 9, color: rgb(0.6, 0.6, 0.65), align: 'right' });
   };
 
-  // ─ Header
   drawPageHeader();
   y = H - 36 - 30;
 
@@ -252,18 +195,19 @@ async function exportToPDF(data: PDFData) {
   }
 
   // ─ Title block
-  text(`Rental Income Tax Summary`, margin, y, { size: 20, font: bold, color: dark });
+  text('Greek Rental Income Tax Estimate', margin, y, { size: 20, font: bold, color: dark });
   y -= 18;
-  text(`Tax Year ${data.year}  ·  ${data.landlordName}`, margin, y, { size: 11, color: muted });
+  text(`Tax Year ${data.year}  |  ${data.landlordName}`, margin, y, { size: 11, color: muted });
+  y -= 12;
+  text('Article 40, Law 4172/2013 - Tax on gross rental income; no deductions permitted.', margin, y, { size: 8, color: muted });
   y -= 32;
 
-  // ─ 4 summary boxes
-  const boxW = (contentWidth - 12) / 4;
+  // ─ 3 summary boxes
+  const boxW = (contentWidth - 8) / 3;
   const summaryBoxes = [
-    { label: 'Gross Rental Income', value: `\xa3${data.grossIncome.toLocaleString()}`, color: accent },
-    { label: 'Allowable Deductions', value: `-\xa3${data.totalDeductions.toLocaleString()}`, color: rgb(0.2, 0.7, 0.4) },
-    { label: 'Taxable Profit', value: `\xa3${data.taxableProfit.toLocaleString()}`, color: rgb(0.3, 0.6, 0.95) },
-    { label: 'Estimated Tax Owed', value: `\xa3${data.tax.total.toLocaleString()}`, color: data.tax.total > 0 ? yellow : accent },
+    { label: 'Gross Rental Income', value: `EUR ${data.grossIncome.toLocaleString()}`, color: accent },
+    { label: 'Estimated Tax Owed',  value: `EUR ${data.tax.total.toLocaleString()}`,   color: data.tax.total > 0 ? yellow : accent },
+    { label: 'Effective Tax Rate',  value: `${data.tax.effectiveRate.toFixed(1)}%`,    color: rgb(0.3, 0.6, 0.95) },
   ];
   summaryBoxes.forEach((box, i) => {
     const bx = margin + i * (boxW + 4);
@@ -275,32 +219,37 @@ async function exportToPDF(data: PDFData) {
 
   // ─ Tax breakdown
   ensureSpace(120);
-  text('TAX BREAKDOWN (GREECE 2024 - Article 40, Law 4172/2013)', margin, y, { size: 9, font: bold, color: muted });
+  text('TAX BREAKDOWN — GREEK RENTAL INCOME TAX (Article 40, Law 4172/2013)', margin, y, { size: 9, font: bold, color: muted });
   y -= 14;
   line(margin, y, W - margin, y);
   y -= 14;
 
-  const gr1 = Math.round(Math.min(data.taxableProfit, 12_000) * 0.15);
-  const gr2 = data.taxableProfit > 12_000 ? Math.round(Math.min(data.taxableProfit - 12_000, 23_000) * 0.35) : 0;
-  const gr3 = data.taxableProfit > 35_000 ? Math.round((data.taxableProfit - 35_000) * 0.45) : 0;
-  const taxRows: [string, string, string][] = [
-    ['Band 1: up to GBP 12,000 @ 15%', '', `\xa3${gr1.toLocaleString()}`],
-    ...(gr2 > 0 ? [['Band 2: GBP 12,001-35,000 @ 35%', '', `\xa3${gr2.toLocaleString()}`] as [string, string, string]] : []),
-    ...(gr3 > 0 ? [['Band 3: above GBP 35,000 @ 45%', '', `\xa3${gr3.toLocaleString()}`] as [string, string, string]] : []),
-  ];
-  taxRows.forEach(([label, sub, val]) => {
-    text(label, margin, y, { size: 10 });
-    if (sub) text(sub, margin + 220, y, { size: 9, color: muted });
-    text(val, W - margin, y, { align: 'right', size: 10, font: bold });
-    y -= 18;
+  GR_TAX_BRACKETS.forEach(({ label, rate }, i) => {
+    const bandTax = data.tax.bands[i];
+    if (bandTax > 0 || i === 0) {
+      text(`${label} @ ${(rate * 100).toFixed(0)}%`, margin, y, { size: 10 });
+      text(`EUR ${bandTax.toLocaleString()}`, W - margin, y, { align: 'right', size: 10, font: bold });
+      y -= 18;
+    }
   });
+
   y -= 4;
   line(margin, y, W - margin, y, dark, 1);
   y -= 14;
   text('TOTAL ESTIMATED TAX', margin, y, { size: 10, font: bold });
   text(`${data.tax.effectiveRate.toFixed(1)}% effective rate`, margin + 180, y, { size: 9, color: muted });
-  text(`\xa3${data.tax.total.toLocaleString()}`, W - margin, y, { align: 'right', size: 12, font: bold, color: red });
+  text(`EUR ${data.tax.total.toLocaleString()}`, W - margin, y, { align: 'right', size: 12, font: bold, color: red });
   y -= 30;
+
+  // ─ ENFIA note
+  ensureSpace(36);
+  rect(margin, y - 20, contentWidth, 24, rgb(0.97, 0.94, 0.88));
+  text(
+    'Note: ENFIA (property tax) is a separate annual obligation and is NOT included in this estimate.',
+    margin + 8, y - 10,
+    { size: 8, color: rgb(0.5, 0.35, 0.05) }
+  );
+  y -= 38;
 
   // ─ Income per property
   ensureSpace(40 + data.leaseBreakdown.length * 22);
@@ -310,18 +259,18 @@ async function exportToPDF(data: PDFData) {
   y -= 14;
 
   rect(margin, y - 4, contentWidth, 18, rgb(0.93, 0.93, 0.95));
-  text('Property', margin + 6, y + 2, { size: 8, font: bold, color: muted });
-  text('Months', margin + 320, y + 2, { size: 8, font: bold, color: muted, align: 'right' });
+  text('Property',     margin + 6,   y + 2, { size: 8, font: bold, color: muted });
+  text('Months',       margin + 320, y + 2, { size: 8, font: bold, color: muted, align: 'right' });
   text('Monthly Rent', margin + 400, y + 2, { size: 8, font: bold, color: muted, align: 'right' });
-  text('Total Income', W - margin, y + 2, { size: 8, font: bold, color: muted, align: 'right' });
+  text('Total Income', W - margin,   y + 2, { size: 8, font: bold, color: muted, align: 'right' });
   y -= 20;
 
   data.leaseBreakdown.forEach((row, i) => {
     if (i % 2 === 0) rect(margin, y - 4, contentWidth, 18, rgb(0.98, 0.98, 0.99));
-    text(row.address, margin + 6, y + 2, { size: 9 });
-    text(String(row.months), margin + 320, y + 2, { size: 9, align: 'right' });
-    text(`\xa3${row.rent.toLocaleString()}/mo`, margin + 400, y + 2, { size: 9, align: 'right' });
-    text(`\xa3${row.income.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: accent });
+    text(row.address,                             margin + 6,   y + 2, { size: 9 });
+    text(String(row.months),                      margin + 320, y + 2, { size: 9, align: 'right' });
+    text(`EUR ${row.rent.toLocaleString()}/mo`,   margin + 400, y + 2, { size: 9, align: 'right' });
+    text(`EUR ${row.income.toLocaleString()}`,    W - margin,   y + 2, { size: 9, font: bold, align: 'right', color: accent });
     y -= 20;
   });
 
@@ -329,52 +278,22 @@ async function exportToPDF(data: PDFData) {
   line(margin, y, W - margin, y);
   y -= 14;
   text('Total gross rental income', margin, y, { size: 10, font: bold });
-  text(`\xa3${data.grossIncome.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right' });
+  text(`EUR ${data.grossIncome.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right' });
   y -= 28;
 
-  // ─ Deductions
-  ensureSpace(40 + data.deductions.length * 22);
-  text('ALLOWABLE DEDUCTIONS', margin, y, { size: 9, font: bold, color: muted });
-  y -= 14;
-  line(margin, y, W - margin, y);
-  y -= 14;
-
-  if (data.deductions.length === 0) {
-    text('No deductions recorded for this tax year.', margin, y, { size: 10, color: muted });
-    y -= 20;
-  } else {
-    rect(margin, y - 4, contentWidth, 18, rgb(0.93, 0.93, 0.95));
-    text('Description', margin + 6, y + 2, { size: 8, font: bold, color: muted });
-    text('Category', margin + 320, y + 2, { size: 8, font: bold, color: muted });
-    text('Amount', W - margin, y + 2, { size: 8, font: bold, color: muted, align: 'right' });
-    y -= 20;
-
-    data.deductions.forEach((d, i) => {
-      if (i % 2 === 0) rect(margin, y - 4, contentWidth, 18, rgb(0.98, 0.98, 0.99));
-      text(d.label, margin + 6, y + 2, { size: 9 });
-      text(d.category, margin + 320, y + 2, { size: 9, color: muted });
-      text(`-\xa3${d.amount.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
-      y -= 20;
-    });
-
-    y -= 4;
-    line(margin, y, W - margin, y);
-    y -= 14;
-    text('Total deductions', margin, y, { size: 10, font: bold });
-    text(`-\xa3${data.totalDeductions.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
-    y -= 28;
-  }
-
   // ─ Disclaimer
-  ensureSpace(60);
-  rect(margin, y - 42, contentWidth, 46, rgb(0.97, 0.97, 0.97));
+  ensureSpace(70);
+  rect(margin, y - 54, contentWidth, 58, rgb(0.97, 0.97, 0.97));
   text('Important Disclaimer', margin + 8, y - 8, { size: 8, font: bold, color: muted });
   const disclaimer =
-    'This report is an estimate only and does not constitute tax advice. Figures are based on Greek rental income tax rates (Article 40, Law 4172/2013) and deductions you have recorded. ' +
-    'This estimate does not account for other income sources, credits, or individual circumstances. File via Taxisnet (E1/E2 forms) by 30 June. Please consult a certified Greek accountant before filing.';
+    'This report is an estimate only and does not constitute tax advice. ' +
+    'Figures are based on Greek rental income tax rates (Article 40, Law 4172/2013). ' +
+    'Tax is assessed on gross rental income; no expenses or deductions are permitted under Greek law for this income category. ' +
+    'ENFIA property tax is a separate obligation and is not included here. ' +
+    'File via Taxisnet (E1/E2 forms) by 30 June. Consult a certified Greek accountant (logistis) before filing.';
   const words = sanitize(disclaimer).split(' ');
   let lineStr = '';
-  let dy = y - 20;
+  let dy = y - 22;
   words.forEach((word) => {
     const test = lineStr ? `${lineStr} ${word}` : word;
     if (regular.widthOfTextAtSize(test, 7.5) > contentWidth - 16) {
@@ -386,12 +305,12 @@ async function exportToPDF(data: PDFData) {
     }
   });
   if (lineStr) text(lineStr, margin + 8, dy, { size: 7.5, color: muted });
-  y -= 56;
+  y -= 68;
 
   // ─ Footer
   const footerY = margin - 8;
   line(margin, footerY + 20, W - margin, footerY + 20, muted, 0.5);
-  text('PropAI · Rental Management Platform', margin, footerY + 8, { size: 8, color: muted });
+  text('PropAI - Rental Management Platform', margin, footerY + 8, { size: 8, color: muted });
   text(`Tax Year ${data.year}`, W - margin, footerY + 8, { size: 8, color: muted, align: 'right' });
 
   const pdfBytes = await doc.save();
@@ -399,7 +318,7 @@ async function exportToPDF(data: PDFData) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `propai-tax-report-${data.year}.pdf`;
+  a.download = `propai-greek-rental-tax-${data.year}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -411,10 +330,6 @@ export default function LandlordTaxesPage() {
   const { user } = useAuthStore();
 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [deductions, setDeductions] = useState<Record<number, Deduction[]>>({});
-  const [newLabel, setNewLabel] = useState('');
-  const [newAmount, setNewAmount] = useState('');
-  const [newCategory, setNewCategory] = useState(DEDUCTION_CATEGORIES[0]);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
@@ -433,19 +348,7 @@ export default function LandlordTaxesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setDeductions(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  const saveDeductions = (next: Record<number, Deduction[]>) => {
-    setDeductions(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
-  };
-
-  // ── computed values ──────────────────────────────────────────────────────
+  // ── computed values ───────────────────────────────────────────────────────
 
   const activeLeaseSrc = demoMode ? MOCK_LEASES : leases;
 
@@ -474,13 +377,7 @@ export default function LandlordTaxesPage() {
   });
 
   const grossIncome = leaseBreakdown.reduce((s, r) => s + r.income, 0);
-
-  const yearDeductions: Deduction[] = demoMode
-    ? MOCK_DEDUCTIONS
-    : (deductions[selectedYear] ?? []);
-  const totalDeductions = yearDeductions.reduce((s, d) => s + d.amount, 0);
-  const taxableProfit = Math.max(0, grossIncome - totalDeductions);
-  const tax = estimateTax(taxableProfit);
+  const tax = computeGreekRentalTax(grossIncome);
 
   const availableYears = [...new Set([
     new Date().getFullYear(),
@@ -488,58 +385,28 @@ export default function LandlordTaxesPage() {
     ...activeLeaseSrc.filter(l => l.end_date).map(l => new Date(l.end_date!).getFullYear()),
   ])].sort((a, b) => b - a);
 
-  // ── deduction actions ─────────────────────────────────────────────────────
-
-  const addDeduction = () => {
-    const amt = parseFloat(newAmount);
-    if (!newLabel.trim() || isNaN(amt) || amt <= 0) return;
-    const next = {
-      ...deductions,
-      [selectedYear]: [
-        ...(deductions[selectedYear] ?? []),
-        { id: crypto.randomUUID(), label: newLabel.trim(), amount: amt, category: newCategory },
-      ],
-    };
-    saveDeductions(next);
-    setNewLabel('');
-    setNewAmount('');
-  };
-
-  const removeDeduction = (id: string) => {
-    const next = {
-      ...deductions,
-      [selectedYear]: (deductions[selectedYear] ?? []).filter(d => d.id !== id),
-    };
-    saveDeductions(next);
-  };
-
   // ── AI summary ────────────────────────────────────────────────────────────
 
   const handleAiSummary = () => {
     setSummaryLoading(true);
     setTimeout(() => {
-      const band = taxableProfit > 35_000 ? 'top band (45%)' : taxableProfit > 12_000 ? 'middle band (35%)' : 'first band (15%)';
+      const topBand = grossIncome > 35_000 ? 'top band (45%)' : grossIncome > 12_000 ? 'middle band (35%)' : 'first band (15%)';
       setAiSummary(
-        `Tax Year ${selectedYear} — AI Tax Summary (UK rates)\n\n` +
-        `Gross rental income:      \xa3${Math.round(grossIncome).toLocaleString()}\n` +
-        `Allowable deductions:     \xa3${Math.round(totalDeductions).toLocaleString()}\n` +
-        `Taxable profit:           \xa3${Math.round(taxableProfit).toLocaleString()}\n\n` +
-        `  Income tax (${band}):\n` +
-        `    Band 1 up to \xa312,000 @ 15%:     \xa3${Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}\n` +
-        (taxableProfit > 12_000 ? `    Band 2 \xa312k-\xa335k @ 35%:          \xa3${Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}\n` : '') +
-        (taxableProfit > 35_000 ? `    Band 3 above \xa335,000 @ 45%:      \xa3${Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}\n` : '') +
-        `  ─────────────────────────────────\n` +
-        `  Estimated total tax:    \xa3${tax.total.toLocaleString()}\n` +
-        `  Effective rate:         ${tax.effectiveRate.toFixed(1)}%\n\n` +
-        `Deductions you may be missing (UK tax law):\n` +
-        `• Property repair & maintenance costs\n` +
-        `• Letting agent & management fees\n` +
-        `• Insurance premiums\n` +
-        `• Replacement of domestic items relief\n` +
-        `• Accountancy & legal fees\n` +
-        `• Void period utility costs\n\n` +
-        `Filing deadline: 31 January ${selectedYear + 2} via HMRC Self Assessment.\n` +
-        `Keep all receipts for at least 5 years. Consult a certified UK accountant.`
+        `Greek Rental Income Tax Estimate — ${selectedYear}\n` +
+        `(Article 40, Law 4172/2013)\n\n` +
+        `Gross rental income:          €${Math.round(grossIncome).toLocaleString()}\n` +
+        `(No deductions permitted under Greek law)\n\n` +
+        `Tax by bracket (currently in ${topBand}):\n` +
+        `  Band 1: up to €12,000 @ 15%:       €${tax.bands[0].toLocaleString()}\n` +
+        (grossIncome > 12_000 ? `  Band 2: €12,001–€35,000 @ 35%:     €${tax.bands[1].toLocaleString()}\n` : '') +
+        (grossIncome > 35_000 ? `  Band 3: above €35,000 @ 45%:       €${tax.bands[2].toLocaleString()}\n` : '') +
+        `  ─────────────────────────────────────────\n` +
+        `  Total estimated tax:          €${tax.total.toLocaleString()}\n` +
+        `  Effective rate:               ${tax.effectiveRate.toFixed(1)}%\n\n` +
+        `Note: ENFIA (property tax) is a separate annual\n` +
+        `obligation and is NOT included in this estimate.\n\n` +
+        `Filing: Submit via Taxisnet (E1/E2 forms) by 30 June ${selectedYear + 1}.\n` +
+        `Consult a certified Greek accountant (logistis) before filing.`
       );
       setSummaryLoading(false);
     }, 800);
@@ -550,18 +417,11 @@ export default function LandlordTaxesPage() {
   const handleExportPDF = async () => {
     setExportLoading(true);
     try {
-      const landlordName = demoMode
-        ? 'Manolis Papadopoulos (Demo)'
-        : (user?.email ?? 'Landlord');
-
       await exportToPDF({
         year: selectedYear,
-        landlordName,
+        landlordName: demoMode ? 'Manolis Papadopoulos (Demo)' : (user?.email ?? 'Landlord'),
         grossIncome: Math.round(grossIncome),
-        totalDeductions: Math.round(totalDeductions),
-        taxableProfit: Math.round(taxableProfit),
         tax,
-        deductions: yearDeductions,
         leaseBreakdown,
         isMock: demoMode,
       });
@@ -577,10 +437,24 @@ export default function LandlordTaxesPage() {
   const isLoading = !demoMode && loading;
 
   const summaryCards = [
-    { label: 'Gross Rental Income', value: `£${Math.round(grossIncome).toLocaleString()}`, icon: TrendingUp, color: 'text-primary' },
-    { label: 'Allowable Deductions', value: `-£${Math.round(totalDeductions).toLocaleString()}`, icon: ShieldCheck, color: 'text-green-400' },
-    { label: 'Taxable Profit', value: `£${Math.round(taxableProfit).toLocaleString()}`, icon: Calculator, color: 'text-blue-400' },
-    { label: 'Estimated Tax Owed', value: `£${tax.total.toLocaleString()}`, icon: AlertTriangle, color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground' },
+    {
+      label: 'Gross Rental Income',
+      value: `€${Math.round(grossIncome).toLocaleString()}`,
+      icon: TrendingUp,
+      color: 'text-primary',
+    },
+    {
+      label: 'Estimated Tax Owed',
+      value: `€${tax.total.toLocaleString()}`,
+      icon: AlertTriangle,
+      color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground',
+    },
+    {
+      label: 'Effective Tax Rate',
+      value: grossIncome > 0 ? `${tax.effectiveRate.toFixed(1)}%` : '—',
+      icon: Calculator,
+      color: 'text-blue-400',
+    },
   ];
 
   return (
@@ -590,8 +464,10 @@ export default function LandlordTaxesPage() {
         <div className="flex items-center gap-3">
           <Receipt className="h-7 w-7 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Taxes</h1>
-            <p className="text-sm text-muted-foreground">Rental income tax estimate · Greek rates 2024</p>
+            <h1 className="text-2xl font-bold">Greek Rental Income Tax Estimate</h1>
+            <p className="text-sm text-muted-foreground">
+              Article 40, Law 4172/2013 · Tax on gross rental income · {selectedYear}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -641,8 +517,16 @@ export default function LandlordTaxesPage() {
         </div>
       )}
 
+      {/* ENFIA notice */}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-400">
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+        <span>
+          <strong>ENFIA not included.</strong> ENFIA (property tax) is a separate annual obligation and is not part of this rental income tax estimate.
+        </span>
+      </div>
+
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {summaryCards.map(row => (
           <Card key={row.label} className="p-4 flex items-center gap-3">
             <row.icon className={`h-7 w-7 ${row.color} shrink-0`} />
@@ -655,38 +539,35 @@ export default function LandlordTaxesPage() {
       </div>
 
       {/* Tax breakdown */}
-      {!isLoading && taxableProfit > 0 && (
+      {!isLoading && grossIncome > 0 && (
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">Tax Breakdown (UK {selectedYear})</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Tax Breakdown — Greek Rental Income Tax {selectedYear}
+            </h2>
             <Badge variant="outline" className="text-xs">
               {tax.effectiveRate.toFixed(1)}% effective rate
             </Badge>
           </div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Band 1: up to £12,000 (15%)</span>
-              <span className="font-medium">£{Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}</span>
-            </div>
-            {taxableProfit > 12_000 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Band 2: £12,001 – £35,000 (35%)</span>
-                <span className="font-medium">£{Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}</span>
-              </div>
-            )}
-            {taxableProfit > 35_000 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Band 3: above £35,000 (45%)</span>
-                <span className="font-medium">£{Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}</span>
-              </div>
-            )}
+            {GR_TAX_BRACKETS.map(({ label, rate }, i) => {
+              const bandTax = tax.bands[i];
+              if (bandTax === 0 && i > 0) return null;
+              return (
+                <div key={i} className="flex justify-between">
+                  <span className="text-muted-foreground">{label} ({(rate * 100).toFixed(0)}%)</span>
+                  <span className="font-medium">€{bandTax.toLocaleString()}</span>
+                </div>
+              );
+            })}
             <div className="flex justify-between border-t border-border pt-2 font-semibold">
-              <span>Estimated total tax owed</span>
-              <span className="text-yellow-400">£{tax.total.toLocaleString()}</span>
+              <span>Total estimated tax owed</span>
+              <span className="text-yellow-400">€{tax.total.toLocaleString()}</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Estimate only. Does not account for other income sources, deductions, or individual circumstances. Consult a qualified UK tax advisor before filing your Self Assessment.
+            Estimate only. Tax is assessed on gross rental income — no deductions are permitted under Greek law (Article 40, Law 4172/2013).
+            Consult a certified Greek accountant (logistis) and file via Taxisnet (E1/E2 forms) by 30 June.
           </p>
         </Card>
       )}
@@ -702,93 +583,20 @@ export default function LandlordTaxesPage() {
               <div key={i} className="flex items-center justify-between py-2">
                 <div>
                   <div className="font-medium">{row.address}</div>
-                  <div className="text-xs text-muted-foreground">{row.months} months × £{row.rent.toLocaleString()}/mo</div>
+                  <div className="text-xs text-muted-foreground">
+                    {row.months} months × €{row.rent.toLocaleString()}/mo
+                  </div>
                 </div>
-                <span className="font-semibold text-primary">£{row.income.toLocaleString()}</span>
+                <span className="font-semibold text-primary">€{row.income.toLocaleString()}</span>
               </div>
             ))}
             <div className="flex justify-between py-2 font-bold">
-              <span>Total gross income</span>
-              <span>£{Math.round(grossIncome).toLocaleString()}</span>
+              <span>Total gross rental income</span>
+              <span>€{Math.round(grossIncome).toLocaleString()}</span>
             </div>
           </div>
         </Card>
       )}
-
-      {/* Deductions */}
-      <Card className="p-5 space-y-4">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          Allowable Deductions — {selectedYear}
-        </h2>
-
-        {/* Add deduction (hidden in demo mode) */}
-        {!demoMode && (
-          <div className="flex gap-2 flex-wrap">
-            <Input
-              placeholder="e.g. Letting agent fees"
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addDeduction()}
-              className="flex-1 min-w-[160px]"
-            />
-            <Select value={newCategory} onValueChange={setNewCategory}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DEDUCTION_CATEGORIES.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="£ amount"
-              type="number"
-              min="0"
-              value={newAmount}
-              onChange={e => setNewAmount(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addDeduction()}
-              className="w-28"
-            />
-            <Button onClick={addDeduction} size="icon" variant="outline">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {yearDeductions.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">
-            No deductions added yet. Add expenses like agent fees, insurance, and repairs above.
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {/* Header */}
-            <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-xs font-medium text-muted-foreground px-1 pb-1 border-b border-border/50">
-              <span>Description</span>
-              <span className="text-right w-32">Category</span>
-              <span className="text-right w-24">Amount</span>
-            </div>
-            {yearDeductions.map(d => (
-              <div key={d.id} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center text-sm py-1.5 border-b border-border/30">
-                <span>{d.label}</span>
-                <span className="text-right w-32 text-xs text-muted-foreground">{d.category}</span>
-                <div className="flex items-center gap-2 justify-end w-24">
-                  <span className="text-green-400 font-medium">-£{d.amount.toLocaleString()}</span>
-                  {!demoMode && (
-                    <button onClick={() => removeDeduction(d.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div className="flex justify-between text-sm pt-2 font-bold">
-              <span>Total deductions</span>
-              <span className="text-green-400">-£{Math.round(totalDeductions).toLocaleString()}</span>
-            </div>
-          </div>
-        )}
-      </Card>
 
       {/* AI Summary */}
       {aiSummary && (

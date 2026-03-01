@@ -357,6 +357,55 @@ export default function LandlordLeasesPage() {
         )}
       </Card>
 
+      {/* Pending Signatures */}
+      {signingTokens.length > 0 && (
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Pending Lease Signatures
+            </h3>
+            <Badge className="bg-primary/10 text-primary">
+              {signingTokens.filter(t => !t.signed_at).length} awaiting signature
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {signingTokens.map(token => (
+              <div key={token.id} className="flex items-center justify-between p-4 bg-accent/50 rounded-lg">
+                <div>
+                  <p className="font-medium">{token.prospect_name || 'Unknown'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {token.unit_address || 'No address'}{token.monthly_rent ? ` • £${token.monthly_rent}/month` : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sent {format(new Date(token.created_at), 'dd MMM yyyy')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {token.signed_at ? (
+                    <Badge variant="default" className="gap-1 bg-green-600">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Signed {format(new Date(token.signed_at), 'dd MMM yyyy')}
+                    </Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => copySigningLink(token.id)}
+                    >
+                      {copiedId === token.id
+                        ? <><CheckCircle2 className="h-3 w-3 text-green-500" />Copied!</>
+                        : <><Copy className="h-3 w-3" />Copy Sign Link</>}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Lease Renewal Opportunities */}
       {expiringLeases.length > 0 && (
         <Card className="p-6">

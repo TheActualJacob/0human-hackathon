@@ -35,10 +35,16 @@ router = APIRouter(prefix="/api/renewals", tags=["renewals"])
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 async def _get_verified_user(authorization: str = Header(...)) -> dict[str, Any]:
-    """Validate Supabase JWT and return user payload."""
+    """Validate Supabase JWT and return user payload.
+    Internal service calls may pass the service role key as bearer token."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ").strip()
+
+    # Allow internal calls (e.g. from Next.js API routes) using the service role key
+    if token == settings.SUPABASE_SERVICE_ROLE_KEY:
+        return {"id": "internal", "email": "internal@propai.system"}
+
     try:
         sb = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
         user_res = sb.auth.get_user(token)

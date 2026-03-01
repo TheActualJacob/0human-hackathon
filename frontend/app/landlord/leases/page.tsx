@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import {
   FileText, Calendar, TrendingUp, AlertCircle, Plus,
-  User, Home, DollarSign, Clock, ChevronRight, Copy, CheckCircle2, Download
+  User, Home, DollarSign, Clock, ChevronRight, Copy, CheckCircle2, Download,
+  Loader2, MessageCircle, Send
 } from "lucide-react";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -38,6 +39,8 @@ export default function LandlordLeasesPage() {
   const [selectedLease, setSelectedLease] = useState<string | null>(null);
   const [signingTokens, setSigningTokens] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [contactingLease, setContactingLease] = useState<string | null>(null);
+  const [contactedLeases, setContactedLeases] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -79,6 +82,25 @@ export default function LandlordLeasesPage() {
       setCopiedId(tokenId);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  };
+
+  const handleContactTenant = async (leaseId: string) => {
+    setContactingLease(leaseId);
+    try {
+      const res = await fetch('/api/lease/contact-tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lease_id: leaseId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed');
+      setContactedLeases(prev => new Set(prev).add(leaseId));
+    } catch (err: any) {
+      console.error('Contact tenant error:', err);
+      alert(`Failed to contact tenant: ${err.message}`);
+    } finally {
+      setContactingLease(null);
+    }
   };
 
   // Get tenant info for lease
@@ -468,9 +490,32 @@ export default function LandlordLeasesPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        Contact Tenant
-                      </Button>
+                      {contactedLeases.has(lease.id) ? (
+                        <Button size="sm" variant="outline" disabled className="gap-1.5 text-green-500 border-green-500/40">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          WhatsApp Sent
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          disabled={contactingLease === lease.id}
+                          onClick={() => handleContactTenant(lease.id)}
+                        >
+                          {contactingLease === lease.id ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Sending…
+                            </>
+                          ) : (
+                            <>
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              Contact Tenant
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button size="sm">
                         Renew Lease
                       </Button>

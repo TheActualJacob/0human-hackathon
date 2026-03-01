@@ -33,6 +33,9 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       : authRole;
 
   useEffect(() => {
+    // Clear any previously corrupted auth-storage from the old persist middleware
+    try { localStorage.removeItem('auth-storage'); } catch {}
+
     // Fast: use local session cache — no network round-trip
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsLoggedIn(!!session);

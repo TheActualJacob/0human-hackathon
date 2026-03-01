@@ -85,7 +85,15 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
         )
         return Response(status_code=200)
 
-    # Attach any media URLs to context so the maintenance tool can store them
+    # Proxy Twilio media to Supabase Storage so URLs are publicly accessible
+    if media_urls:
+        import asyncio
+        from app.services.media_proxy import proxy_twilio_media_list
+        media_urls = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: proxy_twilio_media_list(media_urls)
+        )
+
+    # Attach public media URLs to context so the maintenance tool can store them
     ctx.pending_media_urls = media_urls
 
     # Log inbound message before any processing

@@ -240,14 +240,17 @@ async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResul
         ),
     }
 
-    await log_agent_action(
-        lease_id=lease_id,
-        action_category="payment",
-        action_description=f"Checked rent status. Total arrears: £{total_arrears:.2f}",
-        tools_called=[{"tool": "get_rent_status", "input": inp}],
-        output_summary=f"Total arrears: £{total_arrears:.2f}",
-        confidence_score=1.0,
-    )
+    try:
+        await log_agent_action(
+            lease_id=lease_id,
+            action_category="payment",
+            action_description=f"Checked rent status. Total arrears: £{total_arrears:.2f}",
+            tools_called=[{"tool": "get_rent_status", "input": inp}],
+            output_summary=f"Total arrears: £{total_arrears:.2f}",
+            confidence_score=1.0,
+        )
+    except Exception as log_exc:
+        logger.warning("[get_rent_status] log_agent_action failed (non-fatal): %s", log_exc)
 
     return ToolResult(success=True, data=result_data)
 
@@ -394,14 +397,17 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
         ),
     )
 
-    await log_agent_action(
-        lease_id=lease_id,
-        action_category="maintenance",
-        action_description=f"Scheduled {urgency} maintenance: {category} — {description[:80]}",
-        tools_called=[{"tool": "schedule_maintenance", "input": inp}],
-        output_summary=f"Assigned to {selected['name']}" if selected else "No contractor available, logged as open",
-        confidence_score=0.9,
-    )
+    try:
+        await log_agent_action(
+            lease_id=lease_id,
+            action_category="maintenance",
+            action_description=f"Scheduled {urgency} maintenance: {category} — {description[:80]}",
+            tools_called=[{"tool": "schedule_maintenance", "input": inp}],
+            output_summary=f"Assigned to {selected['name']}" if selected else "No contractor available, logged as open",
+            confidence_score=0.9,
+        )
+    except Exception as log_exc:
+        logger.warning("[schedule_maintenance] log_agent_action failed (non-fatal): %s", log_exc)
 
     landlord_msg = None
     if is_emergency:
@@ -455,14 +461,17 @@ async def _record_renewal_decision(inp: dict[str, Any], ctx: TenantContext) -> T
         "renewal_status": decision,
     }).eq("id", lease_id).execute()
 
-    await log_agent_action(
-        lease_id=lease_id,
-        action_category="renewal",
-        action_description=f"Tenant renewal decision recorded: {decision}. Notes: {notes}",
-        tools_called=[{"tool": "record_renewal_decision", "input": inp}],
-        output_summary=decision,
-        confidence_score=0.95,
-    )
+    try:
+        await log_agent_action(
+            lease_id=lease_id,
+            action_category="renewal",
+            action_description=f"Tenant renewal decision recorded: {decision}. Notes: {notes}",
+            tools_called=[{"tool": "record_renewal_decision", "input": inp}],
+            output_summary=decision,
+            confidence_score=0.95,
+        )
+    except Exception as log_exc:
+        logger.warning("[record_renewal_decision] log_agent_action failed (non-fatal): %s", log_exc)
 
     if decision == "not_renewing":
         try:
@@ -577,14 +586,17 @@ async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolRe
         "requires_signature": requires_sig,
     }).execute()
 
-    await log_agent_action(
-        lease_id=lease_id,
-        action_category="legal",
-        action_description=f"Issued {notice_type} to {ctx.tenant.full_name}. Reason: {reason}",
-        tools_called=[{"tool": "issue_legal_notice", "input": inp}],
-        output_summary=f"Legal action ID: {legal_action_id}. Deadline: {deadline_display}.",
-        confidence_score=0.95,
-    )
+    try:
+        await log_agent_action(
+            lease_id=lease_id,
+            action_category="legal",
+            action_description=f"Issued {notice_type} to {ctx.tenant.full_name}. Reason: {reason}",
+            tools_called=[{"tool": "issue_legal_notice", "input": inp}],
+            output_summary=f"Legal action ID: {legal_action_id}. Deadline: {deadline_display}.",
+            confidence_score=0.95,
+        )
+    except Exception as log_exc:
+        logger.warning("[issue_legal_notice] log_agent_action failed (non-fatal): %s", log_exc)
 
     notice_desc = _NOTICE_DESCRIPTIONS.get(notice_type, "A formal notice")
 
@@ -632,16 +644,19 @@ async def _update_escalation_level(inp: dict[str, Any], ctx: TenantContext) -> T
         open_threads=updated_threads,
     )
 
-    await log_agent_action(
-        lease_id=lease_id,
-        action_category="escalation",
-        action_description=(
-            f"Escalation level changed from {ctx.escalation_level} to {new_level}. Reason: {reason}"
-        ),
-        tools_called=[{"tool": "update_escalation_level", "input": inp}],
-        output_summary=f"New level: {new_level}",
-        confidence_score=1.0,
-    )
+    try:
+        await log_agent_action(
+            lease_id=lease_id,
+            action_category="escalation",
+            action_description=(
+                f"Escalation level changed from {ctx.escalation_level} to {new_level}. Reason: {reason}"
+            ),
+            tools_called=[{"tool": "update_escalation_level", "input": inp}],
+            output_summary=f"New level: {new_level}",
+            confidence_score=1.0,
+        )
+    except Exception as log_exc:
+        logger.warning("[update_escalation_level] log_agent_action failed (non-fatal): %s", log_exc)
 
     is_high_severity = new_level >= 3
 

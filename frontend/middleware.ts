@@ -55,27 +55,18 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  // getUser() validates the token server-side — always accurate, never stale
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // Public routes that don't need authentication
-  const publicRoutes = [
-    '/',
-    '/auth/login',
-    '/auth/signup/landlord',
-    '/auth/signup/tenant',
-    '/demo',
-    '/properties',
-  ];
-
-  const isPublicRoute = publicRoutes.some(route => 
-    request.nextUrl.pathname === route || 
+  const isPublicRoute =
+    request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/auth/') ||
     request.nextUrl.pathname.startsWith('/demo') ||
-    request.nextUrl.pathname.startsWith('/properties')
-  );
+    request.nextUrl.pathname.startsWith('/properties') ||
+    request.nextUrl.pathname.startsWith('/pay/');
 
   // If not authenticated and trying to access protected route
-  if (!session && !isPublicRoute) {
+  if (!user && !isPublicRoute) {
     console.log('Middleware: No session, redirecting to login from', request.nextUrl.pathname);
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/auth/login';
@@ -84,12 +75,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // If authenticated, get user role
-  if (session) {
+  if (user) {
     const { data: authUser } = await supabase
       .from('auth_users')
       .select('role')
-      .eq('id', session.user.id)
-      .single();
+      .eq('id', user.id)
+      .maybeSingle();
 
     if (authUser) {
       // Redirect to appropriate dashboard if accessing root

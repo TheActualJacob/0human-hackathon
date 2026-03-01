@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           deposit_amount: deposit_amount ? Number(deposit_amount) : undefined,
         });
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Claude timeout after 20s')), 20000)
+          setTimeout(() => reject(new Error('Claude timeout after 45s')), 45000)
         );
         lease_content = await Promise.race([aiPromise, timeoutPromise]);
       } catch (aiErr) {

@@ -74,8 +74,8 @@ const deltaCol  = (n: number) => n >= 0 ? 'text-emerald-400' : 'text-red-400';
 const ChartTip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#111] border border-white/10 rounded-lg px-3 py-2 text-xs shadow-xl">
-      <p className="text-white/40 mb-1.5 text-[10px]">{label}</p>
+    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-xs shadow-xl">
+      <p className="text-muted-foreground mb-1.5 text-[10px]">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} className="font-medium" style={{ color: p.color }}>
           {p.name}:{' '}
@@ -92,7 +92,7 @@ const ChartTip = ({ active, payload, label }: any) => {
 
 // ─── Reusable card ────────────────────────────────────────────────────────────
 const Card = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={cn("rounded-xl border border-white/[0.07] bg-white/[0.03] p-5", className)}>
+  <div className={cn("rounded-xl border border-border bg-card p-5", className)}>
     {children}
   </div>
 );
@@ -100,18 +100,18 @@ const Card = ({ children, className }: { children: React.ReactNode; className?: 
 const CardTitle = ({ children, sub, right }: { children: React.ReactNode; sub?: string; right?: React.ReactNode }) => (
   <div className="flex items-start justify-between mb-4">
     <div>
-      <h3 className="text-sm font-semibold text-white">{children}</h3>
-      {sub && <p className="text-xs text-white/40 mt-0.5">{sub}</p>}
+      <h3 className="text-sm font-semibold text-foreground">{children}</h3>
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
-    {right && <div className="text-xs text-white/30">{right}</div>}
+    {right && <div className="text-xs text-muted-foreground">{right}</div>}
   </div>
 );
 
 // ─── Stat pill ────────────────────────────────────────────────────────────────
 const StatPill = ({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) => (
   <div className="flex flex-col gap-0.5">
-    <span className="text-[10px] text-white/30 font-medium uppercase tracking-wide">{label}</span>
-    <span className={cn("text-sm font-bold leading-none", valueClass ?? 'text-white')}>{value}</span>
+    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
+    <span className={cn("text-sm font-bold leading-none", valueClass ?? 'text-foreground')}>{value}</span>
   </div>
 );
 
@@ -224,24 +224,24 @@ export default function RevenuePage() {
 
   // ── Guards ─────────────────────────────────────────────────────────────────
   if (initialLoad) return (
-    <div className="flex h-full items-center justify-center bg-[#0a0a0a]">
-      <div className="flex items-center gap-2 text-white/30 text-sm">
+    <div className="flex h-full items-center justify-center bg-background">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
         <RefreshCw className="h-4 w-4 animate-spin" /> Loading portfolio…
       </div>
     </div>
   );
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[#0a0a0a] text-white">
+    <div className="h-full flex flex-col overflow-hidden bg-background text-foreground">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-white/[0.07] bg-[#0d0d0d]">
+      <div className="flex-shrink-0 border-b border-border bg-card">
 
         {/* Title row */}
         <div className="flex items-center justify-between px-6 py-3.5">
           <div>
-            <h1 className="text-base font-semibold text-white">Revenue Intelligence</h1>
-            <p className="text-xs text-white/30 mt-0.5">AI pricing · vacancy risk · market strategy</p>
+            <h1 className="text-base font-semibold text-foreground">Revenue Intelligence</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">AI pricing · vacancy risk · market strategy</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -249,15 +249,15 @@ export default function RevenuePage() {
               <select
                 value={selectedUnitId}
                 onChange={e => setSelectedUnitId(e.target.value)}
-                className="appearance-none bg-white/[0.05] border border-white/10 rounded-lg px-3 py-2 pr-8 text-sm text-white/80 focus:outline-none focus:border-amber-500/50 cursor-pointer"
+                className="appearance-none bg-secondary border border-border rounded-lg px-3 py-2 pr-8 text-sm text-foreground focus:outline-none focus:border-amber-500/50 cursor-pointer"
               >
                 {units.map(u => (
-                  <option key={u.id} value={u.id} className="bg-[#1a1a1a]">
+                  <option key={u.id} value={u.id} className="bg-card">
                     {u.unit_identifier || u.address || 'Unit'}{u.city ? ` · ${u.city}` : ''}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-white/30 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             </div>
 
             <button
@@ -266,7 +266,7 @@ export default function RevenuePage() {
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
                 loading
-                  ? "bg-white/5 text-white/30 cursor-not-allowed"
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_16px_rgba(245,158,11,0.25)]"
               )}
             >
@@ -279,7 +279,7 @@ export default function RevenuePage() {
 
         {/* KPI strip */}
         {recommendation && stats && (
-          <div className="flex items-center gap-px border-t border-white/[0.06] overflow-x-auto">
+          <div className="flex items-center gap-px border-t border-border overflow-x-auto">
             {/* Optimal — highlighted */}
             <div className="flex-shrink-0 px-5 py-3 bg-amber-500/8 border-r border-amber-500/15">
               <p className="text-[10px] text-amber-500/70 font-medium uppercase tracking-wider mb-1">AI Optimal</p>
@@ -290,7 +290,7 @@ export default function RevenuePage() {
             </div>
 
             {[
-              { label: 'Current Rent', value: `${fmt(stats.currentRent)}/mo`, cls: 'text-white/70' },
+              { label: 'Current Rent', value: `${fmt(stats.currentRent)}/mo`, cls: 'text-foreground/70' },
               {
                 label: 'Market Rank',
                 value: `${recommendation.market_percentile}th percentile`,
@@ -316,15 +316,15 @@ export default function RevenuePage() {
                 value: `${confidencePct}%`,
                 cls: confidencePct >= 70 ? 'text-emerald-400' : 'text-amber-400',
               },
-              { label: 'Market Median', value: `${fmt(stats.median)}/mo`, cls: 'text-white/60' },
+              { label: 'Market Median', value: `${fmt(stats.median)}/mo`, cls: 'text-muted-foreground' },
               {
                 label: 'Avg DOM',
                 value: `${Math.round(stats.avgDom)} days`,
                 cls: stats.avgDom < 12 ? 'text-emerald-400' : stats.avgDom < 25 ? 'text-amber-400' : 'text-red-400',
               },
             ].map(({ label, value, cls }) => (
-              <div key={label} className="flex-shrink-0 px-5 py-3 border-r border-white/[0.06]">
-                <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider mb-1">{label}</p>
+              <div key={label} className="flex-shrink-0 px-5 py-3 border-r border-border">
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mb-1">{label}</p>
                 <p className={cn("text-sm font-semibold leading-none", cls)}>{value}</p>
               </div>
             ))}
@@ -333,27 +333,27 @@ export default function RevenuePage() {
 
         {/* Meta row */}
         {meta && (
-          <div className="flex items-center gap-4 px-6 py-2 border-t border-white/[0.04] flex-wrap">
+          <div className="flex items-center gap-4 px-6 py-2 border-t border-border/50 flex-wrap">
             <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-500/70">
               <Database className="h-3 w-3" />
               {meta.data_source}
             </span>
             {meta.geocoded && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-white/30">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <MapPin className="h-3 w-3" />
                 {meta.sample_size} comps · {meta.coverage_radius_km ?? 10}km radius
               </span>
             )}
             {meta.season && (
               <span className={cn("inline-flex items-center gap-1.5 text-[11px]",
-                meta.season.adjustment > 5 ? 'text-orange-400/70' : meta.season.adjustment < -4 ? 'text-emerald-500/60' : 'text-white/25'
+                meta.season.adjustment > 5 ? 'text-orange-400/70' : meta.season.adjustment < -4 ? 'text-emerald-500/60' : 'text-muted-foreground/60'
               )}>
                 <Thermometer className="h-3 w-3" />
                 {meta.season.label} · {meta.season.adjustment > 0 ? '+' : ''}{meta.season.adjustment}% vacancy
               </span>
             )}
             {meta.fetched_at && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-white/20 ml-auto">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/50 ml-auto">
                 <Clock className="h-3 w-3" />
                 {new Date(meta.fetched_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
               </span>
@@ -381,8 +381,8 @@ export default function RevenuePage() {
           <div className="text-center space-y-4">
             <Brain className="h-8 w-8 text-amber-400 mx-auto animate-pulse" />
             <div>
-              <p className="text-sm font-medium text-white/70">Analyzing market data…</p>
-              <p className="text-xs text-white/30 mt-1">Fetching Numbeo · modeling vacancy risk · generating strategy</p>
+              <p className="text-sm font-medium text-foreground/70">Analyzing market data…</p>
+              <p className="text-xs text-muted-foreground mt-1">Fetching Numbeo · modeling vacancy risk · generating strategy</p>
             </div>
           </div>
         </div>
@@ -396,22 +396,22 @@ export default function RevenuePage() {
               <BarChart3 className="h-7 w-7 text-amber-400" />
             </div>
             <div>
-              <p className="text-base font-semibold text-white">Ready to analyze</p>
+              <p className="text-base font-semibold text-foreground">Ready to analyze</p>
               {selectedUnit && (
-                <p className="text-sm text-white/40 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {selectedUnit.unit_identifier || selectedUnit.address}
                   {selectedUnit.city ? ` · ${selectedUnit.city}` : ''}
                   {selectedUnit.bedrooms ? ` · ${selectedUnit.bedrooms} bed` : ''}
                 </p>
               )}
             </div>
-            <p className="text-xs text-white/25 leading-relaxed">
+            <p className="text-xs text-muted-foreground/70 leading-relaxed">
               Pulls live Numbeo market data, models vacancy risk, and generates a Claude-powered pricing strategy for this property.
             </p>
             <button
               onClick={runAnalysis}
               disabled={!selectedUnitId}
-              className="flex items-center gap-2 mx-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-white/5 disabled:text-white/20 text-black text-sm font-semibold rounded-xl transition-all"
+              className="flex items-center gap-2 mx-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-muted disabled:text-muted-foreground text-black text-sm font-semibold rounded-xl transition-all"
             >
               <Zap className="h-4 w-4" /> Run Analysis
             </button>
@@ -437,29 +437,29 @@ export default function RevenuePage() {
                 </CardTitle>
                 <ResponsiveContainer width="100%" height={190}>
                   <BarChart data={positioningData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={v => `£${v}`} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="2 6" stroke="oklch(0.5 0 0 / 0.1)" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={v => `£${v}`} tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTip />} />
                     <ReferenceLine y={stats.median} stroke="#f59e0b" strokeDasharray="4 6" strokeWidth={1}
                       label={{ value: `Median ${fmt(stats.median)}`, position: 'insideTopRight', fontSize: 9, fill: '#f59e0b' }} />
                     <Bar dataKey="rent" name="Monthly Rent" radius={[3, 3, 0, 0]}>
                       {positioningData.map((entry, i) => (
-                        <rect key={i} fill={entry.isYou ? '#f59e0b' : 'rgba(255,255,255,0.1)'} />
+                        <rect key={i} fill={entry.isYou ? '#f59e0b' : 'oklch(0.5 0 0 / 0.2)'} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex items-center gap-5 mt-3 pt-3 border-t border-white/[0.06]">
+                <div className="flex items-center gap-5 mt-3 pt-3 border-t border-border">
                   {[
-                    { label: 'P25',       val: fmt(stats.p25),                             cls: 'text-white/50' },
+                    { label: 'P25',       val: fmt(stats.p25),                             cls: 'text-muted-foreground' },
                     { label: 'Median',    val: fmt(stats.median),                          cls: 'text-amber-400' },
-                    { label: 'P75',       val: fmt(stats.p75),                             cls: 'text-white/50' },
-                    { label: 'Your Rent', val: fmt(stats.currentRent),                     cls: 'text-white' },
+                    { label: 'P75',       val: fmt(stats.p75),                             cls: 'text-muted-foreground' },
+                    { label: 'Your Rent', val: fmt(stats.currentRent),                     cls: 'text-foreground' },
                     { label: 'AI Target', val: fmt(recommendation.optimal_listing_price),  cls: 'text-emerald-400' },
                   ].map(({ label, val, cls }) => (
                     <div key={label}>
-                      <p className="text-[10px] text-white/25 font-medium">{label}</p>
+                      <p className="text-[10px] text-muted-foreground/70 font-medium">{label}</p>
                       <p className={cn("text-xs font-bold mt-0.5", cls)}>{val}</p>
                     </div>
                   ))}
@@ -474,13 +474,13 @@ export default function RevenuePage() {
                   </CardTitle>
                   <ResponsiveContainer width="100%" height={160}>
                     <LineChart data={elasticityCurve} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                      <CartesianGrid strokeDasharray="2 6" stroke="oklch(0.5 0 0 / 0.1)" vertical={false} />
                       <XAxis dataKey="priceDeltaPct" tickFormatter={v => `${v > 0 ? '+' : ''}${v}%`}
-                        tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="l" tickFormatter={v => `${v}%`} tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="r" orientation="right" tickFormatter={fmtK} tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
+                        tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="l" tickFormatter={v => `${v}%`} tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="r" orientation="right" tickFormatter={fmtK} tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                       <Tooltip content={<ChartTip />} />
-                      <ReferenceLine yAxisId="l" x={0} stroke="rgba(255,255,255,0.08)" />
+                      <ReferenceLine yAxisId="l" x={0} stroke="oklch(0.5 0 0 / 0.15)" />
                       <Line yAxisId="l" type="monotone" dataKey="vacancyRisk" name="Vacancy Risk" stroke="#f97316" strokeWidth={2} dot={false} />
                       <Line yAxisId="r" type="monotone" dataKey="netAfterVacancy" name="Net Revenue" stroke="#10b981" strokeWidth={2} dot={false} />
                     </LineChart>
@@ -499,9 +499,9 @@ export default function RevenuePage() {
                       }))}
                       margin={{ top: 4, right: 4, left: -18, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={fmtK} tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
+                      <CartesianGrid strokeDasharray="2 6" stroke="oklch(0.5 0 0 / 0.1)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={fmtK} tick={{ fontSize: 8, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                       <Tooltip content={<ChartTip />} />
                       <Bar dataKey="net" name="Net Revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} opacity={0.7} />
                     </BarChart>
@@ -517,12 +517,12 @@ export default function RevenuePage() {
                   </CardTitle>
                   <ResponsiveContainer width="100%" height={130}>
                     <LineChart data={histData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={v => `£${v}`} tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.2)' }} axisLine={false} tickLine={false} />
+                      <CartesianGrid strokeDasharray="2 6" stroke="oklch(0.5 0 0 / 0.1)" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={v => `£${v}`} tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                       <Tooltip content={<ChartTip />} />
                       <Line type="monotone" dataKey="optimal" name="AI Optimal" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: '#f59e0b' }} />
-                      <Line type="monotone" dataKey="current" name="Current Rent" stroke="rgba(255,255,255,0.2)" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 4" />
+                      <Line type="monotone" dataKey="current" name="Current Rent" stroke="#94a3b8" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="4 4" />
                     </LineChart>
                   </ResponsiveContainer>
                 </Card>
@@ -552,7 +552,7 @@ export default function RevenuePage() {
                         </span>
                       );
                     })()}
-                    <span className="text-white/25">{comps.length} comps · sorted by match</span>
+                    <span className="text-muted-foreground/70">{comps.length} comps · sorted by match</span>
                   </span>
                 }>
                   Comparable Listings
@@ -560,10 +560,10 @@ export default function RevenuePage() {
                 {comps.some(c => (c as any).data_source?.includes('Numbeo')) && (
                   <div className="mx-0 mb-3 px-4 py-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15 flex items-start gap-2">
                     <Info className="h-3.5 w-3.5 text-amber-400/70 mt-0.5 flex-shrink-0" />
-                    <p className="text-[11px] text-white/40 leading-relaxed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       {comps.some(c => ['Spitogatos','xe.gr','Rentola','Findallrentals','Kugli','Craigslist','OpenRent','HousingAnywhere','Blueground'].some(s => (c as any).data_source?.includes(s)))
                         ? <>Live listings supplemented with <span className="text-amber-400/80">Numbeo market estimates</span> (amber <span className="text-amber-400/80">Est</span> badge) to give Claude enough data for accurate recommendations.</>
-                        : <>No live listings found. Showing <span className="text-amber-400/80">Numbeo market estimates</span> — statistically modelled from community price data. <span className="text-white/30">Click any row to view source.</span></>
+                        : <>No live listings found. Showing <span className="text-amber-400/80">Numbeo market estimates</span> — statistically modelled from community price data. <span className="text-muted-foreground/70">Click any row to view source.</span></>
                       }
                     </p>
                   </div>
@@ -571,9 +571,9 @@ export default function RevenuePage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-white/[0.07]">
+                      <tr className="border-b border-border">
                         {['Area / Source', 'Rent', 'Beds · Baths', 'Size', 'Dist', 'DOM', 'Match'].map(h => (
-                          <th key={h} className="text-left pb-2.5 pr-4 text-[10px] text-white/25 font-medium uppercase tracking-wide whitespace-nowrap">
+                          <th key={h} className="text-left pb-2.5 pr-4 text-[10px] text-muted-foreground font-medium uppercase tracking-wide whitespace-nowrap">
                             {h}
                           </th>
                         ))}
@@ -588,9 +588,9 @@ export default function RevenuePage() {
                         const LIVE_SOURCES = ['Spitogatos','xe.gr','Rentola','Findallrentals','Kugli','Craigslist','OpenRent','HousingAnywhere','Blueground'];
                         const isLive    = LIVE_SOURCES.some(s => src?.includes(s));
                         const srcLabel  = src?.includes('Spitogatos') ? 'SG' : src?.includes('xe.gr') ? 'XE' : src?.includes('Rentola') ? 'RT' : src?.includes('Findallrentals') ? 'FA' : src?.includes('Kugli') ? 'KG' : src?.includes('Craigslist') ? 'CL' : src?.includes('OpenRent') ? 'OR' : src?.includes('HousingAnywhere') ? 'HA' : src?.includes('Blueground') ? 'BG' : 'Est';
-                        const srcColor  = isLive ? 'text-emerald-400/60 border-emerald-500/20 bg-emerald-500/5' : 'text-white/20 border-white/10 bg-white/[0.03]';
+                        const srcColor  = isLive ? 'text-emerald-400/60 border-emerald-500/20 bg-emerald-500/5' : 'text-muted-foreground/60 border-border bg-muted/40';
                         return (
-                          <tr key={i} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/40 transition-colors">
                             <td className="py-2.5 pr-4 max-w-[180px]">
                               <div className="flex items-center gap-1.5">
                                 <span className={cn("text-[8px] font-semibold px-1 py-0.5 rounded border flex-shrink-0", srcColor)}>
@@ -602,38 +602,38 @@ export default function RevenuePage() {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title={isLive ? `View real listing: ${addr} ↗` : `View market data source for ${addr} ↗`}
-                                    className="truncate text-white/50 hover:text-amber-400 underline decoration-dotted underline-offset-2 decoration-white/20 hover:decoration-amber-400/50 transition-colors cursor-pointer"
+                                    className="truncate text-muted-foreground hover:text-amber-400 underline decoration-dotted underline-offset-2 decoration-border hover:decoration-amber-400/50 transition-colors cursor-pointer"
                                   >
                                     {addr.length > 24 ? addr.slice(0, 24) + '…' : addr}
-                                    <span className="ml-0.5 text-[9px] text-white/20">↗</span>
+                                    <span className="ml-0.5 text-[9px] text-muted-foreground/50">↗</span>
                                   </a>
                                 ) : (
-                                  <span className="truncate text-white/50" title={addr}>
+                                  <span className="truncate text-muted-foreground" title={addr}>
                                     {addr.length > 24 ? addr.slice(0, 24) + '…' : addr}
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">
-                              {fmt(c.rent)}<span className="text-white/30 font-normal">/mo</span>
+                            <td className="py-2.5 pr-4 font-semibold text-foreground whitespace-nowrap">
+                              {fmt(c.rent)}<span className="text-muted-foreground font-normal">/mo</span>
                             </td>
-                            <td className="py-2.5 pr-4 text-white/50 whitespace-nowrap">
+                            <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">
                               {c.bedrooms ?? '?'}bd{c.bathrooms != null ? ` · ${c.bathrooms}ba` : ''}
                             </td>
-                            <td className="py-2.5 pr-4 text-white/40">{sqm ? `${sqm} m²` : '—'}</td>
-                            <td className="py-2.5 pr-4 text-white/30 whitespace-nowrap">{c.distance_km} km</td>
-                            <td className={cn("py-2.5 pr-4 whitespace-nowrap font-medium", c.days_on_market === 0 ? 'text-emerald-400' : 'text-white/30')}>
+                            <td className="py-2.5 pr-4 text-muted-foreground">{sqm ? `${sqm} m²` : '—'}</td>
+                            <td className="py-2.5 pr-4 text-muted-foreground whitespace-nowrap">{c.distance_km} km</td>
+                            <td className={cn("py-2.5 pr-4 whitespace-nowrap font-medium", c.days_on_market === 0 ? 'text-emerald-400' : 'text-muted-foreground')}>
                               {c.days_on_market === 0 ? 'New' : `${c.days_on_market}d`}
                             </td>
                             <td className="py-2.5">
                               <div className="flex items-center gap-2">
-                                <div className="w-14 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                                <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
                                   <div
-                                    className={cn("h-full rounded-full", c.similarity_score >= 80 ? 'bg-emerald-500' : c.similarity_score >= 60 ? 'bg-amber-500' : 'bg-white/20')}
+                                    className={cn("h-full rounded-full", c.similarity_score >= 80 ? 'bg-emerald-500' : c.similarity_score >= 60 ? 'bg-amber-500' : 'bg-muted-foreground/30')}
                                     style={{ width: `${c.similarity_score}%` }}
                                   />
                                 </div>
-                                <span className="text-[10px] text-white/25 w-4 text-right">{c.similarity_score}</span>
+                                <span className="text-[10px] text-muted-foreground/70 w-4 text-right">{c.similarity_score}</span>
                               </div>
                             </td>
                           </tr>
@@ -667,13 +667,13 @@ export default function RevenuePage() {
                     {fmt(recommendation.optimal_listing_price)}
                     <span className="text-base font-normal text-amber-500/50 ml-1">/mo</span>
                   </p>
-                  <p className="text-xs text-white/30 mt-1.5">
+                  <p className="text-xs text-muted-foreground mt-1.5">
                     +{recommendation.recommended_renewal_increase_percent}% renewal · {recommendation.projected_days_on_market[0]}–{recommendation.projected_days_on_market[1]} days to let
                   </p>
                 </div>
 
                 {/* Reasoning */}
-                <p className="text-xs text-white/40 leading-relaxed mb-4 pl-3 border-l-2 border-white/10">
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4 pl-3 border-l-2 border-border">
                   {recommendation.reasoning_summary}
                 </p>
 
@@ -685,8 +685,8 @@ export default function RevenuePage() {
                     { label: 'Vacancy Risk',  val: `${recommendation.vacancy_risk_score}/100`,                     cls: vacColor(recommendation.vacancy_risk_score) },
                     { label: 'Market',        val: recommendation.market_trend.charAt(0).toUpperCase() + recommendation.market_trend.slice(1), cls: trendCol(recommendation.market_trend) },
                   ].map(({ label, val, cls }) => (
-                    <div key={label} className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
-                      <p className="text-[10px] text-white/25 font-medium mb-1">{label}</p>
+                    <div key={label} className="rounded-lg bg-muted/50 border border-border p-3">
+                      <p className="text-[10px] text-muted-foreground/70 font-medium mb-1">{label}</p>
                       <p className={cn("text-sm font-bold leading-none", cls)}>{val}</p>
                     </div>
                   ))}
@@ -694,10 +694,10 @@ export default function RevenuePage() {
 
                 {/* Confidence bar */}
                 <div className="mb-4">
-                  <div className="flex justify-between text-[10px] text-white/25 mb-1.5">
+                  <div className="flex justify-between text-[10px] text-muted-foreground/70 mb-1.5">
                     <span>Model confidence</span><span>{confidencePct}%</span>
                   </div>
-                  <div className="h-1.5 bg-white/[0.06] rounded-full">
+                  <div className="h-1.5 bg-muted rounded-full">
                     <div
                       className={cn("h-full rounded-full transition-all", confidencePct >= 75 ? 'bg-emerald-500' : confidencePct >= 50 ? 'bg-amber-500' : 'bg-orange-500')}
                       style={{ width: `${confidencePct}%` }}
@@ -717,7 +717,7 @@ export default function RevenuePage() {
                   <button
                     onClick={updateListing}
                     disabled={updatingListing}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:bg-white/5 disabled:text-white/20 text-black text-sm font-semibold transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:bg-muted disabled:text-muted-foreground text-black text-sm font-semibold transition-all"
                   >
                     {updatingListing
                       ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Updating…</>
@@ -757,8 +757,8 @@ export default function RevenuePage() {
                             ? <AlertCircle className="h-3.5 w-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
                             : <Info className="h-3.5 w-3.5 text-cyan-400 mt-0.5 flex-shrink-0" />}
                           <div className="flex-1 min-w-0 pr-4">
-                            <p className="text-xs font-semibold text-white/80">{alert.title}</p>
-                            <p className="text-[11px] text-white/35 mt-0.5 leading-relaxed">{alert.body}</p>
+                            <p className="text-xs font-semibold text-foreground/80">{alert.title}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{alert.body}</p>
                             {alert.revenue_impact !== 0 && (
                               <p className={cn("text-[11px] font-semibold mt-1", deltaCol(alert.revenue_impact))}>
                                 {fmtSign(alert.revenue_impact)}/yr
@@ -767,7 +767,7 @@ export default function RevenuePage() {
                           </div>
                           <button
                             onClick={() => setDismissed(p => new Set([...p, alert.title]))}
-                            className="absolute top-2.5 right-2.5 text-[11px] text-white/20 hover:text-white/50"
+                            className="absolute top-2.5 right-2.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground"
                           >✕</button>
                         </div>
                       </div>
@@ -787,17 +787,17 @@ export default function RevenuePage() {
                                                     'border-emerald-500/15 bg-emerald-500/[0.03]'
                     )}>
                       <div className="flex items-center justify-between mb-2.5">
-                        <p className="text-xs font-semibold text-white/80">{s.label}</p>
+                        <p className="text-xs font-semibold text-foreground/80">{s.label}</p>
                         <RiskBadge level={s.risk_level} />
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
                         {[
-                          { label: 'Price',   val: fmt(s.price),                                  cls: 'text-white/70' },
+                          { label: 'Price',   val: fmt(s.price),                                  cls: 'text-foreground/70' },
                           { label: 'Vacancy', val: `${s.vacancy_risk}%`,                          cls: vacColor(s.vacancy_risk) },
-                          { label: 'Net/yr',  val: fmtK(s.net_after_vacancy ?? s.annual_revenue), cls: 'text-white/70' },
+                          { label: 'Net/yr',  val: fmtK(s.net_after_vacancy ?? s.annual_revenue), cls: 'text-foreground/70' },
                         ].map(({ label, val, cls }) => (
-                          <div key={label} className="rounded-lg bg-white/[0.03] px-2 py-1.5 text-center">
-                            <p className="text-[9px] text-white/20 font-medium mb-0.5">{label}</p>
+                          <div key={label} className="rounded-lg bg-muted/40 px-2 py-1.5 text-center">
+                            <p className="text-[9px] text-muted-foreground/60 font-medium mb-0.5">{label}</p>
                             <p className={cn("text-xs font-bold", cls)}>{val}</p>
                           </div>
                         ))}
@@ -815,7 +815,7 @@ export default function RevenuePage() {
               {/* Market stats */}
               <Card>
                 <CardTitle>Market Statistics</CardTitle>
-                <div className="space-y-0 divide-y divide-white/[0.05]">
+                <div className="space-y-0 divide-y divide-border">
                   {[
                     { label: 'Median Rent',    val: fmt(stats.median) + '/mo' },
                     { label: 'Market Average', val: fmt(Math.round(stats.mean)) + '/mo' },
@@ -826,14 +826,14 @@ export default function RevenuePage() {
                     { label: 'Sample Size',    val: `${comps.length} properties` },
                   ].map(({ label, val }) => (
                     <div key={label} className="flex justify-between items-center py-2">
-                      <span className="text-xs text-white/30">{label}</span>
-                      <span className="text-xs font-semibold text-white/70">{val}</span>
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <span className="text-xs font-semibold text-foreground/70">{val}</span>
                     </div>
                   ))}
                 </div>
                 {recommendation.seasonal_note && (
-                  <div className="mt-3 pt-3 border-t border-white/[0.06]">
-                    <p className="text-[11px] text-white/30 leading-relaxed">
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       <span className="text-amber-500/60 font-medium">Seasonal note: </span>
                       {recommendation.seasonal_note}
                     </p>

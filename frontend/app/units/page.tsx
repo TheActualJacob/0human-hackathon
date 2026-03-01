@@ -588,7 +588,7 @@ export default function UnitsPage() {
                     city: g('city'),
                     postcode: g('postcode') || null,
                     country: countryCode || null,
-                    jurisdiction: JURISDICTION_MAP[countryCode] ?? countryCode.toLowerCase() || null,
+                    jurisdiction: (JURISDICTION_MAP[countryCode] ?? countryCode.toLowerCase()) || null,
                     unit_type: g('unit_type') || null,
                     bedrooms: parseInt(g('bedrooms')) || null,
                     bathrooms: parseFloat(g('bathrooms')) || null,

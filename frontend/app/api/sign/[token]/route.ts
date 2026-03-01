@@ -175,15 +175,15 @@ async function activateNewTenant(
   const unitId = token.unit_id as string | null;
   const monthlyRent = token.monthly_rent as number | null;
 
-  // 1. Create tenant record
+  // 1. Create tenant record — must match actual schema columns
   const { data: tenantRow, error: tenantErr } = await supabase
     .from('tenants')
     .insert({
       full_name: name ?? 'New Tenant',
       email: email ?? null,
-      phone: (token.prospect_phone as string | null) ?? null,
-      lease_start_date: signedAt.toISOString().slice(0, 10),
-      rent_amount: monthlyRent ?? 0,
+      whatsapp_number: (token.prospect_phone as string | null) ?? `+000${Date.now()}`,
+      is_primary_tenant: true,
+      lease_id: unitId ? null : null, // will be updated after lease lookup
     })
     .select('id')
     .single();
@@ -206,10 +206,17 @@ async function activateNewTenant(
       .maybeSingle();
 
     if (pendingLease) {
+      // Update lease to active
       await supabase
         .from('leases')
-        .update({ status: 'active', tenant_id: tenantId })
+        .update({ status: 'active' })
         .eq('id', pendingLease.id);
+
+      // Link tenant to lease
+      await supabase
+        .from('tenants')
+        .update({ lease_id: pendingLease.id })
+        .eq('id', tenantId);
     }
   }
 

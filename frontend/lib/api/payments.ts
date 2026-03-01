@@ -94,6 +94,16 @@ export async function triggerOverdueCheck(): Promise<CheckOverdueResult> {
   return apiFetch("/payments/check-overdue", { method: "POST" });
 }
 
+export interface GenerateLeasePaymentsResult {
+  created: number;
+  lease_id: string;
+  message: string;
+}
+
+export async function generatePaymentsForLease(leaseId: string): Promise<GenerateLeasePaymentsResult> {
+  return apiFetch(`/payments/generate-for-lease/${leaseId}`, { method: "POST" });
+}
+
 export async function getMonthlyReport(
   landlordId: string,
   year?: number,

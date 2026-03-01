@@ -68,6 +68,11 @@ export default function SignPage() {
   useEffect(() => {
     const el = docRef.current;
     if (!el) return;
+    // If content fits without scrolling, enable immediately
+    if (el.scrollHeight <= el.clientHeight + 40) {
+      setHasScrolled(true);
+      return;
+    }
     const onScroll = () => {
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) setHasScrolled(true);
     };

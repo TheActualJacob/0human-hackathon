@@ -297,7 +297,7 @@ export async function GET(
 ) {
   try {
     const { token } = await context.params;
-    const supabase = getSupabase(false);
+    const supabase = getSupabase(true);
 
     const { data, error } = await supabase
       .from('signing_tokens')
@@ -403,11 +403,30 @@ export async function POST(
 
     if (updateErr) return NextResponse.json({ detail: `Failed to record signature: ${updateErr.message}` }, { status: 500 });
 
-    // ── Post-signing: create tenant + activate lease ──────────────────────────
-    try {
-      await activateNewTenant(supabase, existing, signedAt, pdfUrl);
-    } catch (activateErr) {
-      console.warn('Post-signing activation failed (non-fatal):', activateErr);
+    // Activate lease and generate payments
+    const prospectPhone = existing.prospect_phone as string | null;
+    if (prospectPhone) {
+      try {
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('lease_id')
+          .eq('whatsapp_number', prospectPhone)
+          .maybeSingle();
+
+        if (tenant?.lease_id) {
+          await supabase
+            .from('leases')
+            .update({ status: 'active', lease_document_url: pdfUrl })
+            .eq('id', tenant.lease_id);
+
+          await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}/payments/generate-for-lease/${tenant.lease_id}`,
+            { method: 'POST' },
+          ).catch(() => { /* non-fatal */ });
+        }
+      } catch {
+        // Non-fatal — signing succeeded
+      }
     }
 
     return NextResponse.json({ success: true, pdf_url: pdfUrl });

@@ -103,8 +103,8 @@ export async function middleware(request: NextRequest) {
       //   return NextResponse.redirect(new URL('/unauthorized', request.url));
       // }
 
-      // Redirect authenticated users away from auth pages (but not /properties)
-      if (isPublicRoute && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/properties')) {
+      // Redirect authenticated users away from auth pages (but not /properties, /sign/, /pay/)
+      if (isPublicRoute && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/properties') && !request.nextUrl.pathname.startsWith('/sign/') && !request.nextUrl.pathname.startsWith('/pay/')) {
         if (authUser.role === 'landlord') {
           return NextResponse.redirect(new URL('/landlord/dashboard', request.url));
         } else if (authUser.role === 'tenant') {

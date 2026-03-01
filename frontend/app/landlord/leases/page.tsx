@@ -28,7 +28,8 @@ export default function LandlordLeasesPage() {
     units,
     tenants,
     loading,
-    fetchLandlordData
+    fetchLandlordData,
+    createLease,
   } = useLandlordStore();
 
   const { user } = useAuthStore();
@@ -38,6 +39,13 @@ export default function LandlordLeasesPage() {
   const [selectedLease, setSelectedLease] = useState<string | null>(null);
   const [signingTokens, setSigningTokens] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [newLease, setNewLease] = useState({
+    unit_id: '',
+    monthly_rent: '',
+    start_date: format(new Date(), 'yyyy-MM-dd'),
+    end_date: format(addMonths(new Date(), 12), 'yyyy-MM-dd'),
+  });
+  const [creatingLease, setCreatingLease] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -91,6 +99,31 @@ export default function LandlordLeasesPage() {
     if (!endDate) return null;
     return differenceInDays(new Date(endDate), new Date());
   };
+
+  async function handleCreateLease() {
+    if (!newLease.unit_id || !newLease.monthly_rent || !newLease.start_date) return;
+    setCreatingLease(true);
+    try {
+      await createLease({
+        unit_id: newLease.unit_id,
+        monthly_rent: Number(newLease.monthly_rent),
+        start_date: newLease.start_date,
+        end_date: newLease.end_date || null,
+        status: 'active',
+      });
+      setShowNewLeaseDialog(false);
+      setNewLease({
+        unit_id: '',
+        monthly_rent: '',
+        start_date: format(new Date(), 'yyyy-MM-dd'),
+        end_date: format(addMonths(new Date(), 12), 'yyyy-MM-dd'),
+      });
+    } catch (err) {
+      console.error('Failed to create lease:', err);
+    } finally {
+      setCreatingLease(false);
+    }
+  }
 
   // Filter leases
   const filteredLeases = leases.filter(lease => {
@@ -494,7 +527,7 @@ export default function LandlordLeasesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Property</Label>
-                <Select>
+                <Select value={newLease.unit_id} onValueChange={(v) => setNewLease(p => ({ ...p, unit_id: v }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select property" />
                   </SelectTrigger>
@@ -507,51 +540,54 @@ export default function LandlordLeasesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Monthly Rent</Label>
-                <Input type="number" placeholder="1500" />
+                <Input type="number" placeholder="1500" value={newLease.monthly_rent}
+                  onChange={(e) => setNewLease(p => ({ ...p, monthly_rent: e.target.value }))} />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Tenant Name</Label>
               <Input placeholder="John Doe" />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Tenant Email</Label>
               <Input type="email" placeholder="john@example.com" />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Tenant Phone</Label>
               <Input placeholder="+44 7XXX XXXXXX" />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
+                <Input type="date" value={newLease.start_date}
+                  onChange={(e) => setNewLease(p => ({ ...p, start_date: e.target.value }))} />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Input type="date" defaultValue={format(addMonths(new Date(), 12), 'yyyy-MM-dd')} />
+                <Input type="date" value={newLease.end_date}
+                  onChange={(e) => setNewLease(p => ({ ...p, end_date: e.target.value }))} />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label>Deposit Amount</Label>
               <Input type="number" placeholder="1500" />
             </div>
-            
+
             <div className="flex justify-end gap-3 pt-4">
               <Button variant="outline" onClick={() => setShowNewLeaseDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowNewLeaseDialog(false)}>
-                Create Lease
+              <Button onClick={handleCreateLease} disabled={creatingLease || !newLease.unit_id || !newLease.monthly_rent}>
+                {creatingLease ? 'Creating...' : 'Create Lease'}
               </Button>
             </div>
           </div>

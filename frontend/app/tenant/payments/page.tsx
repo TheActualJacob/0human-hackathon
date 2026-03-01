@@ -243,7 +243,7 @@ export default function TenantPaymentsPage() {
               <p className="text-muted-foreground">No upcoming payments</p>
             </div>
           ) : (
-            upcomingPayments.slice(0, 3).map((payment, idx) => (
+            [...upcomingPayments].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).map((payment, idx) => (
               <div key={payment.id} className="flex items-center justify-between p-4 rounded-lg bg-accent/50">
                 <div className="flex items-center gap-4">
                   <div className={cn(

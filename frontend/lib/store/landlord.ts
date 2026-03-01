@@ -257,13 +257,24 @@ const useLandlordStore = create<LandlordState>()(
       // Lease operations
       createLease: async (lease: Partial<Lease>) => {
         const supabase = createClient();
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('leases')
-          .insert(lease);
-        
+          .insert(lease)
+          .select('id')
+          .single();
+
         if (error) {
           set({ error: error.message });
           throw error;
+        }
+
+        if (data?.id) {
+          try {
+            const { generatePaymentsForLease } = await import('@/lib/api/payments');
+            await generatePaymentsForLease(data.id);
+          } catch {
+            // Non-fatal — lease is created, payments can be generated later
+          }
         }
       },
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.payments import (
     CheckOverdueResult,
+    GenerateLeasePaymentsResult,
     MonthlyReportResponse,
     PaymentRecordRequest,
     PaymentRecordResult,
@@ -13,6 +14,7 @@ from app.schemas.payments import (
 from app.services.payments import (
     check_overdue_payments,
     generate_monthly_report,
+    generate_payments_for_lease,
     get_payments,
     record_payment,
 )
@@ -44,6 +46,15 @@ async def list_payments(
 @router.post("/check-overdue", response_model=CheckOverdueResult)
 async def check_overdue_endpoint():
     return await check_overdue_payments()
+
+
+@router.post("/generate-for-lease/{lease_id}", response_model=GenerateLeasePaymentsResult)
+async def generate_payments_for_lease_endpoint(lease_id: str):
+    """Generate all monthly payment records for a lease. Idempotent."""
+    try:
+        return await generate_payments_for_lease(lease_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/report/{landlord_id}", response_model=MonthlyReportResponse)

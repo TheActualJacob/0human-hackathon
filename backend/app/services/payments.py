@@ -1,3 +1,4 @@
+import calendar
 import json
 import logging
 from datetime import date, datetime, timezone
@@ -6,6 +7,7 @@ from uuid import UUID
 from app.database import supabase
 from app.schemas.payments import (
     CheckOverdueResult,
+    GenerateLeasePaymentsResult,
     LatePatternItem,
     MonthlyReportResponse,
     PaymentRecordRequest,
@@ -581,4 +583,85 @@ async def generate_monthly_report(
         property_breakdown=property_breakdown,
         active_payment_plans=len(plans),
         total_arrears_under_plan=sum(float(p["total_arrears"]) for p in plans),
+    )
+
+
+# ── 5. Generate Payments for Lease ──
+
+
+def _monthly_due_dates_for_lease(start_date: date, end_date: date | None) -> list[date]:
+    """
+    Generate all monthly due dates from start_date to end_date (inclusive).
+    Due day = same calendar day as start_date, clamped to last day of month.
+    If end_date is None, generates 12 months from start_date.
+    """
+    from dateutil.relativedelta import relativedelta
+
+    due_day = start_date.day
+    if end_date is None:
+        end_date = start_date + relativedelta(months=12)
+
+    due_dates: list[date] = []
+    year, month = start_date.year, start_date.month
+
+    while True:
+        days_in_month = calendar.monthrange(year, month)[1]
+        due = date(year, month, min(due_day, days_in_month))
+        if due > end_date:
+            break
+        if due >= start_date:
+            due_dates.append(due)
+        if month == 12:
+            month, year = 1, year + 1
+        else:
+            month += 1
+
+    return due_dates
+
+
+async def generate_payments_for_lease(lease_id: str) -> GenerateLeasePaymentsResult:
+    """
+    Generate all monthly payment records for a lease from start_date to end_date.
+    Idempotent — skips records that already exist for that (lease_id, due_date).
+    """
+    lease_res = (
+        supabase.table("leases")
+        .select("id, start_date, end_date, monthly_rent")
+        .eq("id", lease_id)
+        .maybe_single()
+        .execute()
+    )
+    lease = lease_res.data
+    if not lease:
+        raise ValueError(f"Lease {lease_id} not found")
+
+    start = date.fromisoformat(lease["start_date"])
+    end = date.fromisoformat(lease["end_date"]) if lease.get("end_date") else None
+    monthly_rent = float(lease["monthly_rent"])
+
+    due_dates = _monthly_due_dates_for_lease(start, end)
+
+    existing_res = (
+        supabase.table("payments")
+        .select("due_date")
+        .eq("lease_id", lease_id)
+        .execute()
+    )
+    existing_dates = {r["due_date"] for r in (existing_res.data or [])}
+
+    to_insert = [
+        {"lease_id": lease_id, "amount_due": monthly_rent, "due_date": str(due), "status": "pending"}
+        for due in due_dates
+        if str(due) not in existing_dates
+    ]
+
+    created = 0
+    if to_insert:
+        res = supabase.table("payments").insert(to_insert).execute()
+        created = len(res.data or [])
+
+    return GenerateLeasePaymentsResult(
+        created=created,
+        lease_id=lease_id,
+        message=f"Created {created} payment records for lease {lease_id}.",
     )

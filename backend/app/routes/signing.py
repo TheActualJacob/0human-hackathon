@@ -113,6 +113,12 @@ async def submit_signature(token: str, body: SignRequest):
                     "lease_document_url": pdf_url,
                 }).eq("id", lease_id).execute()
                 print(f"Lease {lease_id} activated after signing")
+                try:
+                    from app.services.payments import generate_payments_for_lease
+                    result = await generate_payments_for_lease(lease_id)
+                    print(f"Generated {result.created} payment records for lease {lease_id}")
+                except Exception as pay_exc:
+                    print(f"Warning: could not generate payments for lease {lease_id}: {pay_exc}")
         except Exception as exc:
             print(f"Failed to activate lease: {exc}")
 

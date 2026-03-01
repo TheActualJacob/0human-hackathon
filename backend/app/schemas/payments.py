@@ -72,3 +72,9 @@ class MonthlyReportResponse(BaseModel):
     property_breakdown: list[PropertyBreakdownItem]
     active_payment_plans: int
     total_arrears_under_plan: float
+
+
+class GenerateLeasePaymentsResult(BaseModel):
+    created: int
+    lease_id: str
+    message: str

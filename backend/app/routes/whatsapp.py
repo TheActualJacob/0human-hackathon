@@ -76,7 +76,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
     # Signature validation in production
     if os.getenv("ENVIRONMENT", "development") == "production":
         signature = request.headers.get("x-twilio-signature", "")
-        url = f"{settings.APP_URL}/webhook/whatsapp"
+        url = f"{settings.APP_URL}/api/webhook/whatsapp"
         if signature and not validate_twilio_signature(signature, url, body):
             return Response(content="Forbidden", status_code=403)
 

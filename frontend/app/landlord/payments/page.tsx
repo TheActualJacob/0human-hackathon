@@ -113,7 +113,7 @@ export default function LandlordPaymentsPage() {
     await logAgentAction({
       lease_id: details.lease.id,
       action_category: 'payment',
-      action_description: `Sent payment reminder to ${details.tenant.full_name} for £${details.payment.amount_due}`,
+      action_description: `Sent payment reminder to ${details.tenant.full_name} for €${details.payment.amount_due}`,
       confidence_score: 0.95
     });
 
@@ -122,7 +122,7 @@ export default function LandlordPaymentsPage() {
       landlord_id: details.unit?.landlord_id || '',
       lease_id: details.lease.id,
       notification_type: 'rent_overdue',
-      message: `Payment reminder sent to ${details.tenant.full_name} (${details.unit?.unit_identifier}) for overdue rent of £${details.payment.amount_due}`
+      message: `Payment reminder sent to ${details.tenant.full_name} (${details.unit?.unit_identifier}) for overdue rent of €${details.payment.amount_due}`
     });
   };
 
@@ -140,7 +140,7 @@ export default function LandlordPaymentsPage() {
     await logAgentAction({
       lease_id: leaseId,
       action_category: 'payment',
-      action_description: `Created payment plan: £${installmentAmount}/month for £${arrears} total arrears`,
+      action_description: `Created payment plan: €${installmentAmount}/month for €${arrears} total arrears`,
       confidence_score: 0.9
     });
 
@@ -171,10 +171,10 @@ export default function LandlordPaymentsPage() {
         const details = getPaymentWithDetails(payment.id);
         return (
           <div>
-            <p className="font-medium">£{payment.amount_due.toLocaleString()}</p>
+            <p className="font-medium">€{payment.amount_due.toLocaleString()}</p>
             {payment.amount_paid !== null && payment.amount_paid < payment.amount_due && (
               <p className="text-sm text-orange-400">
-                £{payment.amount_paid} paid
+                €{payment.amount_paid} paid
               </p>
             )}
             {details?.plan && (
@@ -296,7 +296,7 @@ export default function LandlordPaymentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Expected</p>
-              <h3 className="text-2xl font-bold">£{totalExpected.toLocaleString()}</h3>
+              <h3 className="text-2xl font-bold">€{totalExpected.toLocaleString()}</h3>
             </div>
             <DollarSign className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -307,7 +307,7 @@ export default function LandlordPaymentsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Collected</p>
               <h3 className="text-2xl font-bold text-green-500">
-                £{totalCollected.toLocaleString()}
+                €{totalCollected.toLocaleString()}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {collectionRate}% rate
@@ -322,7 +322,7 @@ export default function LandlordPaymentsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Pending</p>
               <h3 className="text-2xl font-bold text-yellow-500">
-                £{totalPending.toLocaleString()}
+                €{totalPending.toLocaleString()}
               </h3>
             </div>
             <Clock className="h-8 w-8 text-yellow-500" />
@@ -334,7 +334,7 @@ export default function LandlordPaymentsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Overdue</p>
               <h3 className="text-2xl font-bold text-red-500">
-                £{totalLate.toLocaleString()}
+                €{totalLate.toLocaleString()}
               </h3>
             </div>
             <AlertCircle className="h-8 w-8 text-red-500" />
@@ -347,7 +347,7 @@ export default function LandlordPaymentsPage() {
               <p className="text-sm text-muted-foreground">Payment Plans</p>
               <h3 className="text-2xl font-bold text-blue-500">{activePlans}</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                £{totalArrears.toLocaleString()} total
+                €{totalArrears.toLocaleString()} total
               </p>
             </div>
             <CreditCard className="h-8 w-8 text-blue-500" />
@@ -437,12 +437,12 @@ export default function LandlordPaymentsPage() {
                       <div>
                         <p className="font-medium">{tenant?.full_name || 'Unknown'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {unit?.unit_identifier || unit?.name} • £{plan.installment_amount}/{plan.installment_frequency}
+                          {unit?.unit_identifier || unit?.name} • €{plan.installment_amount}/{plan.installment_frequency}
                         </p>
                         <div className="mt-2">
                           <div className="flex items-center justify-between text-xs mb-1">
                             <span>Progress</span>
-                            <span>£{Math.round(plan.total_arrears * 0.3)} / £{plan.total_arrears}</span>
+                            <span>€{Math.round(plan.total_arrears * 0.3)} / €{plan.total_arrears}</span>
                           </div>
                           <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div className="h-full bg-primary rounded-full" style={{ width: '30%' }} />
@@ -525,7 +525,7 @@ export default function LandlordPaymentsPage() {
                     Suggested Installment
                   </p>
                   <p className="text-2xl font-bold text-primary">
-                    £{Math.round(details.payment.amount_due / 6)}/month
+                    €{Math.round(details.payment.amount_due / 6)}/month
                   </p>
                 </div>
                 

@@ -99,7 +99,7 @@ export default function PropertyApplicationPage() {
         .from('units')
         .select('*')
         .eq('id', params.id)
-        .eq('listing_status', 'public')
+        .or('listing_status.eq.public,listing_status.is.null')
         .single();
 
       if (propertyError || !propertyData) {

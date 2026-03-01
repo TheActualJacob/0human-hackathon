@@ -317,7 +317,7 @@ export default function LandlordMaintenancePage() {
               {/* Owner Action Panel */}
               <OwnerActionPanel
                 workflowId={currentWorkflow.id}
-                onResponse={handleOwnerResponse}
+                onResponse={(response, message) => handleOwnerResponse(currentWorkflow.id, response, message)}
                 isVisible={currentState === 'OWNER_NOTIFIED'}
                 isLoading={isSubmitting}
               />

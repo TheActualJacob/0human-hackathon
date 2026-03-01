@@ -195,6 +195,20 @@ async function exportToPDF(data: PDFData) {
   const red = rgb(0.9, 0.25, 0.25);
   const yellow = rgb(0.95, 0.7, 0.1);
 
+  // WinAnsi standard fonts can't encode characters outside Windows-1252.
+  // Replace the most common Unicode-only characters with safe ASCII equivalents.
+  const sanitize = (s: string) =>
+    s
+      .replace(/\u2212/g, '-')   // MINUS SIGN → hyphen
+      .replace(/\u2014/g, '-')   // EM DASH → hyphen
+      .replace(/\u2013/g, '-')   // EN DASH → hyphen
+      .replace(/\u2019/g, "'")   // RIGHT SINGLE QUOTATION → apostrophe
+      .replace(/\u2018/g, "'")   // LEFT SINGLE QUOTATION → apostrophe
+      .replace(/\u201c/g, '"')   // LEFT DOUBLE QUOTATION → quote
+      .replace(/\u201d/g, '"')   // RIGHT DOUBLE QUOTATION → quote
+      .replace(/\u00b7/g, '.')   // MIDDLE DOT → period
+      .replace(/[^\x00-\xff]/g, '?'); // catch-all for anything else outside Latin-1
+
   const line = (x1: number, y1: number, x2: number, y2: number, color = muted, thickness = 0.5) => {
     page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness, color });
   };
@@ -208,15 +222,16 @@ async function exportToPDF(data: PDFData) {
     opts: { size?: number; font?: typeof regular; color?: ReturnType<typeof rgb>; align?: 'left' | 'right' | 'center' } = {}
   ) => {
     const { size = 10, font = regular, color = dark, align = 'left' } = opts;
+    const safe = sanitize(str);
     let drawX = x;
     if (align === 'right') {
-      const w = font.widthOfTextAtSize(str, size);
+      const w = font.widthOfTextAtSize(safe, size);
       drawX = x - w;
     } else if (align === 'center') {
-      const w = font.widthOfTextAtSize(str, size);
+      const w = font.widthOfTextAtSize(safe, size);
       drawX = x - w / 2;
     }
-    page.drawText(str, { x: drawX, y: yPos, size, font, color });
+    page.drawText(safe, { x: drawX, y: yPos, size, font, color });
   };
 
   const ensureSpace = (needed: number) => {
@@ -255,7 +270,7 @@ async function exportToPDF(data: PDFData) {
   const boxW = (contentWidth - 12) / 4;
   const summaryBoxes = [
     { label: 'Gross Rental Income', value: `€${data.grossIncome.toLocaleString()}`, color: accent },
-    { label: 'Allowable Deductions', value: `−€${data.totalDeductions.toLocaleString()}`, color: rgb(0.2, 0.7, 0.4) },
+    { label: 'Allowable Deductions', value: `-€${data.totalDeductions.toLocaleString()}`, color: rgb(0.2, 0.7, 0.4) },
     { label: 'Taxable Profit', value: `€${data.taxableProfit.toLocaleString()}`, color: rgb(0.3, 0.6, 0.95) },
     { label: 'Estimated Tax Owed', value: `€${data.tax.total.toLocaleString()}`, color: data.tax.total > 0 ? yellow : accent },
   ];
@@ -363,7 +378,7 @@ async function exportToPDF(data: PDFData) {
   const disclaimer =
     'This report is an estimate only and does not constitute tax advice. Figures are based on rental income data entered into PropAI and deductions you have recorded. ' +
     'This estimate does not account for other income sources, credits, or individual circumstances. Please consult a qualified tax advisor or accountant before filing your return.';
-  const words = disclaimer.split(' ');
+  const words = sanitize(disclaimer).split(' ');
   let lineStr = '';
   let dy = y - 20;
   words.forEach((word) => {
@@ -456,7 +471,7 @@ export default function LandlordTaxesPage() {
     const rent = l.monthly_rent;
     return {
       address: (l as any).units
-        ? `${(l as any).units.address}${(l as any).units.unit_identifier ? ` · ${(l as any).units.unit_identifier}` : ''}`
+        ? `${(l as any).units.address}${(l as any).units.unit_identifier ? ` - ${(l as any).units.unit_identifier}` : ''}`
         : 'Property',
       months,
       rent,

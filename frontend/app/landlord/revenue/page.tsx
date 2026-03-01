@@ -382,7 +382,7 @@ export default function RevenuePage() {
             <Brain className="h-8 w-8 text-amber-400 mx-auto animate-pulse" />
             <div>
               <p className="text-sm font-medium text-foreground/70">Analyzing market data…</p>
-              <p className="text-xs text-muted-foreground mt-1">Fetching Numbeo · modeling vacancy risk · generating strategy</p>
+              <p className="text-xs text-muted-foreground mt-1">Fetching market data · modeling vacancy risk · generating strategy</p>
             </div>
           </div>
         </div>
@@ -406,7 +406,7 @@ export default function RevenuePage() {
               )}
             </div>
             <p className="text-xs text-muted-foreground/70 leading-relaxed">
-              Pulls live Numbeo market data, models vacancy risk, and generates a Claude-powered pricing strategy for this property.
+              Pulls live market data, models vacancy risk, and generates a Claude-powered pricing strategy for this property.
             </p>
             <button
               onClick={runAnalysis}

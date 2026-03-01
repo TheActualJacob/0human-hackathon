@@ -328,7 +328,7 @@ export default function LandlordPaymentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Expected</p>
-              <h3 className="text-2xl font-bold">€{totalExpected.toLocaleString()}</h3>
+              <h3 className="text-2xl font-bold">€{monthlyExpected.toLocaleString()}</h3>
             </div>
             <DollarSign className="h-8 w-8 text-muted-foreground" />
           </div>

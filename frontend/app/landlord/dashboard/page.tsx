@@ -243,18 +243,31 @@ export default function LandlordDashboard() {
         </div>
 
         {/* Alert strip */}
-        {(overduePayments > 0 || activeMaintenanceRequests > 5) && (
-          <div className="relative mt-5 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2.5 text-sm">
+        {(overduePayments > 0 || activeMaintenanceRequests > 0) && (
+          <div className="relative mt-5 flex flex-wrap items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/8 px-4 py-2.5 text-sm">
             <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
-            <span className="text-red-300">
-              {[
-                overduePayments > 0 && `${overduePayments} overdue payment${overduePayments > 1 ? 's' : ''}`,
-                activeMaintenanceRequests > 5 && `${activeMaintenanceRequests} open maintenance requests`
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-            <ArrowRight className="h-3.5 w-3.5 text-red-400 ml-auto" />
+            <span className="text-red-400 font-medium">Needs attention:</span>
+            {overduePayments > 0 && (
+              <Link
+                href="/landlord/payments"
+                className="flex items-center gap-1 text-red-300 hover:text-red-200 underline underline-offset-2 transition-colors"
+              >
+                {overduePayments} overdue payment{overduePayments > 1 ? 's' : ''}
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            )}
+            {overduePayments > 0 && activeMaintenanceRequests > 0 && (
+              <span className="text-red-500">·</span>
+            )}
+            {activeMaintenanceRequests > 0 && (
+              <Link
+                href="/landlord/maintenance"
+                className="flex items-center gap-1 text-red-300 hover:text-red-200 underline underline-offset-2 transition-colors"
+              >
+                {activeMaintenanceRequests} open maintenance request{activeMaintenanceRequests > 1 ? 's' : ''}
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            )}
           </div>
         )}
       </div>

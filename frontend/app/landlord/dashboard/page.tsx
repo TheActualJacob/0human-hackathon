@@ -49,7 +49,7 @@ function CollectionBar({ collected, total }: { collected: number; total: number 
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Collected this month</span>
+        <span>Collected (all time)</span>
         <span className="font-medium text-foreground">{pct}%</span>
       </div>
       <div className="h-2 bg-white/5 rounded-full overflow-hidden">
@@ -131,15 +131,6 @@ export default function LandlordDashboard() {
     .reduce((sum, l) => sum + (l.monthly_rent || 0), 0);
 
   const now = new Date();
-  const thisMonthPayments = payments.filter((p) => {
-    const d = new Date(p.due_date);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const collectedThisMonth = thisMonthPayments
-    .filter((p) => p.status === 'paid')
-    .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
-  const expectedThisMonth = thisMonthPayments
-    .reduce((sum, p) => sum + (p.amount_due || 0), 0);
 
   const activeMaintenanceRequests = maintenanceRequests.filter((r) =>
     ['open', 'assigned', 'in_progress'].includes(r.status || '')
@@ -285,7 +276,7 @@ export default function LandlordDashboard() {
             </div>
           </div>
           <div className="mt-4">
-            <CollectionBar collected={collectedThisMonth} total={expectedThisMonth || totalMonthlyRent} />
+            <CollectionBar collected={totalCollected} total={totalExpected} />
           </div>
         </div>
 

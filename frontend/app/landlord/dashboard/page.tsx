@@ -26,7 +26,7 @@ function OccupancyRing({ rate }: { rate: number }) {
       <svg width="96" height="96" viewBox="0 0 96 96" className="-rotate-90">
         <circle
           cx="48" cy="48" r={radius}
-          fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8"
+          fill="none" stroke="oklch(0.5 0.01 240 / 0.15)" strokeWidth="8"
         />
         <circle
           cx="48" cy="48" r={radius}
@@ -52,7 +52,7 @@ function CollectionBar({ collected, total }: { collected: number; total: number 
         <span>Collected (all time)</span>
         <span className="font-medium text-foreground">{pct}%</span>
       </div>
-      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-1000"
           style={{ width: `${pct}%` }}
@@ -213,7 +213,7 @@ export default function LandlordDashboard() {
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
 
       {/* ── Hero Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-gradient-to-br from-[oklch(0.18_0.04_240)] via-[oklch(0.16_0.02_250)] to-[oklch(0.13_0.01_260)] p-6 md:p-8">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/8 via-card to-secondary p-6 md:p-8">
         {/* Decorative orbs */}
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 right-48 h-48 w-48 rounded-full bg-emerald-500/8 blur-3xl" />
@@ -231,13 +231,13 @@ export default function LandlordDashboard() {
 
           {/* Health score */}
           <div className="flex items-center gap-6">
-            <div className="hidden md:block h-14 w-px bg-white/10" />
+            <div className="hidden md:block h-14 w-px bg-border" />
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground uppercase tracking-widest">Portfolio Health</p>
               <HealthScore score={healthScore} />
               <p className="text-xs text-muted-foreground">{healthScore}/100 composite score</p>
             </div>
-            <div className="hidden md:block h-14 w-px bg-white/10" />
+            <div className="hidden md:block h-14 w-px bg-border" />
             <OccupancyRing rate={occupancyRate} />
           </div>
         </div>
@@ -275,7 +275,7 @@ export default function LandlordDashboard() {
       {/* ── Primary KPIs ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Revenue */}
-        <div className="col-span-2 lg:col-span-1 group relative overflow-hidden rounded-xl border border-white/8 bg-card p-5 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
+        <div className="col-span-2 lg:col-span-1 group relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -294,7 +294,7 @@ export default function LandlordDashboard() {
         </div>
 
         {/* Units */}
-        <div className="group relative overflow-hidden rounded-xl border border-white/8 bg-card p-5 hover:border-blue-500/30 transition-all hover:shadow-lg hover:shadow-blue-500/5">
+        <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-blue-500/30 transition-all hover:shadow-lg hover:shadow-blue-500/5">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs text-muted-foreground uppercase tracking-widest">Properties</p>
@@ -316,7 +316,7 @@ export default function LandlordDashboard() {
         </div>
 
         {/* Tenants */}
-        <div className="group relative overflow-hidden rounded-xl border border-white/8 bg-card p-5 hover:border-violet-500/30 transition-all hover:shadow-lg hover:shadow-violet-500/5">
+        <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-violet-500/30 transition-all hover:shadow-lg hover:shadow-violet-500/5">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs text-muted-foreground uppercase tracking-widest">Tenants</p>
@@ -332,7 +332,7 @@ export default function LandlordDashboard() {
 
         {/* Maintenance */}
         <div className={cn(
-          "group relative overflow-hidden rounded-xl border border-white/8 bg-card p-5 transition-all hover:shadow-lg",
+          "group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-all hover:shadow-lg",
           activeMaintenanceRequests > 5
             ? "border-orange-500/30 hover:border-orange-500/50 hover:shadow-orange-500/5"
             : "hover:border-slate-500/30 hover:shadow-slate-500/5"
@@ -366,8 +366,8 @@ export default function LandlordDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Recent Activity — 2 cols */}
-        <div className="lg:col-span-2 rounded-xl border border-white/8 bg-card overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-semibold">Recent Activity</h2>
@@ -394,7 +394,7 @@ export default function LandlordDashboard() {
               <p className="text-sm">No recent activity</p>
             </div>
           ) : (
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-border">
               {recentActivities.map((activity, idx) => {
                 const isMaintenance = activity.type === 'maintenance';
                 const statusColors: Record<string, string> = {
@@ -406,13 +406,13 @@ export default function LandlordDashboard() {
                   assigned: 'text-blue-400 bg-blue-400/10',
                   late: 'text-red-400 bg-red-400/10',
                 };
-                const statusClass = statusColors[activity.status || ''] || 'text-muted-foreground bg-white/5';
+                const statusClass = statusColors[activity.status || ''] || 'text-muted-foreground bg-muted';
 
                 return (
                   <Link
                     key={activity.id}
                     href={isMaintenance ? '/landlord/maintenance' : '/landlord/payments'}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-white/[0.03] transition-colors cursor-pointer"
+                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-muted/40 transition-colors cursor-pointer"
                   >
                     {/* Timeline dot */}
                     <div className="relative flex-shrink-0">
@@ -427,7 +427,7 @@ export default function LandlordDashboard() {
                         )}
                       </div>
                       {idx < recentActivities.length - 1 && (
-                        <div className="absolute left-1/2 top-full h-full w-px -translate-x-1/2 bg-white/5" />
+                        <div className="absolute left-1/2 top-full h-full w-px -translate-x-1/2 bg-border" />
                       )}
                     </div>
 
@@ -457,7 +457,7 @@ export default function LandlordDashboard() {
         <div className="space-y-4">
 
           {/* Quick Actions */}
-          <div className="rounded-xl border border-white/8 bg-card p-5">
+          <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Zap className="h-4 w-4 text-primary" />
               <h3 className="font-semibold">Quick Actions</h3>
@@ -471,21 +471,21 @@ export default function LandlordDashboard() {
                 </button>
               </Link>
               <Link href="/landlord/leases">
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-white/5 hover:bg-white/8 border border-white/8 rounded-lg transition-all text-sm group">
+                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-secondary hover:bg-muted border border-border rounded-lg transition-all text-sm group">
                   <CheckCircle className="h-4 w-4 text-muted-foreground" />
                   Create Lease
                   <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all" />
                 </button>
               </Link>
               <Link href="/landlord/tenants">
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-white/5 hover:bg-white/8 border border-white/8 rounded-lg transition-all text-sm group">
+                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-secondary hover:bg-muted border border-border rounded-lg transition-all text-sm group">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   Invite Tenant
                   <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all" />
                 </button>
               </Link>
               <Link href="/landlord/maintenance">
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-white/5 hover:bg-white/8 border border-white/8 rounded-lg transition-all text-sm group">
+                <button className="w-full flex items-center gap-3 px-4 py-2.5 bg-secondary hover:bg-muted border border-border rounded-lg transition-all text-sm group">
                   <Wrench className="h-4 w-4 text-muted-foreground" />
                   View Maintenance
                   <ArrowRight className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-60 group-hover:translate-x-0.5 transition-all" />
@@ -496,11 +496,11 @@ export default function LandlordDashboard() {
 
           {/* Stats pills */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/8 bg-card p-4 text-center">
+            <div className="rounded-xl border border-border bg-card p-4 text-center">
               <p className="text-2xl font-bold text-emerald-400">{collectionRate}%</p>
               <p className="text-[11px] text-muted-foreground mt-1">Collection Rate</p>
             </div>
-            <div className="rounded-xl border border-white/8 bg-card p-4 text-center">
+            <div className="rounded-xl border border-border bg-card p-4 text-center">
               <p className={cn("text-2xl font-bold", overduePayments > 0 ? "text-red-400" : "text-emerald-400")}>
                 {overduePayments}
               </p>
@@ -517,19 +517,19 @@ export default function LandlordDashboard() {
           {/* Expiring Leases */}
           {expiringLeases.length > 0 && (
             <div className="rounded-xl border border-amber-500/20 bg-card overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/8 bg-amber-500/5">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-amber-500/5">
                 <Calendar className="h-4 w-4 text-amber-400" />
                 <h3 className="font-semibold text-sm">Leases Expiring Soon</h3>
                 <span className="ml-auto text-xs bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded-full">
                   {expiringLeases.length}
                 </span>
               </div>
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-border">
                 {expiringLeases.map((lease) => {
                   const daysLeft = differenceInDays(new Date(lease.end_date), now);
                   return (
                     <Link key={lease.id} href="/landlord/leases">
-                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 transition-colors">
                         <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
                           <Shield className="h-4 w-4 text-amber-400" />
                         </div>
@@ -560,19 +560,19 @@ export default function LandlordDashboard() {
           {/* Upcoming Payments */}
           {upcomingPayments.length > 0 && (
             <div className="rounded-xl border border-blue-500/20 bg-card overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-4 border-b border-white/8 bg-blue-500/5">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-blue-500/5">
                 <DollarSign className="h-4 w-4 text-blue-400" />
                 <h3 className="font-semibold text-sm">Payments Due This Week</h3>
                 <span className="ml-auto text-xs bg-blue-400/10 text-blue-400 px-2 py-0.5 rounded-full">
                   {upcomingPayments.length}
                 </span>
               </div>
-              <div className="divide-y divide-white/5">
+              <div className="divide-y divide-border">
                 {upcomingPayments.map((payment) => {
                   const daysLeft = differenceInDays(new Date(payment.due_date), now);
                   return (
                     <Link key={payment.id} href="/landlord/payments">
-                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-muted/40 transition-colors">
                         <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                           <Star className="h-4 w-4 text-blue-400" />
                         </div>

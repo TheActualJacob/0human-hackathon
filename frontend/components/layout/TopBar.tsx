@@ -1,6 +1,7 @@
 'use client';
 
 import { LogOut, User } from "lucide-react";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { cn } from "@/lib/utils";
 import useStore from "@/lib/store/useStore";
 import { useRouter } from 'next/navigation';
@@ -49,6 +50,9 @@ export default function TopBar({ userRole }: TopBarProps) {
           
           {/* Escalations can be added later when you have escalation logic */}
         </div>
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
 
         {/* User Menu */}
         <DropdownMenu>

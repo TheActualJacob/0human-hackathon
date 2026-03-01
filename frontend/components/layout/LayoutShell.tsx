@@ -51,7 +51,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   // Protected pages — wait only for the session cache (fast)
   if (!ready) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#05050a]">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-indigo-500 border-t-transparent" />
       </div>
     );

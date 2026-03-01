@@ -217,7 +217,7 @@ export default function LandlordApplicationsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Rental Applications</h1>
           <p className="text-muted-foreground">Review and manage tenant applications</p>
@@ -240,7 +240,7 @@ export default function LandlordApplicationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Rental Applications</h1>
         <p className="text-muted-foreground">

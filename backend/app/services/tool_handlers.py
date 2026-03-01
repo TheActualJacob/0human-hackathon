@@ -115,6 +115,34 @@ AGENT_TOOLS = [
         },
     },
     {
+        "name": "record_renewal_decision",
+        "description": (
+            "Records the tenant's decision about renewing their lease and triggers the appropriate next step. "
+            "IMPORTANT: Call this tool as soon as the tenant gives a clear renewal decision — do not just "
+            "acknowledge conversationally. "
+            "- If the tenant says NO, declines, says they are leaving, moving out, or not renewing: "
+            "  call with decision='not_renewing'. This will automatically re-list the property on Instagram. "
+            "- If the tenant says YES, wants to renew, or confirms they are staying: "
+            "  call with decision='renewing'. This notifies the landlord to prepare a new lease offer. "
+            "The renewal_status on the lease will be set accordingly and the landlord notified."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "decision": {
+                    "type": "string",
+                    "enum": ["renewing", "not_renewing"],
+                    "description": "'renewing' if tenant confirmed they will renew, 'not_renewing' if they are leaving.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional brief note on what the tenant said, e.g. 'Tenant confirmed moving out end of lease'.",
+                },
+            },
+            "required": ["decision"],
+        },
+    },
+    {
         "name": "update_escalation_level",
         "description": (
             "Updates the escalation level for this tenancy (1=Conversational, 2=Formal Written, "
@@ -151,6 +179,8 @@ async def execute_tool(tool_name: str, tool_input: dict[str, Any], ctx: TenantCo
         return await _schedule_maintenance(tool_input, ctx)
     elif tool_name == "issue_legal_notice":
         return await _issue_legal_notice(tool_input, ctx)
+    elif tool_name == "record_renewal_decision":
+        return await _record_renewal_decision(tool_input, ctx)
     elif tool_name == "update_escalation_level":
         return await _update_escalation_level(tool_input, ctx)
     else:
@@ -411,6 +441,78 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
             ),
         },
     )
+
+
+async def _record_renewal_decision(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
+    from app.services.lease_expiry_service import trigger_listing_for_lease
+
+    sb = _sb()
+    lease_id = ctx.lease.id
+    decision = inp["decision"]  # "renewing" or "not_renewing"
+    notes = inp.get("notes", "")
+
+    sb.table("leases").update({
+        "renewal_status": decision,
+    }).eq("id", lease_id).execute()
+
+    await log_agent_action(
+        lease_id=lease_id,
+        action_category="renewal",
+        action_description=f"Tenant renewal decision recorded: {decision}. Notes: {notes}",
+        tools_called=[{"tool": "record_renewal_decision", "input": inp}],
+        output_summary=decision,
+        confidence_score=0.95,
+    )
+
+    if decision == "not_renewing":
+        try:
+            listing_result = await trigger_listing_for_lease(lease_id)
+            ig_url = listing_result.get("instagram_post_url")
+            ig_success = listing_result.get("instagram_success", False)
+            return ToolResult(
+                success=True,
+                is_high_severity=True,
+                landlord_notification_message=(
+                    f"Tenant {ctx.tenant.full_name} confirmed they will NOT be renewing at "
+                    f"{ctx.unit.unit_identifier}, {ctx.unit.address}. "
+                    + (f"Property listed on Instagram: {ig_url}" if ig_success else "Property re-listing initiated.")
+                ),
+                data={
+                    "decision": decision,
+                    "instagram_success": ig_success,
+                    "instagram_post_url": ig_url,
+                    "message": (
+                        "I've noted that you won't be renewing and have begun re-listing the property. "
+                        "We'll be in touch closer to your move-out date with deposit return and handover details."
+                    ),
+                },
+            )
+        except Exception as exc:
+            logger.error("[record_renewal_decision] Listing trigger failed: %s", exc)
+            return ToolResult(
+                success=True,
+                data={
+                    "decision": decision,
+                    "message": "Noted — we've recorded that you won't be renewing and will begin re-listing the property.",
+                },
+            )
+    else:
+        sb.table("landlord_notifications").insert({
+            "landlord_id": ctx.landlord_id,
+            "lease_id": lease_id,
+            "notification_type": "general",
+            "message": (
+                f"Tenant {ctx.tenant.full_name} at {ctx.unit.unit_identifier}, {ctx.unit.address} "
+                f"has confirmed they WILL be renewing their lease. Please prepare a renewal offer."
+            ),
+        }).execute()
+        return ToolResult(
+            success=True,
+            data={
+                "decision": decision,
+                "message": "Glad to hear you'll be staying! Your landlord will be in touch shortly with a renewal offer.",
+            },
+        )
 
 
 async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:

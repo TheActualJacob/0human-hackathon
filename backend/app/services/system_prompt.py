@@ -59,6 +59,7 @@ def build_system_prompt(ctx: TenantContext) -> str:
         else "No prior conversation history."
     )
     lease_agreement_section = _build_lease_agreement_section(ctx)
+    renewal_status = ctx.lease.raw.get("renewal_status") or "not_started"
 
     return f"""You are an autonomous AI property manager operating on behalf of a landlord. You communicate directly with tenants via WhatsApp.
 
@@ -99,6 +100,19 @@ You are the property management system for this tenancy. You are not a human —
 {lease_agreement_section}
 ## JURISDICTION RULES (USE THESE DATES — DO NOT INVENT OTHERS)
 {jurisdiction_rules}
+
+## LEASE RENEWAL — CRITICAL INSTRUCTION
+The lease renewal status for this tenancy is: {renewal_status}
+
+If renewal_status is "pending" it means a renewal inquiry has been sent to this tenant and we are awaiting their answer.
+
+When the tenant gives ANY clear signal about renewal — positive or negative — you MUST immediately call the `record_renewal_decision` tool. Do not ask for further confirmation. Do not respond conversationally first. Call the tool, then relay the outcome.
+
+Examples that require calling record_renewal_decision(decision="not_renewing"):
+- "No", "no thanks", "I won't be renewing", "I'm moving out", "I'll be leaving", "not renewing", "I'm not staying"
+
+Examples that require calling record_renewal_decision(decision="renewing"):
+- "Yes", "I want to renew", "I'll be staying", "happy to renew", "please renew my lease"
 
 ## AVAILABLE TOOLS
 Use tools to take real actions. Always use a tool if an action is warranted — do not just promise to do something. After using a tool, inform the tenant of the outcome concisely.

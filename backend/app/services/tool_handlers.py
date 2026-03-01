@@ -278,8 +278,50 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
 
     request_id = request_res.data[0]["id"]
 
-    # Send email notification to maintenance company
+    # Build vendor message for workflow record and email
+    vendor_message = (
+        f"New {urgency} maintenance job at {ctx.unit.unit_identifier}, {ctx.unit.address}.\n"
+        f"Tenant: {ctx.tenant.full_name}\n"
+        f"Issue: {title} — {description}\n"
+        f"Category: {category} | Urgency: {urgency}\n"
+        f"Request ID: {request_id}"
+    )
+
+    # Create linked maintenance_workflows entry
     import asyncio
+    open_threads = (
+        ctx.conversation_context.open_threads
+        if ctx.conversation_context
+        else {}
+    )
+    try:
+        sb.table("maintenance_workflows").insert({
+            "maintenance_request_id": request_id,
+            "current_state": "AWAITING_ASSIGNMENT",
+            "title": title,
+            "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
+            "vendor_message": vendor_message,
+            "ai_analysis": f'{{"category": "{category}", "urgency": "{urgency}"}}',
+            "state_history": [],
+        }).execute()
+    except Exception as exc:
+        sys.stderr.write(f"[schedule_maintenance] WARNING: failed to create workflow entry: {exc}\n")
+        sys.stderr.flush()
+
+    # Clear persisted pending media URLs now that they've been attached
+    if ctx.pending_media_urls:
+        try:
+            sb.table("conversation_context").upsert(
+                {
+                    "lease_id": lease_id,
+                    "open_threads": {k: v for k, v in open_threads.items() if k != "pending_media_urls"},
+                },
+                on_conflict="lease_id",
+            ).execute()
+        except Exception:
+            pass
+
+    # Send email notification to maintenance company
     from app.services.email_service import send_maintenance_email
     MAINTENANCE_EMAIL = "perfecttouchphotoshopping@gmail.com"
     await asyncio.get_event_loop().run_in_executor(

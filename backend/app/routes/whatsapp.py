@@ -9,9 +9,11 @@ from app.config import settings
 from app.services.agent_loop import run_agent_loop
 from app.services.context_loader import (
     TenantContext,
+    clear_pending_media_urls,
     load_tenant_context,
     log_agent_action,
     log_conversation,
+    save_pending_media_urls,
     update_conversation_context,
 )
 from app.services.prospect_context_loader import (
@@ -107,10 +109,10 @@ async def _process_and_reply(
     user_message: str,
     media_urls: list[str],
 ) -> None:
-    # Image-only messages (no text): ask tenant to describe the issue.
-    # Photos are already on ctx.pending_media_urls so when they reply with
-    # text and the agent calls schedule_maintenance, the URLs will be stored.
+    # Image-only messages (no text): save URLs to DB so they survive to the
+    # next message, then ask tenant to describe the issue.
     if not user_message and media_urls:
+        await save_pending_media_urls(ctx.lease.id, media_urls)
         ack = (
             f"Thanks, I can see you've sent {len(media_urls)} photo(s). "
             "Please describe the issue in a message so I can log the repair correctly."

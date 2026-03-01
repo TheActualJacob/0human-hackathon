@@ -240,10 +240,14 @@ async def load_tenant_context(whatsapp_number: str) -> TenantContext | None:
     ctx_data = context_res.data if context_res else None
     conversation_context: ConversationContext | None = None
     escalation_level = 1
+    pending_media_urls: list[str] = []
     if ctx_data:
         open_threads = ctx_data.get("open_threads") or {}
         if isinstance(open_threads, dict) and isinstance(open_threads.get("escalation_level"), int):
             escalation_level = open_threads["escalation_level"]
+        # Recover any photo URLs saved from a previous image-only message
+        if isinstance(open_threads, dict) and open_threads.get("pending_media_urls"):
+            pending_media_urls = list(open_threads["pending_media_urls"])
         conversation_context = ConversationContext(
             lease_id=ctx_data["lease_id"],
             summary=ctx_data.get("summary"),
@@ -329,6 +333,7 @@ async def load_tenant_context(whatsapp_number: str) -> TenantContext | None:
         open_legal_actions=[_legal(r) for r in (legal_res.data or [])],
         open_disputes=[_dispute(r) for r in (disputes_res.data or [])],
         escalation_level=escalation_level,
+        pending_media_urls=pending_media_urls,
     )
 
 
@@ -395,6 +400,40 @@ async def update_conversation_context(
             "lease_id": lease_id,
             "summary": summary,
             "open_threads": open_threads,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="lease_id",
+    ).execute()
+
+
+async def save_pending_media_urls(lease_id: str, media_urls: list[str]) -> None:
+    """Persist photo URLs from an image-only WhatsApp message so they survive to the next message."""
+    sb = _get_supabase()
+    from datetime import datetime, timezone
+    existing = sb.table("conversation_context").select("open_threads").eq("lease_id", lease_id).maybe_single().execute()
+    open_threads = {}
+    if existing and existing.data:
+        open_threads = existing.data.get("open_threads") or {}
+    open_threads["pending_media_urls"] = media_urls
+    sb.table("conversation_context").upsert(
+        {
+            "lease_id": lease_id,
+            "open_threads": open_threads,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="lease_id",
+    ).execute()
+
+
+async def clear_pending_media_urls(lease_id: str, current_open_threads: dict[str, Any]) -> None:
+    """Remove pending_media_urls from open_threads after they've been attached to a maintenance request."""
+    sb = _get_supabase()
+    from datetime import datetime, timezone
+    updated = {k: v for k, v in current_open_threads.items() if k != "pending_media_urls"}
+    sb.table("conversation_context").upsert(
+        {
+            "lease_id": lease_id,
+            "open_threads": updated,
             "last_updated": datetime.now(timezone.utc).isoformat(),
         },
         on_conflict="lease_id",

@@ -359,12 +359,20 @@ export default function LandlordDashboard() {
               <Activity className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-semibold">Recent Activity</h2>
             </div>
-            <Link
-              href="/landlord/maintenance"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-            >
-              View all <ChevronRight className="h-3 w-3" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/landlord/maintenance"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Maintenance <ChevronRight className="h-3 w-3" />
+              </Link>
+              <Link
+                href="/landlord/payments"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Payments <ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
           </div>
 
           {recentActivities.length === 0 ? (
@@ -388,9 +396,10 @@ export default function LandlordDashboard() {
                 const statusClass = statusColors[activity.status || ''] || 'text-muted-foreground bg-white/5';
 
                 return (
-                  <div
+                  <Link
                     key={activity.id}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-white/[0.02] transition-colors"
+                    href={isMaintenance ? '/landlord/maintenance' : '/landlord/payments'}
+                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-white/[0.03] transition-colors cursor-pointer"
                   >
                     {/* Timeline dot */}
                     <div className="relative flex-shrink-0">
@@ -424,7 +433,7 @@ export default function LandlordDashboard() {
                     )}>
                       {activity.status}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

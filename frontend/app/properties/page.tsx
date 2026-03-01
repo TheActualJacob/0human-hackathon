@@ -74,7 +74,8 @@ export default function PropertiesPage() {
         }
 
         const publicUnits = (raw || []).filter(
-          (u: any) => !u.listing_status || u.listing_status === 'public'
+          (u: any) => (!u.listing_status || u.listing_status === 'public')
+            && Array.isArray(u.images) && u.images.length > 0
         ) as UnitWithAttributes[];
 
         setFetchError(null);

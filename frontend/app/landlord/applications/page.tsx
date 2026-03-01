@@ -146,8 +146,72 @@ export default function LandlordApplicationsPage() {
 
       if (leaseError) throw leaseError;
 
-      // Send acceptance email
+      // Create a signing token so the applicant gets a lease signing link
       const appData = application.applicant_data as any;
+      const applicantName = application.tenants?.full_name || appData?.fullName || 'Applicant';
+      const propertyAddress = application.units?.address || application.units?.unit_identifier || 'the property';
+      const monthlyRent = application.units?.rent_amount || 0;
+
+      const leaseContent = `TENANCY AGREEMENT
+
+1. PARTIES
+This agreement is between Robert Ryan (Landlord) and ${applicantName} (Tenant).
+
+2. PROPERTY
+The landlord agrees to let the property at ${propertyAddress} to the tenant for residential use only.
+
+3. TERM
+The tenancy shall commence on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} for a period of 12 months.
+
+4. RENT
+The tenant shall pay £${monthlyRent} per calendar month, due on the 1st of each month by bank transfer.
+
+5. DEPOSIT
+A deposit of £${monthlyRent * 2} is payable on signing, to be protected under the Tenancy Deposit Scheme (TDS) within 30 days.
+
+6. TENANT OBLIGATIONS
+The tenant agrees to:
+- Pay rent on time each month
+- Keep the property clean and in good condition
+- Report any damage or maintenance issues promptly
+- Not sublet the property without written consent
+- Allow access for inspections with reasonable notice (minimum 24 hours)
+
+7. LANDLORD OBLIGATIONS
+The landlord agrees to:
+- Keep the property in a good state of repair
+- Respond to urgent repairs within 24 hours and routine repairs within 28 days
+- Protect the tenant's deposit in an approved scheme
+
+8. TERMINATION
+Either party may end this tenancy by giving 1 month's written notice after the fixed term expires.
+
+9. GOVERNING LAW
+This agreement is governed by the laws of England and Wales.`;
+
+      let signingUrl: string | null = null;
+      try {
+        const { data: tokenData } = await supabase
+          .from('signing_tokens')
+          .insert({
+            prospect_name: applicantName,
+            unit_address: propertyAddress,
+            monthly_rent: monthlyRent,
+            lease_content: leaseContent,
+            prospect_phone: appData?.whatsappNumber || null,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select('id')
+          .single();
+        if (tokenData?.id) {
+          const baseUrl = window.location.origin;
+          signingUrl = `${baseUrl}/sign/${tokenData.id}`;
+        }
+      } catch (tokenErr) {
+        console.error('Failed to create signing token (non-fatal):', tokenErr);
+      }
+
+      // Send acceptance email with signing link
       const email = application.tenants?.email || appData?.email;
       if (email) {
         try {
@@ -157,9 +221,10 @@ export default function LandlordApplicationsPage() {
             body: JSON.stringify({
               type: 'accepted',
               to: email,
-              applicantName: application.tenants?.full_name || appData?.fullName || 'Applicant',
-              propertyAddress: application.units?.address || application.units?.unit_identifier || 'the property',
+              applicantName,
+              propertyAddress,
               landlordName: 'Robert Ryan',
+              signingUrl,
             }),
           });
           if (!emailRes.ok) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { type, to, applicantName, propertyAddress, landlordName, rejectionReason } = await request.json();
+    const { type, to, applicantName, propertyAddress, landlordName, rejectionReason, signingUrl } = await request.json();
 
     if (!to || !type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -25,9 +25,17 @@ export async function POST(request: NextRequest) {
           </div>
           <p style="font-size: 16px;">Hi <strong>${applicantName}</strong>,</p>
           <p style="color: #a1a1aa;">Great news — your rental application for <strong style="color: #e5e5e5;">${propertyAddress}</strong> has been accepted by <strong style="color: #e5e5e5;">${landlordName}</strong>.</p>
-          <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; margin: 24px 0;">
-            <p style="margin: 0; color: #a1a1aa; font-size: 14px;">Your landlord will be in touch shortly with lease details and next steps. If you have any questions in the meantime, please reply to this email.</p>
+          ${signingUrl ? `
+          <div style="background: #18181b; border: 1px solid #22c55e; border-radius: 8px; padding: 20px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px; color: #a1a1aa; font-size: 14px;">Your tenancy agreement is ready to sign. Please review and sign it digitally using the link below:</p>
+            <a href="${signingUrl}" style="display: inline-block; background: #22c55e; color: #000; font-weight: bold; font-size: 15px; padding: 12px 28px; border-radius: 6px; text-decoration: none;">Sign Your Lease Agreement →</a>
+            <p style="margin: 12px 0 0; color: #52525b; font-size: 12px;">This link expires in 7 days.</p>
           </div>
+          ` : `
+          <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0; color: #a1a1aa; font-size: 14px;">Your landlord will be in touch shortly with lease details and next steps.</p>
+          </div>
+          `}
           <p style="color: #71717a; font-size: 13px; margin-top: 32px;">This message was sent via PropAI Property Management.</p>
         </div>
       `;

@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Loader2, CheckCircle, AlertCircle,
-  Upload, FileText, X, Shield, User
+  Upload, FileText, X, Shield, User, Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -358,229 +358,220 @@ export default function PropertyApplicationPage() {
   // --- Main form ---
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <Button variant="ghost" asChild>
+    <div className="p-8 max-w-5xl">
+      {/* Back link */}
+      <div className="mb-8">
+        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground -ml-2">
           <Link href={`/properties/${params.id}`}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to property
           </Link>
         </Button>
+        <h1 className="text-2xl font-bold mt-3">Rental Application</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          {property?.unit_identifier} &mdash; {property?.address}, {property?.city}
+        </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Application Form */}
-        <div className="lg:col-span-2">
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* ── Application Form ── */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Personal details section */}
           <Card>
-            <CardHeader>
-              <CardTitle>Rental Application</CardTitle>
-              <CardDescription>
-                Upload your documents and we'll get back to you within 2-3 business days
-              </CardDescription>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                Your Details
+              </CardTitle>
+              <CardDescription>Pre-filled from your account — contact support to update.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input id="fullName" value={formData.fullName} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" value={formData.email} disabled className="bg-muted" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
+                  <Input id="whatsappNumber" value={formData.whatsappNumber} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="numberOfOccupants">Number of Occupants *</Label>
+                  <Select
+                    value={formData.numberOfOccupants}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, numberOfOccupants: value }))}
+                  >
+                    <SelectTrigger id="numberOfOccupants">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Person</SelectItem>
+                      <SelectItem value="2">2 People</SelectItem>
+                      <SelectItem value="3">3 People</SelectItem>
+                      <SelectItem value="4">4 People</SelectItem>
+                      <SelectItem value="5">5+ People</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="preferredMoveInDate">Preferred Move-in Date *</Label>
+                <Input
+                  id="preferredMoveInDate"
+                  type="date"
+                  value={formData.preferredMoveInDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, preferredMoveInDate: e.target.value }))}
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="note">Note to Landlord <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Textarea
+                  id="note"
+                  value={formData.note}
+                  onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
+                  rows={4}
+                  placeholder="Introduce yourself or mention anything relevant about your situation..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Documents section */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" />
+                Supporting Documents
+              </CardTitle>
+              <CardDescription>PDF, JPG, or PNG — max 10 MB per file</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <FileUploadSlot
+                label="Bank Statement"
+                required={true}
+                hint="Last 3 months — shows regular income and spending"
+                slot={{ file: files.bankStatement, uploading: false, url: null, error: null }}
+                onChange={(file) => setFiles(prev => ({ ...prev, bankStatement: file }))}
+              />
+              <FileUploadSlot
+                label="Proof of Income"
+                required={true}
+                hint="Recent payslip, employment letter, or tax return"
+                slot={{ file: files.incomeProof, uploading: false, url: null, error: null }}
+                onChange={(file) => setFiles(prev => ({ ...prev, incomeProof: file }))}
+              />
+              <FileUploadSlot
+                label="Photo ID"
+                required={false}
+                hint="Passport or national ID (optional but recommended)"
+                slot={{ file: files.photoId, uploading: false, url: null, error: null }}
+                onChange={(file) => setFiles(prev => ({ ...prev, photoId: file }))}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Terms + submit */}
+          <Card>
+            <CardContent className="pt-6 space-y-5">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="terms"
+                  checked={agreedToTerms}
+                  onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="terms" className="font-medium cursor-pointer">
+                    I agree to the terms and conditions
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    I consent to background and reference checks and certify that all information provided is accurate and complete.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={submitting || !agreedToTerms}
+                onClick={handleSubmit}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading &amp; Submitting…
+                  </>
+                ) : (
+                  'Submit Application'
                 )}
-
-                {/* Personal Information */}
-                <div className="space-y-4">
-                  <h3 className="text-base font-semibold flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Your Details
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="fullName">Full Name</Label>
-                      <Input
-                        id="fullName"
-                        value={formData.fullName}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                      <Input
-                        id="whatsappNumber"
-                        value={formData.whatsappNumber}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="numberOfOccupants">Number of Occupants *</Label>
-                      <Select
-                        value={formData.numberOfOccupants}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, numberOfOccupants: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 Person</SelectItem>
-                          <SelectItem value="2">2 People</SelectItem>
-                          <SelectItem value="3">3 People</SelectItem>
-                          <SelectItem value="4">4 People</SelectItem>
-                          <SelectItem value="5">5+ People</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="preferredMoveInDate">Preferred Move-in Date *</Label>
-                    <Input
-                      id="preferredMoveInDate"
-                      type="date"
-                      value={formData.preferredMoveInDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, preferredMoveInDate: e.target.value }))}
-                      required
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="note">Note to Landlord (optional)</Label>
-                    <Textarea
-                      id="note"
-                      value={formData.note}
-                      onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-                      rows={3}
-                      placeholder="Introduce yourself or mention anything relevant..."
-                    />
-                  </div>
-                </div>
-
-                {/* Document Uploads */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-base font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Supporting Documents
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      PDF, JPG, or PNG — max 10 MB per file
-                    </p>
-                  </div>
-
-                  <FileUploadSlot
-                    label="Bank Statement"
-                    required={true}
-                    hint="Last 3 months — shows regular income and spending"
-                    slot={{ file: files.bankStatement, uploading: false, url: null, error: null }}
-                    onChange={(file) => setFiles(prev => ({ ...prev, bankStatement: file }))}
-                  />
-
-                  <FileUploadSlot
-                    label="Proof of Income"
-                    required={true}
-                    hint="Recent payslip, employment letter, or tax return"
-                    slot={{ file: files.incomeProof, uploading: false, url: null, error: null }}
-                    onChange={(file) => setFiles(prev => ({ ...prev, incomeProof: file }))}
-                  />
-
-                  <FileUploadSlot
-                    label="Photo ID"
-                    required={false}
-                    hint="Passport or driving licence (optional but recommended)"
-                    slot={{ file: files.photoId, uploading: false, url: null, error: null }}
-                    onChange={(file) => setFiles(prev => ({ ...prev, photoId: file }))}
-                  />
-                </div>
-
-                {/* Terms */}
-                <div className="flex items-start space-x-2">
-                  <Checkbox
-                    id="terms"
-                    checked={agreedToTerms}
-                    onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="terms" className="text-sm font-normal cursor-pointer">
-                      I agree to the terms and conditions
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      I consent to background and reference checks and certify all information is accurate.
-                    </p>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={submitting || !agreedToTerms}
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Uploading & Submitting...
-                    </>
-                  ) : (
-                    'Submit Application'
-                  )}
-                </Button>
-              </form>
+              </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Property Summary */}
-        <div className="space-y-6">
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle>Property Summary</CardTitle>
+        {/* ── Property Summary sidebar ── */}
+        <div className="space-y-5">
+          <Card className="sticky top-8">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Property Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="font-medium">{property?.unit_identifier}</p>
+            <CardContent className="space-y-4">
+              <div className="space-y-0.5">
+                <p className="font-semibold">{property?.unit_identifier}</p>
                 <p className="text-sm text-muted-foreground">{property?.address}, {property?.city}</p>
               </div>
-              <div className="space-y-2 text-sm">
+
+              <div className="border-t border-border pt-4 space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Rent</span>
-                  <span className="font-medium">€{property?.rent_amount}</span>
+                  <span className="font-semibold">€{property?.rent_amount?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Security Deposit</span>
-                  <span className="font-medium">€{property?.security_deposit || property?.rent_amount}</span>
+                  <span className="font-semibold">€{(property?.security_deposit || property?.rent_amount)?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Available</span>
-                  <span className="font-medium">
+                  <span className="font-semibold">
                     {property?.available_date
-                      ? new Date(property.available_date).toLocaleDateString()
+                      ? new Date(property.available_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                       : 'Immediately'}
                   </span>
                 </div>
               </div>
+
+              <div className="border-t border-border pt-4 space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                  <span>Documents encrypted &amp; securely stored</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>Landlord reviews within 2–3 business days</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
-
-          <Alert>
-            <Shield className="h-4 w-4" />
-            <AlertDescription>
-              Your documents are stored securely and only shared with the landlord.
-            </AlertDescription>
-          </Alert>
         </div>
       </div>
     </div>

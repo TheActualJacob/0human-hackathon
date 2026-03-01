@@ -42,22 +42,21 @@ function activeMonthsInYear(
   return count;
 }
 
-// Irish rental income tax thresholds (2024)
-const STANDARD_RATE_BAND = 42_000;
-const STANDARD_RATE = 0.20;
-const HIGHER_RATE = 0.40;
-const USC_BRACKET_1 = 12_012;
-const USC_BRACKET_2 = 25_760; // 12_012 + 13_748
-const USC_RATE_1 = 0.005;
-const USC_RATE_2 = 0.02;
-const USC_RATE_3 = 0.04;
-const USC_RATE_HIGH = 0.08;
-const PRSI_RATE = 0.04;
+// Greek rental income tax rates (Article 40, Law 4172/2013 — current as of 2024)
+// Band 1: up to €12,000 → 15%
+// Band 2: €12,001 – €35,000 → 35%
+// Band 3: above €35,000 → 45%
+// No personal allowance on rental income. No USC/PRSI equivalent.
+const GR_BAND_1_LIMIT = 12_000;
+const GR_BAND_2_LIMIT = 35_000;
+const GR_RATE_1 = 0.15;
+const GR_RATE_2 = 0.35;
+const GR_RATE_3 = 0.45;
 
 interface TaxResult {
   incomeTax: number;
-  usc: number;
-  prsi: number;
+  usc: number;   // repurposed: stamp duty / surcharge (kept at 0 for Greece)
+  prsi: number;  // repurposed: special solidarity contribution (suspended since 2023)
   total: number;
   effectiveRate: number;
 }
@@ -65,35 +64,26 @@ interface TaxResult {
 function estimateTax(taxableProfit: number): TaxResult {
   if (taxableProfit <= 0) return { incomeTax: 0, usc: 0, prsi: 0, total: 0, effectiveRate: 0 };
 
-  // Income tax (Irish rates)
-  const incomeTax =
-    Math.min(taxableProfit, STANDARD_RATE_BAND) * STANDARD_RATE +
-    Math.max(0, taxableProfit - STANDARD_RATE_BAND) * HIGHER_RATE;
-
-  // USC on rental income
-  let usc = 0;
-  if (taxableProfit > USC_BRACKET_2) {
-    usc =
-      USC_BRACKET_1 * USC_RATE_1 +
-      (USC_BRACKET_2 - USC_BRACKET_1) * USC_RATE_2 +
-      Math.min(taxableProfit - USC_BRACKET_2, 65_483) * USC_RATE_3 +
-      Math.max(0, taxableProfit - USC_BRACKET_2 - 65_483) * USC_RATE_HIGH;
-  } else if (taxableProfit > USC_BRACKET_1) {
-    usc = USC_BRACKET_1 * USC_RATE_1 + (taxableProfit - USC_BRACKET_1) * USC_RATE_2;
+  // Greek progressive rental income tax
+  let incomeTax = 0;
+  if (taxableProfit <= GR_BAND_1_LIMIT) {
+    incomeTax = taxableProfit * GR_RATE_1;
+  } else if (taxableProfit <= GR_BAND_2_LIMIT) {
+    incomeTax = GR_BAND_1_LIMIT * GR_RATE_1 + (taxableProfit - GR_BAND_1_LIMIT) * GR_RATE_2;
   } else {
-    usc = taxableProfit * USC_RATE_1;
+    incomeTax =
+      GR_BAND_1_LIMIT * GR_RATE_1 +
+      (GR_BAND_2_LIMIT - GR_BAND_1_LIMIT) * GR_RATE_2 +
+      (taxableProfit - GR_BAND_2_LIMIT) * GR_RATE_3;
   }
 
-  // PRSI on rental income
-  const prsi = taxableProfit * PRSI_RATE;
-
-  const total = incomeTax + usc + prsi;
+  const total = incomeTax;
   const effectiveRate = taxableProfit > 0 ? (total / taxableProfit) * 100 : 0;
 
   return {
     incomeTax: Math.round(incomeTax),
-    usc: Math.round(usc),
-    prsi: Math.round(prsi),
+    usc: 0,
+    prsi: 0,
     total: Math.round(total),
     effectiveRate,
   };
@@ -284,15 +274,18 @@ async function exportToPDF(data: PDFData) {
 
   // ─ Tax breakdown
   ensureSpace(120);
-  text('TAX BREAKDOWN (IRELAND 2024)', margin, y, { size: 9, font: bold, color: muted });
+  text('TAX BREAKDOWN (GREECE 2024 - Article 40, Law 4172/2013)', margin, y, { size: 9, font: bold, color: muted });
   y -= 14;
   line(margin, y, W - margin, y);
   y -= 14;
 
+  const gr1 = Math.round(Math.min(data.taxableProfit, 12_000) * 0.15);
+  const gr2 = data.taxableProfit > 12_000 ? Math.round(Math.min(data.taxableProfit - 12_000, 23_000) * 0.35) : 0;
+  const gr3 = data.taxableProfit > 35_000 ? Math.round((data.taxableProfit - 35_000) * 0.45) : 0;
   const taxRows: [string, string, string][] = [
-    ['Income Tax (20% / 40%)', `€${data.taxableProfit.toLocaleString()} taxable`, `€${data.tax.incomeTax.toLocaleString()}`],
-    ['Universal Social Charge (USC)', '', `€${data.tax.usc.toLocaleString()}`],
-    ['PRSI (4% on rental income)', '', `€${data.tax.prsi.toLocaleString()}`],
+    ['Band 1: up to EUR 12,000 @ 15%', '', `EUR ${gr1.toLocaleString()}`],
+    ...(gr2 > 0 ? [['Band 2: EUR 12,001-35,000 @ 35%', '', `EUR ${gr2.toLocaleString()}`] as [string, string, string]] : []),
+    ...(gr3 > 0 ? [['Band 3: above EUR 35,000 @ 45%', '', `EUR ${gr3.toLocaleString()}`] as [string, string, string]] : []),
   ];
   taxRows.forEach(([label, sub, val]) => {
     text(label, margin, y, { size: 10 });
@@ -376,8 +369,8 @@ async function exportToPDF(data: PDFData) {
   rect(margin, y - 42, contentWidth, 46, rgb(0.97, 0.97, 0.97));
   text('Important Disclaimer', margin + 8, y - 8, { size: 8, font: bold, color: muted });
   const disclaimer =
-    'This report is an estimate only and does not constitute tax advice. Figures are based on rental income data entered into PropAI and deductions you have recorded. ' +
-    'This estimate does not account for other income sources, credits, or individual circumstances. Please consult a qualified tax advisor or accountant before filing your return.';
+    'This report is an estimate only and does not constitute tax advice. Figures are based on Greek rental income tax rates (Article 40, Law 4172/2013) and deductions you have recorded. ' +
+    'This estimate does not account for other income sources, credits, or individual circumstances. File via Taxisnet (E1/E2 forms) by 30 June. Please consult a certified Greek accountant before filing.';
   const words = sanitize(disclaimer).split(' ');
   let lineStr = '';
   let dy = y - 20;
@@ -524,28 +517,28 @@ export default function LandlordTaxesPage() {
   const handleAiSummary = () => {
     setSummaryLoading(true);
     setTimeout(() => {
-      const band = taxableProfit > STANDARD_RATE_BAND ? 'higher rate band (40%)' : 'standard rate band (20%)';
+      const band = taxableProfit > 35_000 ? 'top band (45%)' : taxableProfit > 12_000 ? 'middle band (35%)' : 'first band (15%)';
       setAiSummary(
-        `Tax Year ${selectedYear} — AI Tax Summary\n\n` +
+        `Tax Year ${selectedYear} — AI Tax Summary (Greek rates)\n\n` +
         `Gross rental income:      €${Math.round(grossIncome).toLocaleString()}\n` +
         `Allowable deductions:     €${Math.round(totalDeductions).toLocaleString()}\n` +
         `Taxable profit:           €${Math.round(taxableProfit).toLocaleString()}\n\n` +
-        `  Income tax:             €${tax.incomeTax.toLocaleString()}\n` +
-        `  USC:                    €${tax.usc.toLocaleString()}\n` +
-        `  PRSI:                   €${tax.prsi.toLocaleString()}\n` +
+        `  Income tax (${band}):\n` +
+        `    Band 1 up to €12,000 @ 15%:     €${Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}\n` +
+        (taxableProfit > 12_000 ? `    Band 2 €12k-€35k @ 35%:          €${Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}\n` : '') +
+        (taxableProfit > 35_000 ? `    Band 3 above €35,000 @ 45%:      €${Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}\n` : '') +
         `  ─────────────────────────────────\n` +
-        `  Estimated total tax:    €${tax.total.toLocaleString()} (${band})\n` +
+        `  Estimated total tax:    €${tax.total.toLocaleString()}\n` +
         `  Effective rate:         ${tax.effectiveRate.toFixed(1)}%\n\n` +
-        `Deductions you may be missing:\n` +
-        `• Mortgage interest (20% tax credit on finance costs)\n` +
-        `• Letting agent & property management fees\n` +
-        `• Property repairs & maintenance (not improvements)\n` +
-        `• Landlord insurance premiums\n` +
-        `• Void period costs (council tax, utilities)\n` +
-        `• Accountancy, legal, and professional fees\n` +
-        `• Pre-letting expenses (ads, repairs before first tenant)\n\n` +
-        `Self Assessment deadline: 31 October ${selectedYear + 1} (or 14 November via ROS).\n` +
-        `Keep all receipts for at least 6 years. Consult a qualified tax advisor.`
+        `Deductions you may be missing (Greek tax law):\n` +
+        `• Property repair & maintenance costs\n` +
+        `• Letting agent & management fees\n` +
+        `• Insurance premiums\n` +
+        `• Depreciation allowance (where applicable)\n` +
+        `• Accountancy & legal fees\n` +
+        `• Void period utility costs\n\n` +
+        `Filing deadline: 30 June ${selectedYear + 1} via Taxisnet (E1/E2 forms).\n` +
+        `Keep all receipts for at least 5 years. Consult a certified Greek accountant.`
       );
       setSummaryLoading(false);
     }, 800);
@@ -597,7 +590,7 @@ export default function LandlordTaxesPage() {
           <Receipt className="h-7 w-7 text-primary" />
           <div>
             <h1 className="text-2xl font-bold">Taxes</h1>
-            <p className="text-sm text-muted-foreground">Rental income tax estimate · Irish rates 2024</p>
+            <p className="text-sm text-muted-foreground">Rental income tax estimate · Greek rates 2024</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -664,31 +657,35 @@ export default function LandlordTaxesPage() {
       {!isLoading && taxableProfit > 0 && (
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">Tax Breakdown (Ireland 2024)</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">Tax Breakdown (Greece 2024)</h2>
             <Badge variant="outline" className="text-xs">
               {tax.effectiveRate.toFixed(1)}% effective rate
             </Badge>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Income tax (20% / 40%)</span>
-              <span className="font-medium">€{tax.incomeTax.toLocaleString()}</span>
+              <span className="text-muted-foreground">Band 1: up to €12,000 (15%)</span>
+              <span className="font-medium">€{Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Universal Social Charge (USC)</span>
-              <span className="font-medium">€{tax.usc.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">PRSI (4% on rental income)</span>
-              <span className="font-medium">€{tax.prsi.toLocaleString()}</span>
-            </div>
+            {taxableProfit > 12_000 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Band 2: €12,001 – €35,000 (35%)</span>
+                <span className="font-medium">€{Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}</span>
+              </div>
+            )}
+            {taxableProfit > 35_000 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Band 3: above €35,000 (45%)</span>
+                <span className="font-medium">€{Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-border pt-2 font-semibold">
               <span>Estimated total tax owed</span>
               <span className="text-yellow-400">€{tax.total.toLocaleString()}</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Estimate only. Does not account for other income, credits, or individual circumstances. Consult a tax advisor before filing.
+            Estimate only. Does not account for other income sources, deductions, or individual circumstances. Consult a Greek tax advisor (E1/E2 form) before filing.
           </p>
         </Card>
       )}

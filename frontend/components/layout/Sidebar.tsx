@@ -8,8 +8,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import useStore from "@/lib/store/useStore";
-
 type NavItem = {
   title: string;
   href: string;
@@ -138,7 +136,6 @@ const tenantNavItems: NavItem[] = [
 
 export default function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname();
-  const { agentMode, autonomyLevel } = useStore();
   
   const navigation = userRole === 'landlord' ? landlordNavItems : tenantNavItems;
 
@@ -173,31 +170,6 @@ export default function Sidebar({ userRole }: SidebarProps) {
         })}
       </nav>
 
-      {/* AI Status */}
-      <div className="border-t border-border p-4">
-        <div className="rounded-lg bg-sidebar-accent p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground">AI Agent</span>
-            <div className="flex items-center">
-              <div className={cn(
-                "h-2 w-2 rounded-full mr-1",
-                agentMode === 'active' ? "bg-primary pulse-glow" : 
-                agentMode === 'passive' ? "bg-yellow-500" : "bg-gray-500"
-              )} />
-              <span className={cn(
-                "text-xs",
-                agentMode === 'active' ? "text-primary" :
-                agentMode === 'passive' ? "text-yellow-500" : "text-gray-500"
-              )}>
-                {agentMode.charAt(0).toUpperCase() + agentMode.slice(1)}
-              </span>
-            </div>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Autonomy: {autonomyLevel}%
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

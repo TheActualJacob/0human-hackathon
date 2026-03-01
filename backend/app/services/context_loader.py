@@ -147,9 +147,12 @@ async def load_tenant_context(whatsapp_number: str) -> TenantContext | None:
         id=t["id"],
         full_name=t["full_name"],
         whatsapp_number=t["whatsapp_number"],
-        lease_id=t["lease_id"],
+        lease_id=t.get("lease_id") or "",
         raw=t,
     )
+
+    if not tenant.lease_id:
+        return None
 
     lease_res = sb.table("leases").select("*").eq("id", tenant.lease_id).single().execute()
     if not lease_res.data:

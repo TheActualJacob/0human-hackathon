@@ -152,42 +152,6 @@ export default function LandlordApplicationsPage() {
       const propertyAddress = application.units?.address || application.units?.unit_identifier || 'the property';
       const monthlyRent = application.units?.rent_amount || 0;
 
-      const leaseContent = `TENANCY AGREEMENT
-
-1. PARTIES
-This agreement is between Robert Ryan (Landlord) and ${applicantName} (Tenant).
-
-2. PROPERTY
-The landlord agrees to let the property at ${propertyAddress} to the tenant for residential use only.
-
-3. TERM
-The tenancy shall commence on ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} for a period of 12 months.
-
-4. RENT
-The tenant shall pay £${monthlyRent} per calendar month, due on the 1st of each month by bank transfer.
-
-5. DEPOSIT
-A deposit of £${monthlyRent * 2} is payable on signing, to be protected under the Tenancy Deposit Scheme (TDS) within 30 days.
-
-6. TENANT OBLIGATIONS
-The tenant agrees to:
-- Pay rent on time each month
-- Keep the property clean and in good condition
-- Report any damage or maintenance issues promptly
-- Not sublet the property without written consent
-- Allow access for inspections with reasonable notice (minimum 24 hours)
-
-7. LANDLORD OBLIGATIONS
-The landlord agrees to:
-- Keep the property in a good state of repair
-- Respond to urgent repairs within 24 hours and routine repairs within 28 days
-- Protect the tenant's deposit in an approved scheme
-
-8. TERMINATION
-Either party may end this tenancy by giving 1 month's written notice after the fixed term expires.
-
-9. GOVERNING LAW
-This agreement is governed by the laws of England and Wales.`;
 
       let signingUrl: string | null = null;
       try {
@@ -198,7 +162,8 @@ This agreement is governed by the laws of England and Wales.`;
             prospect_name: applicantName,
             unit_address: propertyAddress,
             monthly_rent: monthlyRent,
-            lease_content: leaseContent,
+            deposit_amount: application.units?.security_deposit || monthlyRent * 2,
+            landlord_name: 'Robert Ryan',
             prospect_phone: appData?.whatsappNumber || null,
             prospect_email: application.tenants?.email || appData?.email || null,
             unit_id: application.unit_id || null,
@@ -248,7 +213,7 @@ This agreement is governed by the laws of England and Wales.`;
       }
 
       await loadApplications();
-      notify('success', 'Application accepted — lease created and applicant notified.');
+      notify('success', 'Application accepted — AI-drafted lease sent to applicant for signing.');
     } catch (err) {
       console.error('Error accepting application:', err);
       notify('error', 'Failed to accept application. Please try again.');

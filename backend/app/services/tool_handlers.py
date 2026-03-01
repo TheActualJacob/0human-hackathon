@@ -287,23 +287,48 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
         f"Request ID: {request_id}"
     )
 
-    # Create linked maintenance_workflows entry
+    # Build a complete ai_analysis object (WhatsApp agent has already classified)
+    cost_range = (
+        "high" if urgency == "emergency" or category in ("structural", "electrical")
+        else "medium" if urgency == "high"
+        else "low"
+    )
+    ai_analysis = {
+        "category": category,
+        "urgency": urgency,
+        "estimated_cost_range": cost_range,
+        "vendor_required": True,
+        "reasoning": (
+            f"WhatsApp agent classified this as a {urgency}-urgency {category} issue. "
+            f"Professional intervention required. {title}"
+        ),
+        "confidence_score": 0.88,
+    }
+
+    # Create linked maintenance_workflows entry at OWNER_NOTIFIED
+    # (the WhatsApp agent has already done the AI analysis; landlord action is next)
     import asyncio
     open_threads = (
         ctx.conversation_context.open_threads
         if ctx.conversation_context
         else {}
     )
+    workflow_id = None
     try:
-        sb.table("maintenance_workflows").insert({
+        wf_res = sb.table("maintenance_workflows").insert({
             "maintenance_request_id": request_id,
-            "current_state": "SUBMITTED",
+            "current_state": "OWNER_NOTIFIED",
             "title": title,
             "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
             "vendor_message": vendor_message,
-            "ai_analysis": f'{{"category": "{category}", "urgency": "{urgency}"}}',
-            "state_history": [],
+            "ai_analysis": ai_analysis,
+            "state_history": [
+                {"from_state": None, "to_state": "SUBMITTED", "timestamp": datetime.now(timezone.utc).isoformat()},
+                {"from_state": "SUBMITTED", "to_state": "OWNER_NOTIFIED", "timestamp": datetime.now(timezone.utc).isoformat()},
+            ],
         }).execute()
+        if wf_res.data:
+            workflow_id = wf_res.data[0]["id"]
     except Exception as exc:
         sys.stderr.write(f"[schedule_maintenance] WARNING: failed to create workflow entry: {exc}\n")
         sys.stderr.flush()

@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     if (process.env.ANTHROPIC_API_KEY) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 1024,
         temperature: 0.3 as any,
         system: systemPrompt,

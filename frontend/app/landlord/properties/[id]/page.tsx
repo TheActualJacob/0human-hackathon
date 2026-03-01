@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
+import {
   ArrowLeft, Save, Trash2, Upload, X, Plus, Image as ImageIcon,
   MapPin, Home, Bed, Bath, DollarSign, Calendar, FileText,
-  Loader2, AlertCircle, Check, Camera
+  Loader2, AlertCircle, Check, Camera, Brain, CheckCircle,
+  Clock, User, Phone, Mail, XCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,22 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import useAuthStore from '@/lib/store/auth';
 import useLandlordStore from '@/lib/store/landlord';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import type { Database } from '@/lib/supabase/database.types';
+
+type PropertyApplication = Database['public']['Tables']['property_applications']['Row'];
+type Tenant = Database['public']['Tables']['tenants']['Row'];
+
+interface ApplicationWithTenant extends PropertyApplication {
+  tenants?: Tenant;
+}
+
+interface SelectionResult {
+  tenant_name: string;
+  reason: string;
+  summary: string;
+  signing_link: string | null;
+}
 
 interface PropertyFormData {
   unit_identifier: string;
@@ -71,6 +87,13 @@ export default function PropertyEditPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Applications tab state
+  const [applications, setApplications] = useState<ApplicationWithTenant[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const [selectingTenant, setSelectingTenant] = useState(false);
+  const [selectionResult, setSelectionResult] = useState<SelectionResult | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<PropertyFormData>({
     unit_identifier: '',
@@ -126,7 +149,7 @@ export default function PropertyEditPage() {
           .from('unit_attributes')
           .select('*')
           .eq('unit_id', propertyId)
-          .single();
+          .maybeSingle();
 
         // Set form data
         setFormData({
@@ -163,6 +186,45 @@ export default function PropertyEditPage() {
 
     loadPropertyData();
   }, [propertyId, user?.entityId, router]);
+
+  // Load applications for this unit
+  const loadApplications = async () => {
+    setLoadingApplications(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('property_applications')
+        .select('*, tenants(id, full_name, email, whatsapp_number)')
+        .eq('unit_id', propertyId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setApplications(data || []);
+    } catch (err) {
+      console.error('Error loading applications:', err);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
+
+  const handleSelectBestTenant = async () => {
+    setSelectingTenant(true);
+    setSelectionResult(null);
+    setSelectionError(null);
+    try {
+      const res = await fetch(`http://localhost:8000/api/property-applications/select-best/${propertyId}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Selection failed');
+      setSelectionResult(data);
+      await loadApplications();
+    } catch (err: any) {
+      setSelectionError(err.message || 'Failed to select tenant');
+    } finally {
+      setSelectingTenant(false);
+    }
+  };
 
   // Handle form changes
   const handleChange = (field: keyof PropertyFormData, value: any) => {
@@ -426,12 +488,13 @@ Contact us today to arrange a viewing!`;
         </div>
       </div>
 
-      <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+      <Tabs defaultValue="basic" className="space-y-6" onValueChange={(v) => { if (v === 'applications') loadApplications(); }}>
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="listing">Listing</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
+          <TabsTrigger value="applications">Applications</TabsTrigger>
         </TabsList>
 
         {/* Basic Info Tab */}
@@ -820,6 +883,184 @@ Contact us today to arrange a viewing!`;
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        {/* Applications Tab */}
+        <TabsContent value="applications" className="space-y-6">
+          {/* AI Select Button + Result */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>AI Tenant Selection</CardTitle>
+                  <CardDescription>
+                    Let AI review all applicants and their documents to pick the best candidate
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleSelectBestTenant}
+                  disabled={selectingTenant || applications.filter(a => ['pending','under_review','ai_screening'].includes(a.status || '')).length === 0}
+                >
+                  {selectingTenant ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      AI is reviewing...
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="h-4 w-4 mr-2" />
+                      AI Select Best Tenant
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            {selectionResult && (
+              <CardContent>
+                <Alert className="bg-green-500/10 border-green-500/30">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <AlertDescription>
+                    <p className="font-semibold text-green-700 dark:text-green-400 mb-1">
+                      Selected: {selectionResult.tenant_name}
+                    </p>
+                    <p className="text-sm">{selectionResult.summary}</p>
+                    {selectionResult.signing_link && (
+                      <p className="text-xs mt-2 text-muted-foreground">
+                        Lease sent via WhatsApp · Signing link: {selectionResult.signing_link}
+                      </p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            )}
+            {selectionError && (
+              <CardContent>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{selectionError}</AlertDescription>
+                </Alert>
+              </CardContent>
+            )}
+          </Card>
+
+          {/* Applications List */}
+          {loadingApplications ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : applications.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 pb-6 text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Applications Yet</h3>
+                <p className="text-muted-foreground text-sm">
+                  Applications submitted by tenants will appear here
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {applications.map((app) => {
+                const data: any = app.applicant_data || {};
+                const docs: any = data.documents || {};
+                const isActive = ['pending', 'ai_screening', 'under_review'].includes(app.status || '');
+                const statusIcon = app.status === 'accepted' ? CheckCircle : app.status === 'rejected' ? XCircle : Clock;
+                const StatusIcon = statusIcon;
+                const statusColor = app.status === 'accepted' ? 'text-green-500' : app.status === 'rejected' ? 'text-red-500' : 'text-yellow-500';
+
+                return (
+                  <Card key={app.id} className={app.status === 'rejected' ? 'opacity-60' : ''}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {data.fullName || app.tenants?.full_name || 'Unknown'}
+                          </CardTitle>
+                          <CardDescription className="mt-1 space-y-0.5">
+                            {(data.email || app.tenants?.email) && (
+                              <span className="flex items-center gap-1 text-xs">
+                                <Mail className="h-3 w-3" />
+                                {data.email || app.tenants?.email}
+                              </span>
+                            )}
+                            {(data.whatsappNumber || app.tenants?.whatsapp_number) && (
+                              <span className="flex items-center gap-1 text-xs">
+                                <Phone className="h-3 w-3" />
+                                {data.whatsappNumber || app.tenants?.whatsapp_number}
+                              </span>
+                            )}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={app.status === 'accepted' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1">
+                          <StatusIcon className={`h-3 w-3 ${statusColor}`} />
+                          {app.status?.replace('_', ' ') || 'pending'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs">Move-in Date</p>
+                          <p className="font-medium">{data.preferredMoveInDate ? format(new Date(data.preferredMoveInDate), 'MMM d, yyyy') : 'ASAP'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Occupants</p>
+                          <p className="font-medium">{data.numberOfOccupants || '1'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Applied</p>
+                          <p className="font-medium">{app.created_at ? formatDistanceToNow(new Date(app.created_at), { addSuffix: true }) : '—'}</p>
+                        </div>
+                      </div>
+
+                      {data.note && (
+                        <p className="text-sm text-muted-foreground italic">"{data.note}"</p>
+                      )}
+
+                      {/* Documents */}
+                      <div className="flex gap-2 flex-wrap">
+                        {docs.bankStatement && (
+                          <a href={docs.bankStatement} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Bank Statement
+                            </Badge>
+                          </a>
+                        )}
+                        {docs.incomeProof && (
+                          <a href={docs.incomeProof} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Income Proof
+                            </Badge>
+                          </a>
+                        )}
+                        {docs.photoId && (
+                          <a href={docs.photoId} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="outline" className="text-xs cursor-pointer hover:bg-accent">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Photo ID
+                            </Badge>
+                          </a>
+                        )}
+                      </div>
+
+                      {/* AI Screening Result */}
+                      {app.ai_screening_result && (
+                        <Alert className="bg-primary/5">
+                          <Brain className="h-4 w-4" />
+                          <AlertDescription className="text-sm">
+                            <p className="font-medium mb-1">AI Assessment</p>
+                            <p>{(app.ai_screening_result as any).summary || (app.ai_screening_result as any).reason}</p>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

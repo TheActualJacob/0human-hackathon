@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from "react";
-import { 
+import {
   DollarSign, Calendar, CheckCircle, Clock, AlertCircle,
   CreditCard, FileText, Download, ChevronRight
 } from "lucide-react";
@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import StatusBadge from "@/components/shared/StatusBadge";
 import useTenantStore from "@/lib/store/tenant";
+import useStore from "@/lib/store/useStore";
+import useAuthStore from "@/lib/store/auth";
+import { getCurrentUser } from "@/lib/auth/client";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -19,19 +22,33 @@ export default function TenantPaymentsPage() {
   const {
     tenantInfo,
     payments,
-    paymentPlans,
     loading,
     fetchTenantData
   } = useTenantStore();
 
-  useEffect(() => {
-    if (tenantInfo?.id) {
-      fetchTenantData(tenantInfo.id);
-    }
-  }, [tenantInfo?.id]);
+  const { paymentPlans } = useStore();
 
-  // Get current payment plan if any
-  const activePlan = paymentPlans.find(plan => plan.status === 'active');
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    async function load() {
+      let currentUser = user;
+      if (!currentUser) {
+        currentUser = await getCurrentUser();
+        if (currentUser) useAuthStore.getState().setUser(currentUser);
+      }
+      if (currentUser?.entityId) {
+        fetchTenantData(currentUser.entityId);
+      }
+    }
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Get current payment plan if any (filtered to this tenant's lease)
+  const activePlan = (paymentPlans || []).find(
+    plan => plan.status === 'active' && plan.lease_id === tenantInfo?.lease_id
+  );
 
   // Calculate payment stats
   const upcomingPayments = payments.filter(p => p.status === 'pending' || p.status === 'late');
@@ -53,7 +70,7 @@ export default function TenantPaymentsPage() {
   // Payment history for chart
   const paymentHistory = payments
     .filter(p => p.status === 'paid')
-    .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
+    .sort((a, b) => new Date(b.paid_date ?? b.due_date).getTime() - new Date(a.paid_date ?? a.due_date).getTime())
     .slice(0, 6)
     .reverse();
 
@@ -89,8 +106,8 @@ export default function TenantPaymentsPage() {
                 You have {overduePayments.length} overdue payment{overduePayments.length > 1 ? 's' : ''} totaling £{overduePayments.reduce((sum, p) => sum + p.amount_due, 0).toLocaleString()}
               </p>
             </div>
-            <Button size="sm" variant="outline">
-              Contact Landlord
+            <Button size="sm" asChild>
+              <Link href={`/pay/${overduePayments[0].id}`}>Pay Now</Link>
             </Button>
           </div>
         </Card>
@@ -123,9 +140,11 @@ export default function TenantPaymentsPage() {
                     className="h-2"
                   />
                 </div>
-                <Button className="w-full" disabled={nextPayment.status === 'paid'}>
-                  Pay Now
-                </Button>
+                {nextPayment.status !== 'paid' && (
+                  <Button className="w-full" asChild>
+                    <Link href={`/pay/${nextPayment.id}`}>Pay Now</Link>
+                  </Button>
+                )}
               </>
             ) : (
               <div className="text-center py-4">
@@ -144,9 +163,9 @@ export default function TenantPaymentsPage() {
               <DollarSign className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-3xl font-bold">£{tenantInfo?.monthly_rent?.toLocaleString() || 0}</p>
+              <p className="text-3xl font-bold">£{tenantInfo?.leases?.monthly_rent?.toLocaleString() || 0}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Due on the {tenantInfo?.rent_due_day || 1}st of each month
+                Due every month
               </p>
             </div>
             <div className="pt-2 border-t border-border">
@@ -242,7 +261,11 @@ export default function TenantPaymentsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={payment.status} />
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  {(payment.status === 'pending' || payment.status === 'late') && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/pay/${payment.id}`}>Pay</Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             ))
@@ -265,7 +288,7 @@ export default function TenantPaymentsPage() {
               <div>
                 <p className="font-medium">£{(payment.amount_paid || payment.amount_due).toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(payment.payment_date || payment.due_date), 'MMMM d, yyyy')}
+                  {format(new Date(payment.paid_date ?? payment.due_date), 'MMMM d, yyyy')}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -286,10 +309,10 @@ export default function TenantPaymentsPage() {
           <div>
             <p className="text-sm text-muted-foreground mb-1">Bank Details</p>
             <div className="p-4 bg-accent/50 rounded-lg font-mono text-sm">
-              <p>Account Name: {tenantInfo?.landlord_name || 'PropAI Landlord'}</p>
+              <p>Account Name: Landlord</p>
               <p>Sort Code: 12-34-56</p>
               <p>Account Number: 87654321</p>
-              <p>Reference: {tenantInfo?.unit_identifier || 'UNIT-REF'}</p>
+              <p>Reference: {tenantInfo?.leases?.units?.unit_identifier || 'UNIT-REF'}</p>
             </div>
           </div>
           <div className="pt-4 border-t border-border">

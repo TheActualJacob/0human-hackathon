@@ -209,11 +209,10 @@ def _upload_lease_preview_pdf(
         from app.routes.signing import generate_lease_preview_pdf
         pdf_bytes = generate_lease_preview_pdf(applicant_name, unit_address, monthly_rent, lease_content)
         filename = f"lease_preview_{token_id[:8]}_{datetime.now().strftime('%Y%m%d')}.pdf"
-        upload_res = sb.storage.from_("leases-signed").upload(
-            filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "false"}
+        sb.storage.from_("leases-signed").upload(
+            filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "true"}
         )
-        if upload_res:
-            return sb.storage.from_("leases-signed").get_public_url(filename)
+        return sb.storage.from_("leases-signed").get_public_url(filename)
     except Exception as exc:
         print(f"Review agent: lease preview PDF generation/upload failed: {exc}")
     return None

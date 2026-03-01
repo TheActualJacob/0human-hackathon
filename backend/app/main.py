@@ -8,6 +8,7 @@ from app.config import settings
 from app.routes.frontend_proxy import router as frontend_proxy_router
 from app.routes.health import router as health_router
 from app.routes.lease_applications import router as lease_applications_router
+from app.routes.property_applications import router as property_applications_router
 from app.routes.maintenance_workflow import router as maintenance_workflow_router
 from app.routes.payments import router as payments_router
 from app.routes.signing import router as signing_router
@@ -41,5 +42,6 @@ app.include_router(maintenance_workflow_router)
 app.include_router(test_workflow_router)
 app.include_router(whatsapp_router)
 app.include_router(lease_applications_router)
+app.include_router(property_applications_router)
 app.include_router(signing_router)
 app.include_router(frontend_proxy_router)

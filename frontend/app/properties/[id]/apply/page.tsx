@@ -1,21 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
+import {
   ArrowLeft, Loader2, CheckCircle, AlertCircle,
-  User, Briefcase, Home, Calendar, Pets, Phone,
-  FileText, Shield
+  Upload, FileText, X, Shield, User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { createClient } from '@/lib/supabase/client';
 import { getCurrentUser } from '@/lib/auth/client';
@@ -23,12 +22,95 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type Unit = Database['public']['Tables']['units']['Row'];
 
+interface UploadSlot {
+  file: File | null;
+  uploading: boolean;
+  url: string | null;
+  error: string | null;
+}
+
+function FileUploadSlot({
+  label,
+  required,
+  hint,
+  slot,
+  onChange,
+}: {
+  label: string;
+  required: boolean;
+  hint: string;
+  slot: UploadSlot;
+  onChange: (file: File | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="space-y-2">
+      <Label>
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
+      <div
+        className={`border rounded-lg p-4 flex items-center gap-4 transition-colors ${
+          slot.file ? 'border-green-500/50 bg-green-500/5' : 'border-dashed border-border'
+        }`}
+      >
+        {slot.file ? (
+          <>
+            <FileText className="h-5 w-5 text-green-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{slot.file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(slot.file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(null)}
+              className="shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">{hint}</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              className="shrink-0"
+            >
+              Choose file
+            </Button>
+          </>
+        )}
+      </div>
+      {slot.error && (
+        <p className="text-xs text-destructive">{slot.error}</p>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+    </div>
+  );
+}
+
 export default function PropertyApplicationPage() {
   const router = useRouter();
   const rawParams = useParams();
   const params = { id: rawParams?.id as string };
   const supabase = createClient();
-  
+
   const [property, setProperty] = useState<Unit | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -37,35 +119,20 @@ export default function PropertyApplicationPage() {
   const [success, setSuccess] = useState(false);
   const [existingApplication, setExistingApplication] = useState<any>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  
+
   const [formData, setFormData] = useState({
-    // Pre-filled from user profile
     fullName: '',
     email: '',
     whatsappNumber: '',
-    
-    // Employment Details
-    employmentStatus: '',
-    monthlyIncome: '',
-    currentEmployer: '',
-    employmentDuration: '',
-    
-    // Rental History
-    hasRentalHistory: '',
-    currentAddress: '',
-    reasonForMoving: '',
-    previousLandlordContact: '',
-    
-    // Additional Information
-    hasPets: '',
-    petDetails: '',
     preferredMoveInDate: '',
     numberOfOccupants: '1',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    
-    // Cover Letter
-    coverLetter: ''
+    note: '',
+  });
+
+  const [files, setFiles] = useState({
+    bankStatement: null as File | null,
+    incomeProof: null as File | null,
+    photoId: null as File | null,
   });
 
   useEffect(() => {
@@ -74,7 +141,6 @@ export default function PropertyApplicationPage() {
 
   const loadData = async () => {
     try {
-      // Get current user
       const currentUser = await getCurrentUser();
       if (!currentUser) {
         router.push(`/auth/signup/tenant?returnUrl=/properties/${params.id}/apply`);
@@ -82,19 +148,15 @@ export default function PropertyApplicationPage() {
       }
       setUser(currentUser);
 
-      // Pre-fill form with user data
       if (currentUser.entity) {
         setFormData(prev => ({
           ...prev,
           fullName: currentUser.entity.full_name || '',
           email: currentUser.email || '',
           whatsappNumber: currentUser.entity.whatsapp_number || '',
-          // Pre-fill from profile_data if available
-          ...(currentUser.entity.profile_data || {})
         }));
       }
 
-      // Load property details
       const { data: propertyData, error: propertyError } = await supabase
         .from('units')
         .select('*')
@@ -109,7 +171,6 @@ export default function PropertyApplicationPage() {
 
       setProperty(propertyData);
 
-      // Check if user already applied
       const { data: applications } = await supabase
         .from('property_applications')
         .select('*')
@@ -119,20 +180,37 @@ export default function PropertyApplicationPage() {
       if (applications && applications.length > 0) {
         setExistingApplication(applications[0]);
       }
-
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch (err) {
+      console.error('Error loading data:', err);
       setError('Failed to load application data');
     } finally {
       setLoading(false);
     }
   };
 
+  const uploadFile = async (file: File, fieldName: string): Promise<string> => {
+    const ext = file.name.split('.').pop();
+    const path = `${user.entityId}/${Date.now()}-${fieldName}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('application-documents')
+      .upload(path, file);
+    if (uploadError) throw uploadError;
+    return supabase.storage.from('application-documents').getPublicUrl(path).data.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!agreedToTerms) {
       setError('Please agree to the terms and conditions');
+      return;
+    }
+    if (!files.bankStatement) {
+      setError('Please upload your bank statement');
+      return;
+    }
+    if (!files.incomeProof) {
+      setError('Please upload your proof of income');
       return;
     }
 
@@ -140,57 +218,49 @@ export default function PropertyApplicationPage() {
     setError('');
 
     try {
+      // Upload documents first
+      const bankStatementUrl = await uploadFile(files.bankStatement, 'bankstatement');
+      const incomeProofUrl = await uploadFile(files.incomeProof, 'incomeproof');
+      const photoIdUrl = files.photoId ? await uploadFile(files.photoId, 'photoid') : null;
+
       const applicationData = {
         unit_id: params.id,
         tenant_id: user.entityId,
         applicant_data: {
-          ...formData,
-          submittedAt: new Date().toISOString()
+          fullName: formData.fullName,
+          email: formData.email,
+          whatsappNumber: formData.whatsappNumber,
+          preferredMoveInDate: formData.preferredMoveInDate,
+          numberOfOccupants: formData.numberOfOccupants,
+          note: formData.note,
+          documents: {
+            bankStatement: bankStatementUrl,
+            incomeProof: incomeProofUrl,
+            photoId: photoIdUrl,
+          },
+          submittedAt: new Date().toISOString(),
         },
-        status: 'pending' as const
+        status: 'pending' as const,
       };
 
-      const { data, error } = await supabase
+      const { error: insertError } = await supabase
         .from('property_applications')
         .insert(applicationData)
         .select()
         .single();
 
-      if (error) throw error;
-
-      // Trigger AI screening in the background
-      // In a real app, this would be a server-side function
-      setTimeout(async () => {
-        try {
-          const { screenTenantWithClaude } = await import('@/lib/ai/tenant-screening');
-          await screenTenantWithClaude(
-            formData as any,
-            {
-              rentAmount: property?.rent_amount || 0,
-              securityDeposit: property?.security_deposit || 0,
-              availableDate: property?.available_date || ''
-            }
-          );
-        } catch (error) {
-          console.error('Screening error:', error);
-        }
-      }, 1000);
+      if (insertError) throw insertError;
 
       setSuccess(true);
-    } catch (error: any) {
-      console.error('Application error:', error);
-      setError(error.message || 'Failed to submit application');
+    } catch (err: any) {
+      console.error('Application error:', err);
+      setError(err.message || 'Failed to submit application');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  // --- Loading / error / existing / success states ---
 
   if (loading) {
     return (
@@ -232,7 +302,7 @@ export default function PropertyApplicationPage() {
             <div className="bg-muted p-4 rounded-lg">
               <p className="text-sm font-medium mb-1">Application Status</p>
               <Badge variant={
-                existingApplication.status === 'accepted' ? 'success' :
+                existingApplication.status === 'accepted' ? 'default' :
                 existingApplication.status === 'rejected' ? 'destructive' :
                 'secondary'
               }>
@@ -264,7 +334,7 @@ export default function PropertyApplicationPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p>Your application has been submitted and is being reviewed by our AI screening system.</p>
+            <p>Your application and documents have been submitted for review.</p>
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
@@ -285,9 +355,10 @@ export default function PropertyApplicationPage() {
     );
   }
 
+  // --- Main form ---
+
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" asChild>
           <Link href={`/properties/${params.id}`}>
@@ -304,7 +375,7 @@ export default function PropertyApplicationPage() {
             <CardHeader>
               <CardTitle>Rental Application</CardTitle>
               <CardDescription>
-                Complete all fields to help us process your application quickly
+                Upload your documents and we'll get back to you within 2-3 business days
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -318,47 +389,41 @@ export default function PropertyApplicationPage() {
 
                 {/* Personal Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Personal Information
+                  <h3 className="text-base font-semibold flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Your Details
                   </h3>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="fullName">Full Name *</Label>
+                      <Label htmlFor="fullName">Full Name</Label>
                       <Input
                         id="fullName"
-                        name="fullName"
                         value={formData.fullName}
-                        onChange={handleChange}
-                        required
                         disabled
+                        className="bg-muted"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email">Email *</Label>
+                      <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
-                        name="email"
                         type="email"
                         value={formData.email}
-                        onChange={handleChange}
-                        required
                         disabled
+                        className="bg-muted"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="whatsappNumber">WhatsApp Number *</Label>
+                      <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
                       <Input
                         id="whatsappNumber"
-                        name="whatsappNumber"
                         value={formData.whatsappNumber}
-                        onChange={handleChange}
-                        required
                         disabled
+                        className="bg-muted"
                       />
                     </div>
                     <div>
@@ -380,274 +445,94 @@ export default function PropertyApplicationPage() {
                       </Select>
                     </div>
                   </div>
-                </div>
-
-                {/* Employment Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    Employment Information
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="employmentStatus">Employment Status *</Label>
-                      <Select
-                        value={formData.employmentStatus}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, employmentStatus: value }))}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="full_time">Full-time Employed</SelectItem>
-                          <SelectItem value="part_time">Part-time Employed</SelectItem>
-                          <SelectItem value="self_employed">Self Employed</SelectItem>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="retired">Retired</SelectItem>
-                          <SelectItem value="unemployed">Unemployed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="monthlyIncome">Monthly Income *</Label>
-                      <Select
-                        value={formData.monthlyIncome}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, monthlyIncome: value }))}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0-1000">Under £1,000</SelectItem>
-                          <SelectItem value="1000-2000">£1,000 - £2,000</SelectItem>
-                          <SelectItem value="2000-3000">£2,000 - £3,000</SelectItem>
-                          <SelectItem value="3000-4000">£3,000 - £4,000</SelectItem>
-                          <SelectItem value="4000-5000">£4,000 - £5,000</SelectItem>
-                          <SelectItem value="5000+">£5,000+</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {(formData.employmentStatus && formData.employmentStatus !== 'unemployed') && (
-                    <>
-                      <div>
-                        <Label htmlFor="currentEmployer">Current Employer</Label>
-                        <Input
-                          id="currentEmployer"
-                          name="currentEmployer"
-                          value={formData.currentEmployer}
-                          onChange={handleChange}
-                          placeholder="Company name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="employmentDuration">Employment Duration</Label>
-                        <Select
-                          value={formData.employmentDuration}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, employmentDuration: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select duration" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="less_6_months">Less than 6 months</SelectItem>
-                            <SelectItem value="6_12_months">6-12 months</SelectItem>
-                            <SelectItem value="1_2_years">1-2 years</SelectItem>
-                            <SelectItem value="2_5_years">2-5 years</SelectItem>
-                            <SelectItem value="5_years_plus">5+ years</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Rental History */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Home className="h-5 w-5" />
-                    Rental History
-                  </h3>
-                  
-                  <div>
-                    <Label>Do you have previous rental history? *</Label>
-                    <RadioGroup
-                      value={formData.hasRentalHistory}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, hasRentalHistory: value }))}
-                      required
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="yes" id="rental-yes" />
-                        <Label htmlFor="rental-yes">Yes</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="no" id="rental-no" />
-                        <Label htmlFor="rental-no">No (First-time renter)</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="currentAddress">Current Address *</Label>
-                    <Textarea
-                      id="currentAddress"
-                      name="currentAddress"
-                      value={formData.currentAddress}
-                      onChange={handleChange}
-                      required
-                      rows={2}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="reasonForMoving">Reason for Moving *</Label>
-                    <Input
-                      id="reasonForMoving"
-                      name="reasonForMoving"
-                      value={formData.reasonForMoving}
-                      onChange={handleChange}
-                      required
-                      placeholder="e.g., Work relocation, need more space"
-                    />
-                  </div>
-
-                  {formData.hasRentalHistory === 'yes' && (
-                    <div>
-                      <Label htmlFor="previousLandlordContact">Previous Landlord Contact (Optional)</Label>
-                      <Input
-                        id="previousLandlordContact"
-                        name="previousLandlordContact"
-                        value={formData.previousLandlordContact}
-                        onChange={handleChange}
-                        placeholder="Name and phone/email"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Additional Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Additional Information
-                  </h3>
 
                   <div>
                     <Label htmlFor="preferredMoveInDate">Preferred Move-in Date *</Label>
                     <Input
                       id="preferredMoveInDate"
-                      name="preferredMoveInDate"
                       type="date"
                       value={formData.preferredMoveInDate}
-                      onChange={handleChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, preferredMoveInDate: e.target.value }))}
                       required
                       min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
 
                   <div>
-                    <Label>Do you have any pets? *</Label>
-                    <RadioGroup
-                      value={formData.hasPets}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, hasPets: value }))}
-                      required
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="no" id="pets-no" />
-                        <Label htmlFor="pets-no">No</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="yes" id="pets-yes" />
-                        <Label htmlFor="pets-yes">Yes</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {formData.hasPets === 'yes' && (
-                    <div>
-                      <Label htmlFor="petDetails">Pet Details *</Label>
-                      <Input
-                        id="petDetails"
-                        name="petDetails"
-                        value={formData.petDetails}
-                        onChange={handleChange}
-                        required
-                        placeholder="e.g., 1 small dog, 2 cats"
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="emergencyContactName">Emergency Contact Name</Label>
-                      <Input
-                        id="emergencyContactName"
-                        name="emergencyContactName"
-                        value={formData.emergencyContactName}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
-                      <Input
-                        id="emergencyContactPhone"
-                        name="emergencyContactPhone"
-                        type="tel"
-                        value={formData.emergencyContactPhone}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="coverLetter">Cover Letter (Optional)</Label>
+                    <Label htmlFor="note">Note to Landlord (optional)</Label>
                     <Textarea
-                      id="coverLetter"
-                      name="coverLetter"
-                      value={formData.coverLetter}
-                      onChange={handleChange}
-                      rows={4}
-                      placeholder="Tell the landlord why you'd be a great tenant..."
+                      id="note"
+                      value={formData.note}
+                      onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
+                      rows={3}
+                      placeholder="Introduce yourself or mention anything relevant..."
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This is your chance to stand out from other applicants
+                  </div>
+                </div>
+
+                {/* Document Uploads */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-semibold flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Supporting Documents
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      PDF, JPG, or PNG — max 10 MB per file
+                    </p>
+                  </div>
+
+                  <FileUploadSlot
+                    label="Bank Statement"
+                    required={true}
+                    hint="Last 3 months — shows regular income and spending"
+                    slot={{ file: files.bankStatement, uploading: false, url: null, error: null }}
+                    onChange={(file) => setFiles(prev => ({ ...prev, bankStatement: file }))}
+                  />
+
+                  <FileUploadSlot
+                    label="Proof of Income"
+                    required={true}
+                    hint="Recent payslip, employment letter, or tax return"
+                    slot={{ file: files.incomeProof, uploading: false, url: null, error: null }}
+                    onChange={(file) => setFiles(prev => ({ ...prev, incomeProof: file }))}
+                  />
+
+                  <FileUploadSlot
+                    label="Photo ID"
+                    required={false}
+                    hint="Passport or driving licence (optional but recommended)"
+                    slot={{ file: files.photoId, uploading: false, url: null, error: null }}
+                    onChange={(file) => setFiles(prev => ({ ...prev, photoId: file }))}
+                  />
+                </div>
+
+                {/* Terms */}
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="terms"
+                    checked={agreedToTerms}
+                    onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="terms" className="text-sm font-normal cursor-pointer">
+                      I agree to the terms and conditions
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      I consent to background and reference checks and certify all information is accurate.
                     </p>
                   </div>
                 </div>
 
-                {/* Terms and Conditions */}
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="terms"
-                      checked={agreedToTerms}
-                      onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor="terms" className="text-sm font-normal cursor-pointer">
-                        I agree to the terms and conditions
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        I consent to background and credit checks, and certify that all information provided is accurate.
-                        I understand that providing false information may result in rejection of my application.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="w-full"
                   disabled={submitting || !agreedToTerms}
                 >
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting Application...
+                      Uploading & Submitting...
                     </>
                   ) : (
                     'Submit Application'
@@ -681,7 +566,9 @@ export default function PropertyApplicationPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Available</span>
                   <span className="font-medium">
-                    {property?.available_date ? new Date(property.available_date).toLocaleDateString() : 'Immediately'}
+                    {property?.available_date
+                      ? new Date(property.available_date).toLocaleDateString()
+                      : 'Immediately'}
                   </span>
                 </div>
               </div>
@@ -691,7 +578,7 @@ export default function PropertyApplicationPage() {
           <Alert>
             <Shield className="h-4 w-4" />
             <AlertDescription>
-              Your application will be screened by our AI system for a fair and unbiased review.
+              Your documents are stored securely and only shared with the landlord.
             </AlertDescription>
           </Alert>
         </div>
@@ -699,6 +586,3 @@ export default function PropertyApplicationPage() {
     </div>
   );
 }
-
-// Add missing Badge import
-import { Badge } from '@/components/ui/badge';

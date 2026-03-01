@@ -76,11 +76,12 @@ async def submit_signature(token: str, body: SignRequest):
     try:
         pdf_bytes = _generate_signed_lease_pdf(row, body.signature_data_url)
         filename = f"signed_lease_{token[:8]}_{datetime.now().strftime('%Y%m%d')}.pdf"
-        upload_res = sb.storage.from_("leases-signed").upload(filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "false"})
-        if upload_res:
-            pdf_url = sb.storage.from_("leases-signed").get_public_url(filename)
+        sb.storage.from_("leases-signed").upload(filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "true"})
+        pdf_url = sb.storage.from_("leases-signed").get_public_url(filename)
     except Exception as exc:
+        import traceback
         print(f"Signed PDF generation/upload error: {exc}")
+        traceback.print_exc()
 
     signed_at = datetime.now(timezone.utc).isoformat()
 
@@ -93,6 +94,27 @@ async def submit_signature(token: str, body: SignRequest):
     prospect_id = row.get("prospect_id")
     if prospect_id:
         sb.table("prospects").update({"status": "signed", "updated_at": signed_at}).eq("id", prospect_id).execute()
+
+    # Activate the lease associated with this tenant
+    prospect_phone = row.get("prospect_phone", "")
+    if prospect_phone:
+        try:
+            tenant_res = (
+                sb.table("tenants")
+                .select("lease_id")
+                .eq("whatsapp_number", prospect_phone)
+                .maybe_single()
+                .execute()
+            )
+            if tenant_res and tenant_res.data and tenant_res.data.get("lease_id"):
+                lease_id = tenant_res.data["lease_id"]
+                sb.table("leases").update({
+                    "status": "active",
+                    "lease_document_url": pdf_url,
+                }).eq("id", lease_id).execute()
+                print(f"Lease {lease_id} activated after signing")
+        except Exception as exc:
+            print(f"Failed to activate lease: {exc}")
 
     _notify_landlord_signed(row, pdf_url)
     await _send_signed_confirmation(row, pdf_url)

@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { 
-  DollarSign, Send, AlertCircle, CheckCircle, 
+import {
+  DollarSign, Send, AlertCircle, CheckCircle,
   Calendar, TrendingUp, FileText, Plus, Clock,
-  Home, User, CreditCard
+  Home, User, CreditCard, BarChart2, AlertTriangle
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
+} from "recharts";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { Card } from "@/components/ui/card";
@@ -18,6 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useLandlordStore from "@/lib/store/landlord";
 import useStore from "@/lib/store/useStore";
+import useAuthStore from "@/lib/store/auth";
+import { getCurrentUser } from "@/lib/auth/client";
+import { getMonthlyReport, type MonthlyReportResponse } from "@/lib/api/payments";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -39,13 +45,33 @@ export default function LandlordPaymentsPage() {
     logAgentAction
   } = useStore();
   
+  const { user } = useAuthStore();
+
   const [autonomousMode, setAutonomousMode] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
   const [showPaymentPlanDialog, setShowPaymentPlanDialog] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [reportData, setReportData] = useState<MonthlyReportResponse | null>(null);
 
   useEffect(() => {
-    fetchLandlordData();
+    async function load() {
+      let currentUser = user;
+      if (!currentUser) {
+        currentUser = await getCurrentUser();
+        if (currentUser) useAuthStore.getState().setUser(currentUser);
+      }
+      if (currentUser?.entityId) {
+        fetchLandlordData(currentUser.entityId);
+        try {
+          const report = await getMonthlyReport(currentUser.entityId);
+          setReportData(report);
+        } catch {
+          // report is optional — silently skip if unavailable
+        }
+      }
+    }
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Get payment with details
@@ -56,7 +82,8 @@ export default function LandlordPaymentsPage() {
     const lease = leases.find(l => l.id === payment.lease_id);
     if (!lease) return null;
     
-    const tenant = tenants.find(t => t.lease_id === lease.id && t.is_primary_tenant);
+    const tenant = tenants.find(t => t.lease_id === lease.id && t.is_primary_tenant !== false)
+      ?? tenants.find(t => t.lease_id === lease.id);
     const unit = units.find(u => u.id === lease.unit_id);
     const plan = paymentPlans.find(pp => pp.lease_id === lease.id && pp.status === 'active');
     
@@ -69,8 +96,20 @@ export default function LandlordPaymentsPage() {
     return payment.status === filterStatus;
   });
 
-  // Calculate summary stats
-  const totalExpected = payments.reduce((sum, p) => sum + p.amount_due, 0);
+  // Monthly expected income from current leases (active or pending — exclude only expired/terminated)
+  const activeLeases = leases.filter(
+    l => l.status !== 'expired' && l.status !== 'terminated' && l.status !== 'notice_given'
+  );
+  const monthlyExpected = activeLeases.reduce((sum, l) => sum + (l.monthly_rent || 0), 0);
+
+  // Current month slice for meaningful collection rate
+  const currentYearMonth = format(new Date(), 'yyyy-MM');
+  const thisMonthPayments = payments.filter(p => p.due_date?.startsWith(currentYearMonth));
+  const thisMonthCollected = thisMonthPayments
+    .filter(p => p.status === 'paid')
+    .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+
+  // Pending and overdue across all time
   const totalCollected = payments
     .filter(p => p.status === 'paid')
     .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
@@ -81,8 +120,8 @@ export default function LandlordPaymentsPage() {
     .filter(p => p.status === 'late')
     .reduce((sum, p) => sum + p.amount_due, 0);
 
-  const collectionRate = totalExpected > 0 
-    ? Math.round((totalCollected / totalExpected) * 100) 
+  const collectionRate = monthlyExpected > 0
+    ? Math.round((thisMonthCollected / monthlyExpected) * 100)
     : 0;
 
   // Count payment plans for landlord's tenants
@@ -288,22 +327,25 @@ export default function LandlordPaymentsPage() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Expected</p>
-              <h3 className="text-2xl font-bold">£{totalExpected.toLocaleString()}</h3>
+              <p className="text-sm text-muted-foreground">Monthly Expected</p>
+              <h3 className="text-2xl font-bold">£{monthlyExpected.toLocaleString()}</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {activeLeases.length} active lease{activeLeases.length !== 1 ? 's' : ''}
+              </p>
             </div>
             <DollarSign className="h-8 w-8 text-muted-foreground" />
           </div>
         </Card>
-        
+
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Collected</p>
+              <p className="text-sm text-muted-foreground">This Month</p>
               <h3 className="text-2xl font-bold text-green-500">
-                £{totalCollected.toLocaleString()}
+                £{thisMonthCollected.toLocaleString()}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                {collectionRate}% rate
+                {collectionRate}% collected
               </p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
@@ -451,6 +493,113 @@ export default function LandlordPaymentsPage() {
               })}
           </div>
         </Card>
+      )}
+
+      {/* Insights Section */}
+      {reportData && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Payment Insights
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Collection Breakdown Chart */}
+            <Card className="p-6 col-span-1">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" />
+                Collection Breakdown
+              </h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart
+                  data={[
+                    { name: "On Time", value: reportData.payments_on_time, color: "#22c55e" },
+                    { name: "Late",    value: reportData.payments_late,    color: "#f59e0b" },
+                    { name: "Missed",  value: reportData.payments_missed,  color: "#ef4444" },
+                  ]}
+                  margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                >
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {[
+                      { color: "#22c55e" },
+                      { color: "#f59e0b" },
+                      { color: "#ef4444" },
+                    ].map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Collection rate: <span className="font-semibold text-foreground">{reportData.collection_rate}%</span>
+                {" · "}£{reportData.total_collected.toLocaleString()} / £{reportData.total_expected.toLocaleString()}
+              </p>
+            </Card>
+
+            {/* Per-Property Breakdown */}
+            <Card className="p-6 col-span-1">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                Property Breakdown
+              </h3>
+              {reportData.property_breakdown.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No property data</p>
+              ) : (
+                <div className="space-y-2">
+                  {reportData.property_breakdown.map((prop, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="font-medium truncate max-w-[120px]">{prop.unit_identifier}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">£{prop.collected.toLocaleString()}</span>
+                        <Badge
+                          className={cn(
+                            "text-xs",
+                            prop.status === 'paid'
+                              ? "bg-green-500/10 text-green-500"
+                              : prop.status === 'partial'
+                              ? "bg-orange-500/10 text-orange-500"
+                              : "bg-red-500/10 text-red-500"
+                          )}
+                        >
+                          {prop.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Late Payer Patterns */}
+            <Card className="p-6 col-span-1">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                Late Payer Patterns
+              </h3>
+              {reportData.late_patterns.length === 0 ? (
+                <div className="text-center py-4">
+                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-1" />
+                  <p className="text-sm text-muted-foreground">No recurring late payers</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reportData.late_patterns.map((p, i) => (
+                    <div key={i} className="p-3 bg-yellow-500/5 border border-yellow-500/10 rounded-lg">
+                      <p className="text-sm font-medium">{p.tenant_name}</p>
+                      <p className="text-xs text-muted-foreground">{p.unit_identifier}</p>
+                      <p className="text-xs mt-1 text-yellow-500">
+                        Late {p.times_late}× · avg {Math.round(p.avg_days_late)}d overdue
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* Payment Plan Dialog */}

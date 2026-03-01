@@ -1,10 +1,10 @@
 'use client';
 
 import { cn } from "@/lib/utils";
-import { 
-  Brain, LayoutDashboard, Building2, Users, FileText, 
+import {
+  Brain, LayoutDashboard, Building2, Users, FileText,
   DollarSign, Wrench, UserCircle, Settings, Home, FolderOpen, User,
-  ClipboardList, MessageSquare, TrendingUp, Activity
+  ClipboardList, MessageSquare, TrendingUp, Activity, Receipt
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -70,6 +70,11 @@ const landlordNavItems: NavItem[] = [
     title: "Contractors",
     href: "/landlord/contractors",
     icon: UserCircle,
+  },
+  {
+    title: "Taxes",
+    href: "/landlord/taxes",
+    icon: Receipt,
   },
   {
     title: "Settings",

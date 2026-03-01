@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   FileText, Calendar, TrendingUp, AlertCircle, Plus,
-  User, Home, DollarSign, Clock, ChevronRight, Copy, CheckCircle2
+  User, Home, DollarSign, Clock, ChevronRight, Copy, CheckCircle2, Download
 } from "lucide-react";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -52,7 +52,7 @@ export default function LandlordLeasesPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from('signing_tokens')
-        .select('id, prospect_name, unit_address, monthly_rent, signed_at, created_at')
+        .select('id, prospect_name, unit_address, monthly_rent, signed_at, pdf_url, created_at')
         .order('created_at', { ascending: false });
       setSigningTokens(data || []);
     }
@@ -360,43 +360,72 @@ export default function LandlordLeasesPage() {
       {/* Pending Signatures */}
       {signingTokens.length > 0 && (
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             <h3 className="font-semibold flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Pending Lease Signatures
+              <FileText className="h-4 w-4 text-primary" />
+              Lease Signatures
             </h3>
-            <Badge className="bg-primary/10 text-primary">
-              {signingTokens.filter(t => !t.signed_at).length} awaiting signature
-            </Badge>
+            <div className="flex items-center gap-2">
+              {signingTokens.filter(t => !t.signed_at).length > 0 && (
+                <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                  {signingTokens.filter(t => !t.signed_at).length} awaiting
+                </Badge>
+              )}
+              {signingTokens.filter(t => t.signed_at).length > 0 && (
+                <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                  {signingTokens.filter(t => t.signed_at).length} signed
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="space-y-3">
-            {signingTokens.map(token => (
-              <div key={token.id} className="flex items-center justify-between p-4 bg-accent/50 rounded-lg">
-                <div>
-                  <p className="font-medium">{token.prospect_name || 'Unknown'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {token.unit_address || 'No address'}{token.monthly_rent ? ` • £${token.monthly_rent}/month` : ''}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Sent {format(new Date(token.created_at), 'dd MMM yyyy')}
-                  </p>
+          <div className="space-y-2">
+            {signingTokens.map(t => (
+              <div key={t.id} className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
+                t.signed_at ? 'border-green-500/20 bg-green-500/5' : 'border-border bg-accent/30'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+                    t.signed_at ? 'bg-green-500/15' : 'bg-muted'
+                  }`}>
+                    {t.signed_at
+                      ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      : <FileText className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{t.prospect_name || 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.unit_address || '—'}{t.monthly_rent ? ` · £${Number(t.monthly_rent).toFixed(0)}/mo` : ''}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t.signed_at
+                        ? `Signed ${format(new Date(t.signed_at), 'dd MMM yyyy · HH:mm')}`
+                        : `Sent ${format(new Date(t.created_at), 'dd MMM yyyy')}`}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {token.signed_at ? (
-                    <Badge variant="default" className="gap-1 bg-green-600">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Signed {format(new Date(token.signed_at), 'dd MMM yyyy')}
-                    </Badge>
+                  {t.signed_at ? (
+                    t.pdf_url ? (
+                      <a href={t.pdf_url} target="_blank" rel="noreferrer">
+                        <Button size="sm" variant="outline" className="gap-1.5 text-green-600 border-green-500/30 hover:bg-green-500/10">
+                          <Download className="h-3.5 w-3.5" />PDF
+                        </Button>
+                      </a>
+                    ) : (
+                      <Badge variant="outline" className="text-green-500 border-green-500/30 gap-1">
+                        <CheckCircle2 className="h-3 w-3" />Signed
+                      </Badge>
+                    )
                   ) : (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="gap-1"
-                      onClick={() => copySigningLink(token.id)}
+                      className="gap-1.5"
+                      onClick={() => copySigningLink(t.id)}
                     >
-                      {copiedId === token.id
-                        ? <><CheckCircle2 className="h-3 w-3 text-green-500" />Copied!</>
-                        : <><Copy className="h-3 w-3" />Copy Sign Link</>}
+                      {copiedId === t.id
+                        ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-500" />Copied</>
+                        : <><Copy className="h-3.5 w-3.5" />Copy Link</>}
                     </Button>
                   )}
                 </div>

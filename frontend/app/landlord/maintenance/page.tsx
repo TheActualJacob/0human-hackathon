@@ -257,34 +257,55 @@ export default function LandlordMaintenancePage() {
               {/* Request Details */}
               <Card className="p-6">
                 <h3 className="text-lg font-semibold mb-4">Request Details</h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Unit</p>
-                    <p className="font-medium">
-                      {(() => {
-                        const request = maintenanceRequests.find(r => r.id === currentWorkflow.maintenance_request_id);
-                        const unit = units.find(u => u.id === request?.unit_id);
-                        return unit?.unit_identifier || unit?.name || 'Unknown Unit';
-                      })()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tenant</p>
-                    <p className="font-medium">
-                      {(() => {
-                        const request = maintenanceRequests.find(r => r.id === currentWorkflow.maintenance_request_id);
-                        const tenant = tenants.find(t => t.lease_id === request?.lease_id);
-                        return tenant?.full_name || 'Unknown Tenant';
-                      })()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="mt-1">
-                      {maintenanceRequests.find(r => r.id === currentWorkflow.maintenance_request_id)?.description}
-                    </p>
-                  </div>
-                </div>
+                {(() => {
+                  const request = maintenanceRequests.find(r => r.id === currentWorkflow.maintenance_request_id);
+                  const tenant = tenants.find(t => t.lease_id === request?.lease_id);
+                  const photos: string[] = (request as any)?.photos || [];
+                  return (
+                    <div className="space-y-3">
+                      {request?.title && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Title</p>
+                          <p className="font-semibold">{request.title}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm text-muted-foreground">Tenant</p>
+                        <p className="font-medium">{tenant?.full_name || 'Unknown Tenant'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Category</p>
+                        <p className="font-medium capitalize">{request?.category || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Urgency</p>
+                        <p className={cn("font-medium capitalize", getUrgencyColor(request?.urgency))}>
+                          {request?.urgency || '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Description</p>
+                        <p className="mt-1">{request?.description}</p>
+                      </div>
+                      {photos.length > 0 && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">Photos ({photos.length})</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {photos.map((url, i) => (
+                              <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={url}
+                                  alt={`Maintenance photo ${i + 1}`}
+                                  className="w-full h-32 object-cover rounded-lg border border-border hover:opacity-90 transition-opacity cursor-pointer"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
 
               {/* AI Decision Panel */}

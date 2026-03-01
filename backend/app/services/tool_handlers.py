@@ -297,7 +297,7 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
     try:
         sb.table("maintenance_workflows").insert({
             "maintenance_request_id": request_id,
-            "current_state": "AWAITING_ASSIGNMENT",
+            "current_state": "SUBMITTED",
             "title": title,
             "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
             "vendor_message": vendor_message,

@@ -28,7 +28,7 @@ interface MapViewProps {
   isSplit: boolean;
 }
 
-function MapBoundsFitter({ pins }: { pins: GeocodedPin[] }) {
+function MapBoundsFitter({ pins, geocoding }: { pins: GeocodedPin[]; geocoding: boolean }) {
   const map = useMap();
   const hasFitted = useRef(false);
 
@@ -37,10 +37,10 @@ function MapBoundsFitter({ pins }: { pins: GeocodedPin[] }) {
     if (pins.length === 0) hasFitted.current = false;
   }, [pins.length]);
 
-  // Fit bounds once we have enough pins to get a good view, then leave the
-  // user free to pan — don't keep re-centering as more pins trickle in.
+  // Fit bounds only after geocoding is complete so we get all pins at once,
+  // rather than locking onto the very first pin that arrives.
   useEffect(() => {
-    if (hasFitted.current || pins.length === 0) return;
+    if (hasFitted.current || geocoding || pins.length === 0) return;
 
     hasFitted.current = true;
 
@@ -54,7 +54,7 @@ function MapBoundsFitter({ pins }: { pins: GeocodedPin[] }) {
         { padding: [60, 60], maxZoom: 14 }
       );
     }
-  }, [pins, map]);
+  }, [pins, geocoding, map]);
 
   return null;
 }
@@ -74,18 +74,19 @@ export default function MapView({ pins, geocoding, highlightedId, selectedId, on
 
   return (
     <div className="relative w-full h-full" style={{ minHeight: 0 }}>
-      {geocoding && pins.length === 0 && (
-        <div className="absolute inset-0 z-[400] flex items-center justify-center bg-[#0d0d18]/80 backdrop-blur-sm pointer-events-none">
+      {geocoding && (
+        <div className="absolute inset-0 z-[400] flex items-center justify-center bg-[#0d0d18] pointer-events-none">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-white/50 text-sm">Loading map…</p>
+            <div className="relative w-14 h-14 mx-auto mb-4">
+              <div className="absolute inset-0 rounded-full border-2 border-indigo-500/20" />
+              <div className="absolute inset-0 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+              <div className="absolute inset-[6px] rounded-full border border-purple-500/30 border-b-purple-400 animate-spin" style={{ animationDuration: '0.75s', animationDirection: 'reverse' }} />
+            </div>
+            <p className="text-white/70 text-sm font-medium">Placing properties on map</p>
+            <p className="text-white/30 text-xs mt-1">
+              {pins.length > 0 ? `${pins.length} located so far…` : 'Geocoding addresses…'}
+            </p>
           </div>
-        </div>
-      )}
-
-      {geocoding && pins.length > 0 && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-black/70 backdrop-blur-sm text-white/60 text-xs px-3 py-1.5 rounded-full border border-white/10 pointer-events-none">
-          Loading more pins…
         </div>
       )}
 
@@ -99,7 +100,7 @@ export default function MapView({ pins, geocoding, highlightedId, selectedId, on
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        <MapBoundsFitter pins={pins} />
+        <MapBoundsFitter pins={pins} geocoding={geocoding} />
         <MapResizer isSplit={isSplit} />
 
         {pins.map(pin => {

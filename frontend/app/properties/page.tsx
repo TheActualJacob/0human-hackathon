@@ -14,7 +14,22 @@ import type { Database } from '@/lib/supabase/database.types';
 import type { UnitWithAttributes, GeocodedPin } from '@/components/properties/MapView';
 import { geocodeAddress } from '@/lib/utils/geocode';
 
-const MapView = dynamic(() => import('@/components/properties/MapView'), { ssr: false });
+const MapView = dynamic(() => import('@/components/properties/MapView'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-[#0d0d18]">
+      <div className="text-center">
+        <div className="relative w-14 h-14 mx-auto mb-4">
+          <div className="absolute inset-0 rounded-full border-2 border-indigo-500/20" />
+          <div className="absolute inset-0 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+          <div className="absolute inset-[6px] rounded-full border border-purple-500/30 border-b-purple-400 animate-spin" style={{ animationDuration: '0.75s', animationDirection: 'reverse' }} />
+        </div>
+        <p className="text-white/70 text-sm font-medium">Loading map</p>
+        <p className="text-white/30 text-xs mt-1">Just a moment…</p>
+      </div>
+    </div>
+  ),
+});
 const PropertyChatbot = dynamic(() => import('@/components/properties/PropertyChatbot'), { ssr: false });
 
 type Unit = Database['public']['Tables']['units']['Row'];

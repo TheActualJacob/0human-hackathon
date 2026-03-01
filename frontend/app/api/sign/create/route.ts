@@ -2,6 +2,58 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 
+function buildFallbackLease(p: { prospect_name: string; unit_address: string; monthly_rent: number; landlord_name?: string; deposit_amount?: number }): string {
+  const today = new Date();
+  const start = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const end = new Date(start); end.setFullYear(end.getFullYear() + 1);
+  const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const deposit = p.deposit_amount ?? p.monthly_rent * 2;
+  const landlord = p.landlord_name ?? 'Robert Ryan';
+  return `ASSURED SHORTHOLD TENANCY AGREEMENT
+
+1. PARTIES
+Landlord: ${landlord}
+Tenant: ${p.prospect_name}
+
+2. PROPERTY
+The Landlord agrees to let the property at ${p.unit_address} to the Tenant for residential use only.
+
+3. TERM
+The tenancy shall commence on ${fmt(start)} and continue for a fixed term of 12 months, ending on ${fmt(end)}, unless terminated earlier in accordance with this Agreement.
+
+4. RENT
+The Tenant shall pay £${p.monthly_rent.toFixed(0)} per calendar month, payable in advance on the 1st day of each month by bank transfer.
+
+5. DEPOSIT
+A tenancy deposit of £${deposit.toFixed(0)} is payable on or before the commencement date. The Landlord shall protect this deposit in a government-approved Tenancy Deposit Scheme (TDS) within 30 days of receipt and provide the Tenant with the prescribed information.
+
+6. TENANT OBLIGATIONS
+The Tenant agrees to:
+- Pay rent on time each month without demand
+- Keep the property clean, tidy and in good condition
+- Not cause nuisance or annoyance to neighbours
+- Not sublet or assign the tenancy without the Landlord's written consent
+- Allow the Landlord or authorised agents access to the property upon giving at least 24 hours' written notice (except in emergency)
+- Report any disrepair or maintenance issues promptly
+- Not make alterations to the property without prior written consent
+
+7. LANDLORD OBLIGATIONS
+The Landlord agrees to:
+- Keep the structure and exterior of the property in repair (Landlord and Tenant Act 1985, s.11)
+- Maintain installations for heating, hot water, gas, electricity and sanitation
+- Respond to urgent repairs within 24 hours and routine repairs within 28 days
+- Protect the Tenant's deposit and provide prescribed information within 30 days
+
+8. PERMITTED USE
+The property shall be used as a private residential dwelling only. No business activities shall be conducted from the property without prior written consent from the Landlord.
+
+9. TERMINATION
+After the fixed term, either party may end this tenancy by giving not less than 1 month's written notice (Tenant) or 2 months' written notice (Landlord) pursuant to Section 21 of the Housing Act 1988.
+
+10. GOVERNING LAW
+This Agreement is governed by the laws of England and Wales. Any disputes shall be subject to the exclusive jurisdiction of the courts of England and Wales.`;
+}
+
 async function generateOfficialLease(params: {
   prospect_name: string;
   unit_address: string;
@@ -76,19 +128,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Generate official lease via Claude
+    // Generate official lease via Claude (with 20s timeout)
     let lease_content: string;
-    try {
-      lease_content = await generateOfficialLease({
-        prospect_name,
-        unit_address,
-        monthly_rent: Number(monthly_rent) || 0,
-        landlord_name,
-        deposit_amount: deposit_amount ? Number(deposit_amount) : undefined,
-      });
-    } catch (aiErr) {
-      console.error('Claude lease generation failed, using fallback:', aiErr);
-      lease_content = body.lease_content ?? `ASSURED SHORTHOLD TENANCY AGREEMENT\n\nThis agreement is between ${landlord_name ?? 'the Landlord'} and ${prospect_name} for the property at ${unit_address} at a monthly rent of £${monthly_rent}.`;
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.warn('ANTHROPIC_API_KEY not set — using fallback lease template');
+      lease_content = buildFallbackLease({ prospect_name, unit_address, monthly_rent: Number(monthly_rent) || 0, landlord_name, deposit_amount: deposit_amount ? Number(deposit_amount) : undefined });
+    } else {
+      try {
+        const aiPromise = generateOfficialLease({
+          prospect_name,
+          unit_address,
+          monthly_rent: Number(monthly_rent) || 0,
+          landlord_name,
+          deposit_amount: deposit_amount ? Number(deposit_amount) : undefined,
+        });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Claude timeout after 20s')), 20000)
+        );
+        lease_content = await Promise.race([aiPromise, timeoutPromise]);
+      } catch (aiErr) {
+        console.error('Claude lease generation failed, using fallback:', aiErr);
+        lease_content = buildFallbackLease({ prospect_name, unit_address, monthly_rent: Number(monthly_rent) || 0, landlord_name, deposit_amount: deposit_amount ? Number(deposit_amount) : undefined });
+      }
     }
 
     const supabase = createClient(

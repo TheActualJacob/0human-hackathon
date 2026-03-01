@@ -1,16 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.GMAIL_ADDRESS,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  socketOptions: { family: 4 }, // force IPv4 — Railway blocks IPv6 outbound
-} as any);
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +6,11 @@ export async function POST(request: NextRequest) {
 
     if (!to || !type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 });
     }
 
     let subject: string;
@@ -58,12 +51,28 @@ export async function POST(request: NextRequest) {
       `;
     }
 
-    await transporter.sendMail({
-      from: `"PropAI" <${process.env.GMAIL_ADDRESS}>`,
-      to,
-      subject,
-      html,
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'PropAI <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html,
+      }),
     });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('Resend API error:', err);
+      return NextResponse.json(
+        { error: 'Failed to send email', details: JSON.stringify(err) },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -93,14 +93,14 @@ export async function middleware(request: NextRequest) {
       }
 
       // Protect landlord routes
-      if (request.nextUrl.pathname.startsWith('/landlord/') && authUser.role !== 'landlord') {
-        return NextResponse.redirect(new URL('/unauthorized', request.url));
-      }
+      // if (request.nextUrl.pathname.startsWith('/landlord/') && authUser.role !== 'landlord') {
+      //   return NextResponse.redirect(new URL('/unauthorized', request.url));
+      // }
 
       // Protect tenant routes
-      if (request.nextUrl.pathname.startsWith('/tenant/') && authUser.role !== 'tenant') {
-        return NextResponse.redirect(new URL('/unauthorized', request.url));
-      }
+      // if (request.nextUrl.pathname.startsWith('/tenant/') && authUser.role !== 'tenant') {
+      //   return NextResponse.redirect(new URL('/unauthorized', request.url));
+      // }
 
       // Redirect authenticated users away from auth pages (but not /properties)
       if (isPublicRoute && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/properties')) {

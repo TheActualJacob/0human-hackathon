@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import {
   AlertTriangle, Brain, RefreshCw, Plus, Trash2, Edit3,
   ChevronDown, ChevronUp, Zap, Shield, TrendingUp, TrendingDown,
@@ -497,7 +497,8 @@ export default function PredictiveMaintenancePage() {
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [expandedPredictions, setExpandedPredictions] = useState<Set<string>>(new Set());
 
-  const supabase = createClient();
+  // Memoize client — createClient() must not run on every render
+  const supabase = useMemo(() => createClient(), []);
 
   // ─── Load Data ──────────────────────────────────────────────────────────────
   const loadAll = useCallback(async (lid: string) => {
@@ -513,9 +514,9 @@ export default function PredictiveMaintenancePage() {
 
       setUnits(loadedUnits);
       setAssets(loadedAssets);
-
-      if (loadedUnits.length > 0 && !selectedUnitId) {
-        setSelectedUnitId(loadedUnits[0].id);
+      // Functional update avoids needing selectedUnitId in deps
+      if (loadedUnits.length > 0) {
+        setSelectedUnitId(prev => prev || loadedUnits[0].id);
       }
 
       if (loadedAssets.length > 0) {
@@ -539,7 +540,7 @@ export default function PredictiveMaintenancePage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedUnitId]);
+  }, [supabase]);
 
   useEffect(() => {
     getCurrentUser().then(user => {
@@ -681,39 +682,61 @@ export default function PredictiveMaintenancePage() {
     }
   };
 
-  // ─── Computed Metrics ────────────────────────────────────────────────────────
-  const portfolioExposure = predictions.reduce((s, p) => s + (p.projected_financial_exposure ?? 0), 0);
-  const highRiskCount = predictions.filter(p => p.urgency_level === 'high' || p.urgency_level === 'critical').length;
-  const avgRiskScore = predictions.length > 0
-    ? Math.round(predictions.reduce((s, p) => s + (p.failure_probability_12_months ?? 0), 0) / predictions.length * 100)
-    : 0;
+  // ─── Computed Metrics (memoized — not recalculated on every render) ──────────
+  const portfolioExposure = useMemo(
+    () => predictions.reduce((s, p) => s + (p.projected_financial_exposure ?? 0), 0),
+    [predictions]
+  );
 
-  const unitAssets = assets.filter(a => a.unit_id === selectedUnitId);
-  const selectedUnit = units.find(u => u.id === selectedUnitId);
+  const highRiskCount = useMemo(
+    () => predictions.filter(p => p.urgency_level === 'high' || p.urgency_level === 'critical').length,
+    [predictions]
+  );
 
-  // Risk by category for chart
-  const riskByCategory = ASSET_TYPES.map(t => {
-    const categoryPreds = predictions.filter(p => {
-      const asset = assets.find(a => a.id === p.asset_id);
-      return asset?.asset_type === t.value;
-    });
-    if (categoryPreds.length === 0) return null;
-    return {
-      name: t.label.split(' ')[0],
-      risk: Math.round(categoryPreds.reduce((s, p) => s + (p.failure_probability_12_months ?? 0), 0) / categoryPreds.length * 100),
-      exposure: Math.round(categoryPreds.reduce((s, p) => s + (p.projected_financial_exposure ?? 0), 0)),
-    };
-  }).filter(Boolean) as Array<{ name: string; risk: number; exposure: number }>;
+  const avgRiskScore = useMemo(
+    () => predictions.length > 0
+      ? Math.round(predictions.reduce((s, p) => s + (p.failure_probability_12_months ?? 0), 0) / predictions.length * 100)
+      : 0,
+    [predictions]
+  );
 
-  // Top 5 risky assets across portfolio
-  const topRiskAssets = [...predictions]
-    .sort((a, b) => (b.failure_probability_12_months ?? 0) - (a.failure_probability_12_months ?? 0))
-    .slice(0, 5)
-    .map(p => {
-      const asset = assets.find(a => a.id === p.asset_id);
-      const unit = units.find(u => u.id === asset?.unit_id);
-      return { ...p, asset, unit };
-    });
+  const unitAssets = useMemo(
+    () => assets.filter(a => a.unit_id === selectedUnitId),
+    [assets, selectedUnitId]
+  );
+
+  const selectedUnit = useMemo(
+    () => units.find(u => u.id === selectedUnitId),
+    [units, selectedUnitId]
+  );
+
+  const riskByCategory = useMemo(
+    () => ASSET_TYPES.map(t => {
+      const categoryPreds = predictions.filter(p => {
+        const asset = assets.find(a => a.id === p.asset_id);
+        return asset?.asset_type === t.value;
+      });
+      if (categoryPreds.length === 0) return null;
+      return {
+        name: t.label.split(' ')[0],
+        risk: Math.round(categoryPreds.reduce((s, p) => s + (p.failure_probability_12_months ?? 0), 0) / categoryPreds.length * 100),
+        exposure: Math.round(categoryPreds.reduce((s, p) => s + (p.projected_financial_exposure ?? 0), 0)),
+      };
+    }).filter(Boolean) as Array<{ name: string; risk: number; exposure: number }>,
+    [predictions, assets]
+  );
+
+  const topRiskAssets = useMemo(
+    () => [...predictions]
+      .sort((a, b) => (b.failure_probability_12_months ?? 0) - (a.failure_probability_12_months ?? 0))
+      .slice(0, 5)
+      .map(p => {
+        const asset = assets.find(a => a.id === p.asset_id);
+        const unit = units.find(u => u.id === asset?.unit_id);
+        return { ...p, asset, unit };
+      }),
+    [predictions, assets, units]
+  );
 
   if (loading) {
     return (

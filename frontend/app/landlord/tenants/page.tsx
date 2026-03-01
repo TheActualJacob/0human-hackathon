@@ -77,7 +77,9 @@ export default function TenantsPage() {
         recentConversations
       };
     })
-    .filter(tenant => tenant.lease && tenant.unit && tenant.lease.status === 'active');
+    .filter(tenant => tenant.lease && tenant.unit && tenant.lease.status === 'active')
+    // Deduplicate by lease ID — seed data can produce the same lease_id multiple times
+    .filter((tenant, index, arr) => arr.findIndex(t => t.lease?.id === tenant.lease?.id) === index);
 
   // Filter tenants
   const filteredTenants = activeTenants.filter(tenant => 

@@ -59,13 +59,13 @@ export default function DataTable<T>({
               </TableCell>
             </TableRow>
           ) : (
-            data.map((item) => {
+            data.map((item, index) => {
               const rowId = getRowId(item);
               const isSelected = selectedId === rowId;
               
               return (
                 <TableRow
-                  key={rowId}
+                  key={`${rowId}-${index}`}
                   onClick={() => onRowClick?.(item)}
                   className={cn(
                     "cursor-pointer transition-colors",

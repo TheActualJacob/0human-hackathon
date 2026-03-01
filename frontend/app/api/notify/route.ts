@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_ADDRESS,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { type, to, applicantName, propertyAddress, landlordName, rejectionReason } = await request.json();
+
+    if (!to || !type) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    let subject: string;
+    let html: string;
+
+    if (type === 'accepted') {
+      subject = `Your application for ${propertyAddress} has been accepted 🎉`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f0f; color: #e5e5e5; padding: 32px; border-radius: 12px;">
+          <div style="border-bottom: 1px solid #27272a; padding-bottom: 24px; margin-bottom: 24px;">
+            <h1 style="color: #22c55e; font-size: 22px; margin: 0;">Application Accepted</h1>
+          </div>
+          <p style="font-size: 16px;">Hi <strong>${applicantName}</strong>,</p>
+          <p style="color: #a1a1aa;">Great news — your rental application for <strong style="color: #e5e5e5;">${propertyAddress}</strong> has been accepted by <strong style="color: #e5e5e5;">${landlordName}</strong>.</p>
+          <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0; color: #a1a1aa; font-size: 14px;">Your landlord will be in touch shortly with lease details and next steps. If you have any questions in the meantime, please reply to this email.</p>
+          </div>
+          <p style="color: #71717a; font-size: 13px; margin-top: 32px;">This message was sent via PropAI Property Management.</p>
+        </div>
+      `;
+    } else {
+      subject = `Update on your application for ${propertyAddress}`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f0f0f; color: #e5e5e5; padding: 32px; border-radius: 12px;">
+          <div style="border-bottom: 1px solid #27272a; padding-bottom: 24px; margin-bottom: 24px;">
+            <h1 style="color: #e5e5e5; font-size: 22px; margin: 0;">Application Update</h1>
+          </div>
+          <p style="font-size: 16px;">Hi <strong>${applicantName}</strong>,</p>
+          <p style="color: #a1a1aa;">Thank you for your interest in <strong style="color: #e5e5e5;">${propertyAddress}</strong>. After careful consideration, <strong style="color: #e5e5e5;">${landlordName}</strong> has decided not to proceed with your application at this time.</p>
+          ${rejectionReason ? `
+          <div style="background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; margin: 24px 0;">
+            <p style="margin: 0 0 8px; color: #a1a1aa; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;">Reason provided</p>
+            <p style="margin: 0; color: #e5e5e5;">${rejectionReason}</p>
+          </div>` : ''}
+          <p style="color: #a1a1aa;">We encourage you to continue your search — there are many great properties available.</p>
+          <p style="color: #71717a; font-size: 13px; margin-top: 32px;">This message was sent via PropAI Property Management.</p>
+        </div>
+      `;
+    }
+
+    await transporter.sendMail({
+      from: `"PropAI" <${process.env.GMAIL_ADDRESS}>`,
+      to,
+      subject,
+      html,
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Email send error:', error);
+    return NextResponse.json(
+      { error: 'Failed to send email', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}

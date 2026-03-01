@@ -146,10 +146,25 @@ export default function LandlordApplicationsPage() {
 
       if (leaseError) throw leaseError;
 
-      // TODO: Send acceptance notification to tenant
+      // Send acceptance email
+      const appData = application.applicant_data as any;
+      const email = application.tenants?.email || appData?.email;
+      if (email) {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'accepted',
+            to: email,
+            applicantName: application.tenants?.full_name || appData?.fullName || 'Applicant',
+            propertyAddress: application.units?.address || application.units?.unit_identifier || 'the property',
+            landlordName: 'Robert Ryan',
+          }),
+        }).catch(console.error);
+      }
 
       await loadApplications();
-      notify('success', 'Application accepted — lease created successfully.');
+      notify('success', 'Application accepted — lease created and applicant notified.');
     } catch (err) {
       console.error('Error accepting application:', err);
       notify('error', 'Failed to accept application. Please try again.');
@@ -224,7 +239,23 @@ export default function LandlordApplicationsPage() {
 
       if (error) throw error;
 
-      // TODO: Send rejection notification to tenant
+      // Send rejection email
+      const appData = selectedApplication.applicant_data as any;
+      const email = selectedApplication.tenants?.email || appData?.email;
+      if (email) {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'rejected',
+            to: email,
+            applicantName: selectedApplication.tenants?.full_name || appData?.fullName || 'Applicant',
+            propertyAddress: selectedApplication.units?.address || selectedApplication.units?.unit_identifier || 'the property',
+            landlordName: 'Robert Ryan',
+            rejectionReason: rejectReason,
+          }),
+        }).catch(console.error);
+      }
 
       await loadApplications();
       setShowRejectDialog(false);

@@ -217,41 +217,52 @@ async def get_renewal_dashboard(
     total_at_risk_revenue = 0.0
 
     for lease in leases:
-        lease_id = lease["id"]
+        lease_id = lease.get("id")
+        if not lease_id:
+            continue
 
-        # Latest score
-        score_res = (
-            sb.table("renewal_scores")
-            .select("*")
-            .eq("lease_id", lease_id)
-            .order("created_at", desc=True)
-            .limit(1)
-            .maybe_single()
-            .execute()
-        )
-        score = score_res.data
+        # Latest score — use .limit(1).execute() instead of .maybe_single()
+        # because .maybe_single() returns None (not a response object) when no
+        # rows match in this version of the Supabase Python client.
+        try:
+            score_res = (
+                sb.table("renewal_scores")
+                .select("*")
+                .eq("lease_id", lease_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            score = score_res.data[0] if score_res.data else None
+        except Exception:
+            score = None
 
         # Latest offer
-        offer_res = (
-            sb.table("renewal_offers")
-            .select("id, status, proposed_rent, lease_duration_months, sent_at, responded_at, channel, ai_generated_content")
-            .eq("lease_id", lease_id)
-            .order("created_at", desc=True)
-            .limit(1)
-            .maybe_single()
-            .execute()
-        )
-        offer = offer_res.data
+        try:
+            offer_res = (
+                sb.table("renewal_offers")
+                .select("id, status, proposed_rent, lease_duration_months, sent_at, responded_at, channel, ai_generated_content")
+                .eq("lease_id", lease_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            offer = offer_res.data[0] if offer_res.data else None
+        except Exception:
+            offer = None
 
         # Negotiation transcript (all rounds)
-        neg_res = (
-            sb.table("renewal_negotiation_logs")
-            .select("id, tenant_message, ai_suggested_response, classification, sentiment_label, ai_suggested_counter_rent, ai_new_renewal_probability, created_at")
-            .eq("lease_id", lease_id)
-            .order("created_at", desc=False)
-            .execute()
-        )
-        negotiation_history = neg_res.data or []
+        try:
+            neg_res = (
+                sb.table("renewal_negotiation_logs")
+                .select("id, tenant_message, ai_suggested_response, classification, sentiment_label, ai_suggested_counter_rent, ai_new_renewal_probability, created_at")
+                .eq("lease_id", lease_id)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            negotiation_history = neg_res.data or []
+        except Exception:
+            negotiation_history = []
 
         current_rent = float(lease.get("monthly_rent") or 0)
         unit_raw = lease.get("units")

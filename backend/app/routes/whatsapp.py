@@ -27,6 +27,22 @@ from app.services.twilio_service import send_whatsapp_message, validate_twilio_s
 router = APIRouter(tags=["whatsapp"])
 
 
+def _get_active_renewal_offer(lease_id: str) -> dict | None:
+    """Return the latest pending/countered renewal offer for a lease, or None."""
+    from supabase import create_client
+    sb = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    res = (
+        sb.table("renewal_offers")
+        .select("id, status, proposed_rent")
+        .eq("lease_id", lease_id)
+        .in_("status", ["pending", "countered"])
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return res.data[0] if res.data else None
+
+
 def _parse_form_body(raw: bytes) -> dict[str, str]:
     """Parse application/x-www-form-urlencoded body into a plain dict."""
     params: dict[str, str] = {}
@@ -104,6 +120,17 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
         message_body=log_body,
         whatsapp_message_id=message_sid or None,
     )
+
+    # Check if there is an active renewal negotiation for this tenant's lease.
+    # If so, route the message to the autonomous renewal agent instead of the
+    # general maintenance/query agent.
+    if message_body:
+        active_offer = _get_active_renewal_offer(ctx.lease.id)
+        if active_offer:
+            background_tasks.add_task(
+                _process_renewal_reply, ctx, active_offer["id"], message_body
+            )
+            return Response(status_code=200)
 
     # Schedule async processing — return 200 immediately to prevent Twilio retry
     background_tasks.add_task(_process_and_reply, ctx, from_number, message_body, media_urls)
@@ -206,6 +233,26 @@ async def _process_and_reply_prospect(
 
     await log_prospect_conversation(prospect_ctx.prospect_id, "outbound", reply_message)
     await send_whatsapp_message(to, reply_message)
+
+
+async def _process_renewal_reply(
+    ctx: TenantContext,
+    offer_id: str,
+    message_body: str,
+) -> None:
+    """Route an inbound tenant message to the autonomous renewal negotiation agent."""
+    try:
+        from app.services.renewal_negotiation_service import analyse_tenant_response
+        await analyse_tenant_response(offer_id, message_body)
+    except Exception as exc:
+        print(f"[webhook] Renewal negotiation error for offer {offer_id}: {exc}")
+        # Fall back to a simple acknowledgement so the tenant isn't left hanging
+        try:
+            from app.services.twilio_service import send_whatsapp_message
+            ack = "Thank you for your message. We'll be in touch shortly regarding your lease renewal."
+            await send_whatsapp_message(ctx.tenant.whatsapp_number or "", ack)
+        except Exception:
+            pass
 
 
 async def _notify_landlord(ctx: TenantContext, actions: list[str]) -> None:

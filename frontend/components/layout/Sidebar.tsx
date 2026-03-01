@@ -67,6 +67,11 @@ const landlordNavItems: NavItem[] = [
     icon: Activity,
   },
   {
+    title: "Lease Renewals",
+    href: "/landlord/renewals",
+    icon: TrendingUp,
+  },
+  {
     title: "Contractors",
     href: "/landlord/contractors",
     icon: UserCircle,

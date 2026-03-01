@@ -11,6 +11,7 @@ from app.routes.instagram import router as instagram_router
 from app.routes.lease_applications import router as lease_applications_router
 from app.routes.maintenance_workflow import router as maintenance_workflow_router
 from app.routes.payments import router as payments_router
+from app.routes.renewals import router as renewals_router
 from app.routes.signing import router as signing_router
 from app.routes.stripe import router as stripe_router
 from app.routes.test_workflow import router as test_workflow_router
@@ -39,6 +40,7 @@ app.include_router(health_router)
 app.include_router(payments_router)
 app.include_router(stripe_router)
 app.include_router(maintenance_workflow_router)
+app.include_router(renewals_router)
 app.include_router(test_workflow_router)
 app.include_router(whatsapp_router)
 app.include_router(instagram_router)

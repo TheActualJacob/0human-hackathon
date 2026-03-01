@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
         max_tokens: 1024,
         temperature: 0.3 as any,
         system: systemPrompt,
-        messages: claudeMessages,
+        messages: claudeMessages as any,
       });
       const firstContent = response.content[0];
       if (firstContent.type === 'text') {

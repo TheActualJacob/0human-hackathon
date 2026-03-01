@@ -359,17 +359,26 @@ export async function POST(
         signedAt,
       );
 
-      // Upload to Supabase Storage
+      // Ensure bucket exists then upload
       const fileName = `signed-leases/${token}.pdf`;
+      const BUCKET = 'documents';
+
+      // Create bucket if it doesn't exist
+      const { error: bucketErr } = await supabase.storage.createBucket(BUCKET, { public: true });
+      if (bucketErr && !bucketErr.message.includes('already exists') && !bucketErr.message.includes('duplicate')) {
+        console.warn('Bucket create warning (may already exist):', bucketErr.message);
+      }
+
       const { error: uploadErr } = await supabase.storage
-        .from('documents')
+        .from(BUCKET)
         .upload(fileName, pdfBytes, { contentType: 'application/pdf', upsert: true });
 
       if (!uploadErr) {
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(fileName);
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
         pdfUrl = urlData.publicUrl;
+        console.log('PDF uploaded to storage:', pdfUrl);
       } else {
-        console.warn('Storage upload failed (non-fatal):', uploadErr.message);
+        console.error('Storage upload failed:', uploadErr.message);
       }
     } catch (pdfErr) {
       console.warn('PDF generation failed (non-fatal):', pdfErr);

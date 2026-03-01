@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname.startsWith('/auth/') ||
     request.nextUrl.pathname.startsWith('/demo') ||
-    request.nextUrl.pathname.startsWith('/properties') ||
+    request.nextUrl.pathname.startsWith('/properties') || // includes /properties/[id]/apply
     request.nextUrl.pathname.startsWith('/pay/') ||
     request.nextUrl.pathname.startsWith('/sign/');
 

@@ -557,11 +557,11 @@ export default function PropertyApplicationPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly Rent</span>
-                  <span className="font-medium">£{property?.rent_amount}</span>
+                  <span className="font-medium">€{property?.rent_amount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Security Deposit</span>
-                  <span className="font-medium">£{property?.security_deposit || property?.rent_amount}</span>
+                  <span className="font-medium">€{property?.security_deposit || property?.rent_amount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Available</span>

@@ -117,7 +117,7 @@ export default function PropertyDetailPage() {
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/auth/login" className="text-sm text-white/50 hover:text-white transition-colors px-4 py-2">Sign in</Link>
-            <Link href="/auth/signup/tenant" className="text-sm font-medium text-white px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors">
+            <Link href={`/properties/${id}/apply`} className="text-sm font-medium text-white px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors">
               Apply Now
             </Link>
           </div>
@@ -302,7 +302,7 @@ export default function PropertyDetailPage() {
             <div className="bg-[#0d0d18] border border-white/8 rounded-2xl p-6 sticky top-24">
               <div className="text-center mb-5 pb-5 border-b border-white/8">
                 <div className="text-4xl font-black text-white mb-1">
-                  {unit.rent_amount ? `£${unit.rent_amount.toLocaleString()}` : 'POA'}
+                  {unit.rent_amount ? `€${unit.rent_amount.toLocaleString()}` : 'POA'}
                 </div>
                 <div className="text-white/40 text-sm">per month</div>
               </div>
@@ -325,7 +325,7 @@ export default function PropertyDetailPage() {
               </div>
 
               <Link
-                href="/auth/signup/tenant"
+                href={`/properties/${id}/apply`}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-colors mb-3"
               >
                 Apply Now

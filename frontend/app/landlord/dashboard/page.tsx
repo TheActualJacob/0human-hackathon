@@ -128,12 +128,12 @@ export default function LandlordDashboard() {
 
   const totalMonthlyRent = leases
     .filter((l) => l.status === 'active')
-    .reduce((sum, l) => sum + l.rent_amount, 0);
+    .reduce((sum, l) => sum + (l.monthly_rent || 0), 0);
 
   const now = new Date();
   const collectedThisMonth = payments
     .filter((p) => {
-      const d = new Date(p.payment_date || '');
+      const d = new Date(p.paid_date || '');
       return (
         p.status === 'paid' &&
         d.getMonth() === now.getMonth() &&
@@ -193,7 +193,7 @@ export default function LandlordDashboard() {
       id: p.id,
       type: 'payment' as const,
       description: `Payment of $${p.amount_due?.toLocaleString()}`,
-      time: p.payment_date || p.due_date,
+      time: p.paid_date || p.due_date,
       status: p.status,
       priority: undefined
     }))

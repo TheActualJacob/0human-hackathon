@@ -20,22 +20,33 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/demo');
 
-  // Derive role directly from current pathname on every render — fully reactive
-  const userRole: UserRole = pathname.startsWith('/tenant/') ? 'tenant' : 'landlord';
-
   const [ready, setReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Role from actual auth session — used for shared routes like /properties
+  const [authRole, setAuthRole] = useState<UserRole>('landlord');
+
+  // Derive role: explicit path prefixes override, shared routes use real auth role
+  const userRole: UserRole = pathname.startsWith('/tenant/')
+    ? 'tenant'
+    : pathname.startsWith('/landlord/')
+      ? 'landlord'
+      : authRole;
 
   useEffect(() => {
     // Fast: use local session cache — no network round-trip
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsLoggedIn(!!session);
+      // user_metadata.role is embedded in the JWT — no extra DB call needed
+      const role = session?.user?.user_metadata?.role as UserRole | undefined;
+      if (role === 'tenant' || role === 'landlord') setAuthRole(role);
       setReady(true);
     });
 
     // Keep in sync if user logs in/out in another tab
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
+      const role = session?.user?.user_metadata?.role as UserRole | undefined;
+      if (role === 'tenant' || role === 'landlord') setAuthRole(role);
       setReady(true);
     });
 

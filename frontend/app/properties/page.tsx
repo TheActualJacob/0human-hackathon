@@ -169,9 +169,9 @@ export default function PropertiesPage() {
         {showFilters && (
           <div className="mt-3 bg-card border border-border rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Min Rent (£)', key: 'minRent', placeholder: '0' },
-              { label: 'Max Rent (£)', key: 'maxRent', placeholder: '5000' },
-              { label: 'City', key: 'city', placeholder: 'London…' },
+              { label: 'Min Rent (€)', key: 'minRent', placeholder: '0' },
+              { label: 'Max Rent (€)', key: 'maxRent', placeholder: '5000' },
+              { label: 'City', key: 'city', placeholder: 'Athens…' },
             ].map(f => (
               <div key={f.key}>
                 <label className="text-muted-foreground text-xs mb-1 block">{f.label}</label>
@@ -281,7 +281,7 @@ export default function PropertiesPage() {
                       )}
                       {/* Price overlay */}
                       <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5">
-                        <span className="text-white font-bold">£{unit.rent_amount}</span>
+                        <span className="text-white font-bold">€{unit.rent_amount}</span>
                         <span className="text-white/50 text-xs">/mo</span>
                       </div>
                     </div>
@@ -296,7 +296,7 @@ export default function PropertiesPage() {
                       <Home className="h-12 w-12 text-indigo-500/40 mb-2" />
                       {/* Price overlay */}
                       <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5">
-                        <span className="text-white font-bold">£{unit.rent_amount}</span>
+                        <span className="text-white font-bold">€{unit.rent_amount}</span>
                         <span className="text-white/50 text-xs">/mo</span>
                       </div>
                     </div>

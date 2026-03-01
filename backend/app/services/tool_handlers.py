@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
@@ -8,6 +9,8 @@ from supabase import create_client
 
 from app.config import settings
 from app.services.context_loader import TenantContext, log_agent_action, update_conversation_context
+
+logger = logging.getLogger(__name__)
 
 
 def _sb():
@@ -37,10 +40,8 @@ AGENT_TOOLS = [
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
-            },
-            "required": ["lease_id"],
+            "properties": {},
+            "required": [],
         },
     },
     {
@@ -53,7 +54,10 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
+                "title": {
+                    "type": "string",
+                    "description": "Short title for the maintenance issue, max 10 words (e.g. 'Boiler not working – no heating').",
+                },
                 "category": {
                     "type": "string",
                     "enum": ["plumbing", "electrical", "structural", "appliance", "heating", "pest", "damp", "access", "other"],
@@ -72,7 +76,7 @@ AGENT_TOOLS = [
                     ),
                 },
             },
-            "required": ["lease_id", "category", "description", "urgency"],
+            "required": ["title", "category", "description", "urgency"],
         },
     },
     {
@@ -86,7 +90,6 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
                 "notice_type": {
                     "type": "string",
                     "enum": [
@@ -108,7 +111,7 @@ AGENT_TOOLS = [
                     "description": "Brief explanation of why this notice is being issued. This is logged as agent_reasoning.",
                 },
             },
-            "required": ["lease_id", "notice_type", "reason"],
+            "required": ["notice_type", "reason"],
         },
     },
     {
@@ -121,7 +124,6 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "lease_id": {"type": "string", "description": "The lease ID for this tenancy."},
                 "new_level": {
                     "type": "number",
                     "enum": [1, 2, 3, 4],
@@ -132,7 +134,7 @@ AGENT_TOOLS = [
                     "description": "Reason for the escalation level change. This is permanently logged.",
                 },
             },
-            "required": ["lease_id", "new_level", "reason"],
+            "required": ["new_level", "reason"],
         },
     },
 ]
@@ -161,7 +163,7 @@ async def execute_tool(tool_name: str, tool_input: dict[str, Any], ctx: TenantCo
 
 async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
 
     payments_res = (
         sb.table("payments")
@@ -222,7 +224,8 @@ async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResul
 
 async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id  # always use context — never trust Claude's lease_id input
+    title = inp.get("title", "")
     category = inp["category"]
     description = inp["description"]
     urgency = inp["urgency"]
@@ -242,23 +245,124 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
         eligible = [c for c in contractors if c.get("emergency_available")] if is_emergency else contractors
         selected = (eligible or contractors)[0]
 
-    request_res = (
-        sb.table("maintenance_requests")
-        .insert({
-            "lease_id": lease_id,
-            "category": category,
-            "description": description,
-            "urgency": urgency,
-            "status": "assigned" if selected else "open",
-            "contractor_id": selected["id"] if selected else None,
-        })
-        .execute()
-    )
+    insert_payload = {
+        "lease_id": lease_id,
+        "title": title,
+        "category": category,
+        "description": description,
+        "urgency": urgency,
+        "status": "assigned" if selected else "open",
+        "contractor_id": selected["id"] if selected else None,
+        "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
+    }
+    import sys
+    sys.stderr.write(f"[schedule_maintenance] PAYLOAD: {insert_payload}\n")
+    sys.stderr.flush()
+    try:
+        request_res = (
+            sb.table("maintenance_requests")
+            .insert(insert_payload)
+            .execute()
+        )
+        sys.stderr.write(f"[schedule_maintenance] INSERT OK: {request_res.data}\n")
+        sys.stderr.flush()
+    except Exception as exc:
+        sys.stderr.write(f"[schedule_maintenance] INSERT ERROR: {type(exc).__name__}: {exc}\n")
+        sys.stderr.flush()
+        return ToolResult(success=False, error=f"Failed to create maintenance request: {exc}")
 
     if not request_res.data:
+        sys.stderr.write("[schedule_maintenance] INSERT returned no data\n")
+        sys.stderr.flush()
         return ToolResult(success=False, error="Failed to create maintenance request")
 
     request_id = request_res.data[0]["id"]
+
+    # Build vendor message for workflow record and email
+    vendor_message = (
+        f"New {urgency} maintenance job at {ctx.unit.unit_identifier}, {ctx.unit.address}.\n"
+        f"Tenant: {ctx.tenant.full_name}\n"
+        f"Issue: {title} — {description}\n"
+        f"Category: {category} | Urgency: {urgency}\n"
+        f"Request ID: {request_id}"
+    )
+
+    # Build a complete ai_analysis object (WhatsApp agent has already classified)
+    cost_range = (
+        "high" if urgency == "emergency" or category in ("structural", "electrical")
+        else "medium" if urgency == "high"
+        else "low"
+    )
+    ai_analysis = {
+        "category": category,
+        "urgency": urgency,
+        "estimated_cost_range": cost_range,
+        "vendor_required": True,
+        "reasoning": (
+            f"WhatsApp agent classified this as a {urgency}-urgency {category} issue. "
+            f"Professional intervention required. {title}"
+        ),
+        "confidence_score": 0.88,
+    }
+
+    # Create linked maintenance_workflows entry at OWNER_NOTIFIED
+    # (the WhatsApp agent has already done the AI analysis; landlord action is next)
+    import asyncio
+    open_threads = (
+        ctx.conversation_context.open_threads
+        if ctx.conversation_context
+        else {}
+    )
+    workflow_id = None
+    try:
+        wf_res = sb.table("maintenance_workflows").insert({
+            "maintenance_request_id": request_id,
+            "current_state": "OWNER_NOTIFIED",
+            "title": title,
+            "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
+            "vendor_message": vendor_message,
+            "ai_analysis": ai_analysis,
+            "state_history": [
+                {"from_state": None, "to_state": "SUBMITTED", "timestamp": datetime.now(timezone.utc).isoformat()},
+                {"from_state": "SUBMITTED", "to_state": "OWNER_NOTIFIED", "timestamp": datetime.now(timezone.utc).isoformat()},
+            ],
+        }).execute()
+        if wf_res.data:
+            workflow_id = wf_res.data[0]["id"]
+    except Exception as exc:
+        sys.stderr.write(f"[schedule_maintenance] WARNING: failed to create workflow entry: {exc}\n")
+        sys.stderr.flush()
+
+    # Clear persisted pending media URLs now that they've been attached
+    if ctx.pending_media_urls:
+        try:
+            sb.table("conversation_context").upsert(
+                {
+                    "lease_id": lease_id,
+                    "open_threads": {k: v for k, v in open_threads.items() if k != "pending_media_urls"},
+                },
+                on_conflict="lease_id",
+            ).execute()
+        except Exception:
+            pass
+
+    # Send email notification to maintenance company
+    from app.services.email_service import send_maintenance_email
+    MAINTENANCE_EMAIL = "perfecttouchphotoshopping@gmail.com"
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: send_maintenance_email(
+            to_email=MAINTENANCE_EMAIL,
+            property_address=ctx.unit.address,
+            unit_identifier=ctx.unit.unit_identifier,
+            tenant_name=ctx.tenant.full_name,
+            category=category,
+            urgency=urgency,
+            description=description,
+            request_id=request_id,
+            contractor_name=selected["name"] if selected else None,
+        ),
+    )
 
     await log_agent_action(
         lease_id=lease_id,
@@ -313,7 +417,7 @@ async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolRe
     from app.services.pdf_generator import generate_legal_notice
 
     sb = _sb()
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
     notice_type = inp["notice_type"]
     reason = inp["reason"]
 
@@ -402,7 +506,7 @@ async def _issue_legal_notice(inp: dict[str, Any], ctx: TenantContext) -> ToolRe
 
 
 async def _update_escalation_level(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
-    lease_id = inp["lease_id"]
+    lease_id = ctx.lease.id
     new_level = int(inp["new_level"])
     reason = inp["reason"]
 

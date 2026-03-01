@@ -951,7 +951,7 @@ export interface Database {
           current_state: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
           ai_analysis: any
           owner_response: 'approved' | 'denied' | 'question' | null
-          owner_response_message: string | null
+          owner_message: string | null
           vendor_message: string | null
           vendor_eta: string | null
           vendor_notes: string | null
@@ -965,7 +965,7 @@ export interface Database {
           current_state?: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
           ai_analysis?: any
           owner_response?: 'approved' | 'denied' | 'question' | null
-          owner_response_message?: string | null
+          owner_message?: string | null
           vendor_message?: string | null
           vendor_eta?: string | null
           vendor_notes?: string | null
@@ -979,7 +979,7 @@ export interface Database {
           current_state?: 'SUBMITTED' | 'OWNER_NOTIFIED' | 'OWNER_RESPONDED' | 'DECISION_MADE' | 'VENDOR_CONTACTED' | 'AWAITING_VENDOR_RESPONSE' | 'ETA_CONFIRMED' | 'TENANT_NOTIFIED' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED_DENIED'
           ai_analysis?: any
           owner_response?: 'approved' | 'denied' | 'question' | null
-          owner_response_message?: string | null
+          owner_message?: string | null
           vendor_message?: string | null
           vendor_eta?: string | null
           vendor_notes?: string | null
@@ -987,6 +987,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       workflow_communications: {
         Row: {
@@ -1019,6 +1020,7 @@ export interface Database {
           metadata?: any
           created_at?: string
         }
+        Relationships: []
       }
       vendor_bids: {
         Row: {
@@ -1054,6 +1056,7 @@ export interface Database {
           ai_score?: number | null
           created_at?: string
         }
+        Relationships: []
       }
       property_applications: {
         Row: {

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routes.frontend_proxy import router as frontend_proxy_router
 from app.routes.health import router as health_router
+from app.routes.instagram import router as instagram_router
 from app.routes.lease_applications import router as lease_applications_router
 from app.routes.property_applications import router as property_applications_router
 from app.routes.maintenance_workflow import router as maintenance_workflow_router
@@ -41,6 +42,7 @@ app.include_router(stripe_router)
 app.include_router(maintenance_workflow_router)
 app.include_router(test_workflow_router)
 app.include_router(whatsapp_router)
+app.include_router(instagram_router)
 app.include_router(lease_applications_router)
 app.include_router(property_applications_router)
 app.include_router(signing_router)

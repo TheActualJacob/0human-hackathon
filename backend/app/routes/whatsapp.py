@@ -9,9 +9,11 @@ from app.config import settings
 from app.services.agent_loop import run_agent_loop
 from app.services.context_loader import (
     TenantContext,
+    clear_pending_media_urls,
     load_tenant_context,
     log_agent_action,
     log_conversation,
+    save_pending_media_urls,
     update_conversation_context,
 )
 from app.services.prospect_context_loader import (
@@ -45,7 +47,14 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
     message_body = body.get("Body", "")
     num_media = int(body.get("NumMedia", "0"))
 
-    if not from_number or not message_body:
+    # Extract any media URLs Twilio attached (images, documents, etc.)
+    media_urls: list[str] = [
+        body[f"MediaUrl{i}"]
+        for i in range(num_media)
+        if body.get(f"MediaUrl{i}")
+    ]
+
+    if not from_number or (not message_body and not media_urls):
         return Response(content="Bad Request", status_code=400)
 
     # Signature validation in production
@@ -58,7 +67,9 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
     # Strip whatsapp: prefix for DB lookup
     phone_number = from_number.removeprefix("whatsapp:")
 
+    print(f"[webhook] Inbound message from {phone_number!r}: {message_body!r} media={media_urls}")
     ctx = await load_tenant_context(phone_number)
+    print(f"[webhook] load_tenant_context result: {'FOUND tenant ' + ctx.tenant.full_name if ctx else 'NOT FOUND — routing to prospect'}")
 
     if ctx is None:
         # Unknown number — route through the prospect agent
@@ -66,7 +77,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
         await log_prospect_conversation(
             prospect_id=prospect_ctx.prospect_id,
             direction="inbound",
-            message_body=message_body,
+            message_body=message_body or f"[{len(media_urls)} image(s) attached]",
             whatsapp_message_id=message_sid or None,
         )
         background_tasks.add_task(
@@ -74,16 +85,28 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) 
         )
         return Response(status_code=200)
 
+    # Proxy Twilio media to Supabase Storage so URLs are publicly accessible
+    if media_urls:
+        import asyncio
+        from app.services.media_proxy import proxy_twilio_media_list
+        media_urls = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: proxy_twilio_media_list(media_urls)
+        )
+
+    # Attach public media URLs to context so the maintenance tool can store them
+    ctx.pending_media_urls = media_urls
+
     # Log inbound message before any processing
+    log_body = message_body or f"[{len(media_urls)} image(s) attached]"
     await log_conversation(
         lease_id=ctx.lease.id,
         direction="inbound",
-        message_body=message_body,
+        message_body=log_body,
         whatsapp_message_id=message_sid or None,
     )
 
     # Schedule async processing — return 200 immediately to prevent Twilio retry
-    background_tasks.add_task(_process_and_reply, ctx, from_number, message_body, num_media)
+    background_tasks.add_task(_process_and_reply, ctx, from_number, message_body, media_urls)
 
     return Response(status_code=200)
 
@@ -92,11 +115,16 @@ async def _process_and_reply(
     ctx: TenantContext,
     to: str,
     user_message: str,
-    num_media: int,
+    media_urls: list[str],
 ) -> None:
-    # Media-only messages: acknowledge and ask for text description
-    if num_media > 0:
-        ack = "I can see you sent a photo or file. Could you describe the issue in a message so I can log it correctly?"
+    # Image-only messages (no text): save URLs to DB so they survive to the
+    # next message, then ask tenant to describe the issue.
+    if not user_message and media_urls:
+        await save_pending_media_urls(ctx.lease.id, media_urls)
+        ack = (
+            f"Thanks, I can see you've sent {len(media_urls)} photo(s). "
+            "Please describe the issue in a message so I can log the repair correctly."
+        )
         await log_conversation(ctx.lease.id, "outbound", ack)
         await send_whatsapp_message(to, ack)
         return

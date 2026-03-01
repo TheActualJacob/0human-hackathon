@@ -48,15 +48,11 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#05050a] text-white overflow-x-hidden">
 
-      {/* ── Global CSS injected ── */}
+      {/* ── Global CSS ── */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
           50% { transform: translateY(-12px) rotate(3deg); }
-        }
-        @keyframes pulse-ring {
-          0% { transform: scale(0.8); opacity: 0.8; }
-          100% { transform: scale(2.2); opacity: 0; }
         }
         @keyframes slide-up {
           from { opacity: 0; transform: translateY(30px); }
@@ -220,7 +216,7 @@ export default function LandingPage() {
                 <div className="h-3 w-3 rounded-full bg-emerald-500/70" />
                 <div className="flex-1 mx-4 h-6 bg-white/5 rounded-md" />
               </div>
-              {/* Dashboard content */}
+              {/* Dashboard stats */}
               <div className="grid grid-cols-4 gap-4 mb-5">
                 {[
                   { label: 'Properties', value: '147', icon: Building2, color: 'from-indigo-500 to-blue-600' },
@@ -295,7 +291,6 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-bold mb-4">Live in 3 minutes</h2>
           </div>
           <div className="relative">
-            {/* Connector line */}
             <div className="absolute left-8 top-0 bottom-0 w-px bg-gradient-to-b from-indigo-500/50 via-purple-500/50 to-transparent hidden md:block" />
             <div className="space-y-8">
               {[

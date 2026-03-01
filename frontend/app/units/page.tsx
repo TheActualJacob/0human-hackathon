@@ -13,6 +13,73 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Unit, UnitWithDetails } from '@/types';
 
+// ─── Form helpers ─────────────────────────────────────────────────────────────
+const inputCls = 'w-full px-3 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3 pb-2 border-b border-border/50">
+      {children}
+    </h3>
+  );
+}
+
+function FormRow({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-x-4 gap-y-4">{children}</div>;
+}
+
+function FormField({ label, children, hint, className }: {
+  label: string; children: React.ReactNode; hint?: string; className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      {hint && <p className="text-[11px] text-muted-foreground mb-1.5">{hint}</p>}
+      {children}
+    </div>
+  );
+}
+
+const COUNTRIES = [
+  { code: 'AF', name: 'Afghanistan' }, { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' }, { code: 'AR', name: 'Argentina' },
+  { code: 'AU', name: 'Australia' }, { code: 'AT', name: 'Austria' },
+  { code: 'BE', name: 'Belgium' }, { code: 'BR', name: 'Brazil' },
+  { code: 'BG', name: 'Bulgaria' }, { code: 'CA', name: 'Canada' },
+  { code: 'CL', name: 'Chile' }, { code: 'CN', name: 'China' },
+  { code: 'CO', name: 'Colombia' }, { code: 'HR', name: 'Croatia' },
+  { code: 'CY', name: 'Cyprus' }, { code: 'CZ', name: 'Czech Republic' },
+  { code: 'DK', name: 'Denmark' }, { code: 'EG', name: 'Egypt' },
+  { code: 'EE', name: 'Estonia' }, { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' }, { code: 'DE', name: 'Germany' },
+  { code: 'GH', name: 'Ghana' }, { code: 'GR', name: 'Greece' },
+  { code: 'HK', name: 'Hong Kong' }, { code: 'HU', name: 'Hungary' },
+  { code: 'IN', name: 'India' }, { code: 'ID', name: 'Indonesia' },
+  { code: 'IE', name: 'Ireland' }, { code: 'IL', name: 'Israel' },
+  { code: 'IT', name: 'Italy' }, { code: 'JP', name: 'Japan' },
+  { code: 'JO', name: 'Jordan' }, { code: 'KE', name: 'Kenya' },
+  { code: 'LV', name: 'Latvia' }, { code: 'LB', name: 'Lebanon' },
+  { code: 'LT', name: 'Lithuania' }, { code: 'LU', name: 'Luxembourg' },
+  { code: 'MY', name: 'Malaysia' }, { code: 'MT', name: 'Malta' },
+  { code: 'MX', name: 'Mexico' }, { code: 'MA', name: 'Morocco' },
+  { code: 'NL', name: 'Netherlands' }, { code: 'NZ', name: 'New Zealand' },
+  { code: 'NG', name: 'Nigeria' }, { code: 'NO', name: 'Norway' },
+  { code: 'PK', name: 'Pakistan' }, { code: 'PE', name: 'Peru' },
+  { code: 'PH', name: 'Philippines' }, { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' }, { code: 'RO', name: 'Romania' },
+  { code: 'SA', name: 'Saudi Arabia' }, { code: 'RS', name: 'Serbia' },
+  { code: 'SG', name: 'Singapore' }, { code: 'SK', name: 'Slovakia' },
+  { code: 'SI', name: 'Slovenia' }, { code: 'ZA', name: 'South Africa' },
+  { code: 'KR', name: 'South Korea' }, { code: 'ES', name: 'Spain' },
+  { code: 'SE', name: 'Sweden' }, { code: 'CH', name: 'Switzerland' },
+  { code: 'TW', name: 'Taiwan' }, { code: 'TH', name: 'Thailand' },
+  { code: 'TN', name: 'Tunisia' }, { code: 'TR', name: 'Turkey' },
+  { code: 'AE', name: 'United Arab Emirates' }, { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' }, { code: 'UA', name: 'Ukraine' },
+  { code: 'VN', name: 'Vietnam' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function UnitsPage() {
   const searchParams = useSearchParams();
   const landlordFilter = searchParams.get('landlord');
@@ -32,6 +99,8 @@ export default function UnitsPage() {
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'appliances'>('details');
+  const [addFormCountry, setAddFormCountry] = useState('');
+  const [addFormSaving, setAddFormSaving] = useState(false);
 
   // Filter units by landlord if specified
   const filteredUnits = landlordFilter 
@@ -163,7 +232,7 @@ export default function UnitsPage() {
                         </h3>
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {unit.city}
+                          {[unit.city, unit.postcode, unit.country].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                       <span className={cn(
@@ -256,7 +325,7 @@ export default function UnitsPage() {
                     {selectedUnitData.address}
                   </p>
                   <p className="text-muted-foreground">
-                    {selectedUnitData.city}, {selectedUnitData.country}
+                    {[selectedUnitData.city, selectedUnitData.postcode, selectedUnitData.country].filter(Boolean).join(', ')
                   </p>
                   <div className="pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground">Landlord</p>
@@ -464,93 +533,218 @@ export default function UnitsPage() {
         </div>
       </div>
 
-      {/* Add Unit Modal */}
+      {/* Add Property Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4">Add New Unit</h2>
-            <form 
+          <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border sticky top-0 bg-card z-10">
+              <div>
+                <h2 className="text-lg font-semibold">Add New Property</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Fill in the full address and property details</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent text-muted-foreground transition-colors text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                await useStore.getState().addUnit({
-                  landlord_id: formData.get('landlord') as string,
-                  unit_identifier: formData.get('identifier') as string,
-                  address: formData.get('address') as string,
-                  city: formData.get('city') as string,
-                  country: 'GB',
-                  jurisdiction: 'england_wales'
-                });
-                setShowAddModal(false);
+                setAddFormSaving(true);
+                try {
+                  const fd = new FormData(e.currentTarget);
+                  const g = (k: string) => (fd.get(k) as string ?? '').trim();
+
+                  const streetLine1 = g('street');
+                  const streetLine2 = g('street2');
+                  const fullAddress = streetLine2 ? `${streetLine1}, ${streetLine2}` : streetLine1;
+
+                  const sqmRaw = parseFloat(g('sqm'));
+                  const sqftRaw = parseFloat(g('sqft'));
+                  // Prefer sqm input, convert to sqft for DB column; fall back to sqft direct
+                  const squareFootage = !isNaN(sqmRaw) && sqmRaw > 0
+                    ? Math.round(sqmRaw * 10.764)
+                    : !isNaN(sqftRaw) && sqftRaw > 0 ? sqftRaw : null;
+
+                  const countryCode = g('country');
+                  const JURISDICTION_MAP: Record<string, string> = {
+                    GB: 'england_wales', GR: 'greece', DE: 'germany', FR: 'france',
+                    ES: 'spain', IT: 'italy', NL: 'netherlands', PT: 'portugal',
+                    AT: 'austria', BE: 'belgium', IE: 'ireland', CY: 'cyprus',
+                    PL: 'poland', CZ: 'czech_republic', HU: 'hungary', RO: 'romania',
+                    US: 'united_states', CA: 'canada', AU: 'australia', AE: 'uae',
+                    CH: 'switzerland', SE: 'sweden', DK: 'denmark', NO: 'norway', FI: 'finland',
+                  };
+
+                  await useStore.getState().addUnit({
+                    landlord_id: g('landlord'),
+                    unit_identifier: g('identifier'),
+                    address: fullAddress,
+                    city: g('city'),
+                    postcode: g('postcode') || null,
+                    country: countryCode || null,
+                    jurisdiction: JURISDICTION_MAP[countryCode] ?? countryCode.toLowerCase() || null,
+                    unit_type: g('unit_type') || null,
+                    bedrooms: parseInt(g('bedrooms')) || null,
+                    bathrooms: parseFloat(g('bathrooms')) || null,
+                    square_footage: squareFootage,
+                    rent_amount: parseFloat(g('rent_amount')) || null,
+                    security_deposit: parseFloat(g('security_deposit')) || null,
+                    available_date: g('available_date') || null,
+                  });
+                  setShowAddModal(false);
+                  setAddFormCountry('');
+                } finally {
+                  setAddFormSaving(false);
+                }
               }}
-              className="space-y-4"
+              className="px-6 py-5 space-y-7"
             >
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Landlord *
-                </label>
-                <select
-                  name="landlord"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Select landlord</option>
-                  {landlords.map(landlord => (
-                    <option key={landlord.id} value={landlord.id}>
-                      {landlord.full_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Unit Identifier *
-                </label>
-                <input
-                  type="text"
-                  name="identifier"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Flat 3 / Unit B / 12 Oak Street"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Address *
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="123 Main Street"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  City *
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  required
-                  className="w-full px-3 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="London"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
+              {/* ─── Ownership ──────────────────────────────────────────── */}
+              <section>
+                <SectionHeading>Ownership</SectionHeading>
+                <FormRow>
+                  <FormField label="Landlord *" className="col-span-2">
+                    <select name="landlord" required className={inputCls}>
+                      <option value="">Select landlord</option>
+                      {landlords.map(l => (
+                        <option key={l.id} value={l.id}>{l.full_name}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                </FormRow>
+              </section>
+
+              {/* ─── Property identity ──────────────────────────────────── */}
+              <section>
+                <SectionHeading>Property Identity</SectionHeading>
+                <FormRow>
+                  <FormField label="Display Name *" className="col-span-2" hint='e.g. "Flat 3B", "Garden Studio", "Top Floor Apartment"'>
+                    <input type="text" name="identifier" required placeholder="Flat 3B" className={inputCls} />
+                  </FormField>
+                  <FormField label="Property Type *">
+                    <select name="unit_type" required className={inputCls}>
+                      <option value="">Select type</option>
+                      <option value="apartment">Apartment / Flat</option>
+                      <option value="house">House</option>
+                      <option value="studio">Studio</option>
+                      <option value="room">Room</option>
+                      <option value="townhouse">Townhouse</option>
+                      <option value="villa">Villa</option>
+                      <option value="maisonette">Maisonette</option>
+                      <option value="bungalow">Bungalow</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </FormField>
+                </FormRow>
+              </section>
+
+              {/* ─── Full address ────────────────────────────────────────── */}
+              <section>
+                <SectionHeading>Full Address</SectionHeading>
+                <FormRow>
+                  <FormField label="Street Address *" className="col-span-2" hint="House number and road name">
+                    <input type="text" name="street" required placeholder="e.g. 12 Papagou Street" className={inputCls} />
+                  </FormField>
+                  <FormField label="Apt / Floor / Door (optional)" className="col-span-2" hint="Optional second line">
+                    <input type="text" name="street2" placeholder="e.g. Floor 3, Door B" className={inputCls} />
+                  </FormField>
+                  <FormField label="City / Town *">
+                    <input type="text" name="city" required placeholder="e.g. Athens" className={inputCls} />
+                  </FormField>
+                  <FormField label="State / Region" hint="Optional">
+                    <input type="text" name="state" placeholder="e.g. Attica" className={inputCls} />
+                  </FormField>
+                  <FormField label="Postcode / ZIP *">
+                    <input type="text" name="postcode" required placeholder="e.g. 15669" className={inputCls} />
+                  </FormField>
+                  <FormField label="Country *">
+                    <select
+                      name="country"
+                      required
+                      className={inputCls}
+                      value={addFormCountry}
+                      onChange={e => setAddFormCountry(e.target.value)}
+                    >
+                      <option value="">Select country</option>
+                      {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    </select>
+                  </FormField>
+                </FormRow>
+              </section>
+
+              {/* ─── Property details ────────────────────────────────────── */}
+              <section>
+                <SectionHeading>Property Details</SectionHeading>
+                <FormRow>
+                  <FormField label="Bedrooms *">
+                    <select name="bedrooms" required className={inputCls}>
+                      <option value="">Select</option>
+                      <option value="0">Studio (0)</option>
+                      <option value="1">1 bedroom</option>
+                      <option value="2">2 bedrooms</option>
+                      <option value="3">3 bedrooms</option>
+                      <option value="4">4 bedrooms</option>
+                      <option value="5">5 bedrooms</option>
+                      <option value="6">6+ bedrooms</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Bathrooms *">
+                    <select name="bathrooms" required className={inputCls}>
+                      <option value="">Select</option>
+                      <option value="1">1 bathroom</option>
+                      <option value="1.5">1.5 bathrooms</option>
+                      <option value="2">2 bathrooms</option>
+                      <option value="2.5">2.5 bathrooms</option>
+                      <option value="3">3 bathrooms</option>
+                      <option value="4">4+ bathrooms</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Size in m²" hint="Leave blank if unknown">
+                    <input type="number" name="sqm" min="5" max="2000" placeholder="e.g. 65" className={inputCls} />
+                  </FormField>
+                  <FormField label="Size in ft²" hint="Alternative to m²">
+                    <input type="number" name="sqft" min="50" max="20000" placeholder="e.g. 700" className={inputCls} />
+                  </FormField>
+                </FormRow>
+              </section>
+
+              {/* ─── Listing & pricing ───────────────────────────────────── */}
+              <section>
+                <SectionHeading>Listing & Pricing</SectionHeading>
+                <FormRow>
+                  <FormField label="Monthly Rent *" hint={addFormCountry === 'GB' ? 'In GBP (£)' : addFormCountry === 'US' ? 'In USD ($)' : 'In local currency'}>
+                    <input type="number" name="rent_amount" required min="0" step="0.01" placeholder="e.g. 850" className={inputCls} />
+                  </FormField>
+                  <FormField label="Security Deposit" hint="Optional — leave blank to skip">
+                    <input type="number" name="security_deposit" min="0" step="0.01" placeholder="e.g. 1700" className={inputCls} />
+                  </FormField>
+                  <FormField label="Available From" hint="Leave blank if not yet known">
+                    <input type="date" name="available_date" className={inputCls} />
+                  </FormField>
+                </FormRow>
+              </section>
+
+              {/* ─── Actions ─────────────────────────────────────────────── */}
+              <div className="flex gap-3 pt-2 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors"
+                  onClick={() => { setShowAddModal(false); setAddFormCountry(''); }}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-lg hover:bg-accent transition-colors text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  disabled={addFormSaving}
+                  className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm font-medium"
                 >
-                  Add Unit
+                  {addFormSaving ? 'Saving…' : 'Add Property'}
                 </button>
               </div>
             </form>

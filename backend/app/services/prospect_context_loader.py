@@ -44,6 +44,10 @@ class ProspectContext:
     available_units: list[AvailableUnit] = field(default_factory=list)
     recent_conversations: list[ProspectConversation] = field(default_factory=list)
     interested_unit: AvailableUnit | None = None
+    # Populated when a signing token is awaiting the prospect's signature
+    pending_signing_token: dict | None = None
+    # Channel this prospect arrived from: 'whatsapp' or 'instagram_dm'
+    source_channel: str = "whatsapp"
 
 
 async def load_or_create_prospect(phone_number: str) -> ProspectContext:
@@ -116,6 +120,17 @@ async def load_or_create_prospect(phone_number: str) -> ProspectContext:
             if unit_res and unit_res.data:
                 interested_unit = _build_unit(unit_res.data)
 
+    # Load any pending (unsigned) signing token for this prospect
+    token_res = (
+        sb.table("signing_tokens")
+        .select("*")
+        .eq("prospect_id", prospect_id)
+        .is_("signed_at", "null")
+        .maybe_single()
+        .execute()
+    )
+    pending_signing_token = token_res.data if (token_res and token_res.data) else None
+
     return ProspectContext(
         prospect_id=prospect_id,
         phone_number=phone,
@@ -125,6 +140,113 @@ async def load_or_create_prospect(phone_number: str) -> ProspectContext:
         available_units=available_units,
         recent_conversations=recent_conversations,
         interested_unit=interested_unit,
+        pending_signing_token=pending_signing_token,
+        source_channel="whatsapp",
+    )
+
+
+async def load_or_create_instagram_prospect(igsid: str) -> ProspectContext:
+    """Load or create a prospect identified by their Instagram-Scoped User ID (IGSID)."""
+    sb = _get_supabase()
+
+    prospect_res = (
+        sb.table("prospects")
+        .select("*")
+        .eq("instagram_user_id", igsid)
+        .maybe_single()
+        .execute()
+    )
+
+    if prospect_res and prospect_res.data:
+        prospect = prospect_res.data
+    else:
+        # Use a synthetic phone key so the unique constraint on phone_number is satisfied
+        insert_res = (
+            sb.table("prospects")
+            .insert({
+                "instagram_user_id": igsid,
+                "phone_number": f"ig:{igsid}",
+                "status": "inquiring",
+                "source_channel": "instagram_dm",
+            })
+            .execute()
+        )
+        prospect = insert_res.data[0] if insert_res.data else {
+            "id": "",
+            "instagram_user_id": igsid,
+            "phone_number": f"ig:{igsid}",
+            "status": "inquiring",
+        }
+
+    prospect_id = prospect["id"]
+
+    convs_res = (
+        sb.table("prospect_conversations")
+        .select("*")
+        .eq("prospect_id", prospect_id)
+        .order("created_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+    raw_convs = convs_res.data or []
+    recent_conversations = [
+        ProspectConversation(
+            id=r["id"],
+            direction=r["direction"],
+            message_body=r["message_body"],
+            created_at=r.get("created_at"),
+            raw=r,
+        )
+        for r in reversed(raw_convs)
+    ]
+
+    units_res = sb.table("units").select("*, leases(status)").execute()
+    all_units = units_res.data or []
+
+    def _is_available(u: dict) -> bool:
+        leases = u.get("leases") or []
+        return len([l for l in leases if l.get("status") == "active"]) == 0
+
+    available_units = [_build_unit(u) for u in all_units if _is_available(u)]
+
+    interested_unit: AvailableUnit | None = None
+    if prospect.get("interested_unit_id"):
+        for u in available_units:
+            if u.id == prospect["interested_unit_id"]:
+                interested_unit = u
+                break
+        if interested_unit is None:
+            unit_res = (
+                sb.table("units")
+                .select("*")
+                .eq("id", prospect["interested_unit_id"])
+                .maybe_single()
+                .execute()
+            )
+            if unit_res and unit_res.data:
+                interested_unit = _build_unit(unit_res.data)
+
+    token_res = (
+        sb.table("signing_tokens")
+        .select("*")
+        .eq("prospect_id", prospect_id)
+        .is_("signed_at", "null")
+        .maybe_single()
+        .execute()
+    )
+    pending_signing_token = token_res.data if (token_res and token_res.data) else None
+
+    return ProspectContext(
+        prospect_id=prospect_id,
+        phone_number=prospect.get("phone_number", f"ig:{igsid}"),
+        name=prospect.get("name"),
+        status=prospect.get("status", "inquiring"),
+        conversation_summary=prospect.get("conversation_summary"),
+        available_units=available_units,
+        recent_conversations=recent_conversations,
+        interested_unit=interested_unit,
+        pending_signing_token=pending_signing_token,
+        source_channel="instagram_dm",
     )
 
 
@@ -155,6 +277,7 @@ async def log_prospect_conversation(
     direction: str,
     message_body: str,
     whatsapp_message_id: str | None = None,
+    source_channel: str = "whatsapp",
 ) -> None:
     sb = _get_supabase()
     sb.table("prospect_conversations").insert({
@@ -162,6 +285,7 @@ async def log_prospect_conversation(
         "direction": direction,
         "message_body": message_body,
         "whatsapp_message_id": whatsapp_message_id,
+        "source_channel": source_channel,
     }).execute()
 
 

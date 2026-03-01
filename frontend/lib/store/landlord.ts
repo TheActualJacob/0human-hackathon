@@ -210,6 +210,12 @@ const useLandlordStore = create<LandlordState>()(
         if (unit.rent_amount !== undefined)         extendedFields.rent_amount = unit.rent_amount;
         if (unit.security_deposit !== undefined)    extendedFields.security_deposit = unit.security_deposit;
         if (unit.available_date !== undefined)      extendedFields.available_date = unit.available_date;
+        // Address + property detail fields
+        if (unit.postcode !== undefined)            extendedFields.postcode = unit.postcode;
+        if (unit.unit_type !== undefined)           extendedFields.unit_type = unit.unit_type;
+        if (unit.bedrooms !== undefined)            extendedFields.bedrooms = unit.bedrooms;
+        if (unit.bathrooms !== undefined)           extendedFields.bathrooms = unit.bathrooms;
+        if (unit.square_footage !== undefined)      extendedFields.square_footage = unit.square_footage;
 
         if (Object.keys(extendedFields).length > 0) {
           const { error: updateError } = await supabase

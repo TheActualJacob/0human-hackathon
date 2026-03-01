@@ -238,11 +238,14 @@ export async function signIn(email: string, password: string) {
       throw error;
     }
     
-    // Wait a moment for the session to be fully established and cookies to be set
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Reduced wait time for faster login
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Force a session refresh to ensure cookies are updated
-    await supabase.auth.getSession();
+    // Ensure session is active
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Failed to establish session after login');
+    }
     
     console.log('Sign in successful:', data);
     return data;
@@ -257,6 +260,18 @@ export async function signOut() {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    
+    // Clear any local storage or cookies that might persist
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+      // Clear all cookies by setting their expiry to the past
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+    }
   } catch (error) {
     console.error('Sign out error:', error);
     throw error;
@@ -266,33 +281,38 @@ export async function signOut() {
 // Get current user with role and entity data
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    // 1. Get auth user from session (fastest)
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return null;
 
-    // Get user role and entity
+    // 2. Get user role and entity from our custom table
     const { data: authUser, error } = await supabase
       .from('auth_users')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (error || !authUser) return null;
+    if (error || !authUser) {
+      console.warn('Auth user record not found for user ID:', user.id);
+      return null;
+    }
 
-    // Get entity data based on role
+    // 3. Get entity data based on role
     let entity = null;
     if (authUser.role === 'landlord') {
       const { data } = await supabase
         .from('landlords')
         .select('*')
         .eq('id', authUser.entity_id)
-        .single();
+        .maybeSingle();
       entity = data;
     } else if (authUser.role === 'tenant') {
       const { data } = await supabase
         .from('tenants')
         .select('*, leases(*)')
         .eq('id', authUser.entity_id)
-        .single();
+        .maybeSingle();
       entity = data;
     }
 

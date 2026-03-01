@@ -158,6 +158,17 @@ export interface AIAnalysis {
   confidence_score: number;
 }
 
+// Auto-approval policy set by the landlord
+export interface AutoApprovalPolicy {
+  enabled: boolean;
+  /** Minimum AI confidence (0–1) required to auto-approve. Default 0.9 */
+  minConfidence: number;
+  /** Maximum cost range the policy will auto-approve */
+  maxCostRange: 'low' | 'medium' | 'high';
+  /** When true, emergency urgency always escalates to the owner regardless of other rules */
+  excludeEmergency: boolean;
+}
+
 // Complete workflow with relationships
 export interface MaintenanceWorkflowWithDetails extends MaintenanceWorkflow {
   maintenance_request?: MaintenanceRequestWithDetails;

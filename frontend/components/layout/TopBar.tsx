@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, AlertCircle, CheckCircle2, LogOut, User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useStore from "@/lib/store/useStore";
 import { useRouter } from 'next/navigation';
@@ -20,7 +20,7 @@ type TopBarProps = {
 };
 
 export default function TopBar({ userRole }: TopBarProps) {
-  const { agentMode, autonomyLevel } = useStore();
+  const { agentMode } = useStore();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   
@@ -35,12 +35,6 @@ export default function TopBar({ userRole }: TopBarProps) {
       
       {/* Right Section */}
       <div className="flex items-center gap-6">
-        {/* Notifications */}
-        <button className="relative p-2 hover:bg-secondary rounded-lg transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
-        </button>
-        
         {/* Agent Status Panel */}
         <div className="flex items-center gap-4 rounded-lg bg-card px-4 py-2 ai-glow">
           <div className="flex items-center gap-2">
@@ -52,15 +46,6 @@ export default function TopBar({ userRole }: TopBarProps) {
               Agent: {agentMode.charAt(0).toUpperCase() + agentMode.slice(1)}
             </span>
           </div>
-          
-          <div className="h-4 w-px bg-border" />
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Autonomy:</span>
-            <span className="text-sm font-medium text-primary">{autonomyLevel}%</span>
-          </div>
-          
-          <div className="h-4 w-px bg-border" />
           
           {/* Escalations can be added later when you have escalation logic */}
         </div>
@@ -82,8 +67,15 @@ export default function TopBar({ userRole }: TopBarProps) {
             <DropdownMenuItem 
               onClick={async () => {
                 setLoading(true);
-                await signOut();
-                router.push('/');
+                try {
+                  await signOut();
+                  // Force a hard reload to clear all states and stores
+                  window.location.href = '/';
+                } catch (error) {
+                  console.error('Sign out error:', error);
+                  // Fallback if signOut fails
+                  window.location.href = '/';
+                }
               }}
               className="text-destructive"
             >

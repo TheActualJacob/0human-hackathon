@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3000}",
     "check-db": "node scripts/check-supabase-connection.js",
     "scrape:dry": "npx tsx scripts/scrapeSpitogatos.ts --dry-run",
     "scrape": "npx tsx scripts/scrapeSpitogatos.ts",

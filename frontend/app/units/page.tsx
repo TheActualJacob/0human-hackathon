@@ -325,7 +325,7 @@ export default function UnitsPage() {
                     {selectedUnitData.address}
                   </p>
                   <p className="text-muted-foreground">
-                    {[selectedUnitData.city, selectedUnitData.postcode, selectedUnitData.country].filter(Boolean).join(', ')
+                    {[selectedUnitData.city, selectedUnitData.postcode, selectedUnitData.country].filter(Boolean).join(', ')}
                   </p>
                   <div className="pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground">Landlord</p>

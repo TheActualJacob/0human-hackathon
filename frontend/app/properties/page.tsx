@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { 
+import {
   Search, MapPin, Bed, Bath, Calendar,
-  Home, Shield, SlidersHorizontal, ArrowRight, Building2, Zap
+  Home, Shield, SlidersHorizontal, ArrowRight
 } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Database } from '@/lib/supabase/database.types';
 
@@ -121,153 +120,96 @@ export default function PropertiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05050a] text-white">
+    <div className="flex-1 p-8">
       <style>{`
-        @keyframes shimmer-bar {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes fade-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .card-appear { animation: fade-up 0.5s ease forwards; }
-        .skeleton-shimmer {
-          position: relative;
-          overflow: hidden;
-          background: rgba(255,255,255,0.04);
-        }
-        .skeleton-shimmer::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-          animation: shimmer-bar 1.5s infinite;
-        }
-        .property-card {
-          transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-        }
-        .property-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 20px 60px rgba(99,102,241,0.12);
-          border-color: rgba(99,102,241,0.3);
-        }
-        .glow-orb {
-          filter: blur(80px);
-        }
+        @keyframes shimmer-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .card-appear { animation: fade-up 0.4s ease forwards; }
+        .skeleton-shimmer { position: relative; overflow: hidden; background: rgba(255,255,255,0.04); }
+        .skeleton-shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent); animation: shimmer-bar 1.5s infinite; }
+        .property-card { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+        .property-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.4); }
       `}</style>
 
-      {/* Navbar */}
-      <nav className="border-b border-white/5 bg-[#05050a]/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-bold text-white">PropAI</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="text-sm text-white/50 hover:text-white transition-colors px-4 py-2">Sign in</Link>
-            <Link href="/auth/signup/tenant" className="text-sm font-medium text-white px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors">
-              Apply as Tenant
-            </Link>
+      {/* Page header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold mb-1">Browse Properties</h1>
+        <p className="text-muted-foreground">Find your next home from verified listings</p>
+      </div>
+
+      {/* Search + filters */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2 focus-within:border-primary/50 transition-colors">
+            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <input
+              className="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none text-sm"
+              placeholder="Search by address, city, or description…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchPublicListings()}
+            />
           </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${showFilters ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:text-foreground'}`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+          </button>
+          <button
+            onClick={fetchPublicListings}
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 transition-colors text-sm font-medium text-primary-foreground"
+          >
+            Search
+          </button>
         </div>
-      </nav>
 
-      {/* Hero header */}
-      <div className="relative overflow-hidden border-b border-white/5">
-        <div className="glow-orb absolute top-0 left-1/3 w-96 h-48 bg-indigo-600/20 rounded-full" />
-        <div className="glow-orb absolute top-0 right-1/4 w-64 h-48 bg-purple-600/15 rounded-full" />
-        <div className="relative container mx-auto px-6 py-16 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs mb-6">
-            <Zap className="h-3 w-3" />
-            AI-screened properties · Verified landlords
-          </div>
-          <h1 className="text-5xl md:text-6xl font-black tracking-tighter mb-4">
-            Find Your{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-              Next Home
-            </span>
-          </h1>
-          <p className="text-white/40 text-lg max-w-lg mx-auto mb-8">
-            Browse verified listings. Apply in minutes. AI-powered screening means faster decisions.
-          </p>
-
-          {/* Search bar */}
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl p-2 backdrop-blur-sm focus-within:border-indigo-500/50 transition-colors">
-              <Search className="h-5 w-5 text-white/30 ml-3 flex-shrink-0" />
-              <input
-                className="flex-1 bg-transparent text-white placeholder-white/30 outline-none py-2 text-sm"
-                placeholder="Search by address, city, or description…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchPublicListings()}
-              />
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition-colors ${showFilters ? 'bg-indigo-500 text-white' : 'bg-white/8 text-white/50 hover:text-white hover:bg-white/12'}`}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Filters
-              </button>
-              <button
-                onClick={fetchPublicListings}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-medium text-white"
-              >
-                Search
-              </button>
-            </div>
-
-            {/* Expanded filters */}
-            {showFilters && (
-              <div className="mt-3 bg-white/5 border border-white/10 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-left backdrop-blur-sm">
-                {[
-                  { label: 'Min Rent (£)', key: 'minRent', placeholder: '0' },
-                  { label: 'Max Rent (£)', key: 'maxRent', placeholder: '5000' },
-                  { label: 'City', key: 'city', placeholder: 'London…' },
-                ].map(f => (
-                  <div key={f.key}>
-                    <label className="text-white/40 text-xs mb-1 block">{f.label}</label>
-                    <input
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-indigo-500/50 transition-colors"
-                      placeholder={f.placeholder}
-                      value={(filters as any)[f.key]}
-                      onChange={(e) => setFilters({ ...filters, [f.key]: e.target.value })}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label className="text-white/40 text-xs mb-1 block">Bedrooms</label>
-                  <select
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50 transition-colors"
-                    value={filters.bedrooms}
-                    onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
-                  >
-                    <option value="any" className="bg-[#0d0d18]">Any</option>
-                    <option value="0" className="bg-[#0d0d18]">Studio</option>
-                    <option value="1" className="bg-[#0d0d18]">1 Bed</option>
-                    <option value="2" className="bg-[#0d0d18]">2 Beds</option>
-                    <option value="3" className="bg-[#0d0d18]">3 Beds</option>
-                    <option value="4" className="bg-[#0d0d18]">4+ Beds</option>
-                  </select>
-                </div>
+        {showFilters && (
+          <div className="mt-3 bg-card border border-border rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Min Rent (£)', key: 'minRent', placeholder: '0' },
+              { label: 'Max Rent (£)', key: 'maxRent', placeholder: '5000' },
+              { label: 'City', key: 'city', placeholder: 'London…' },
+            ].map(f => (
+              <div key={f.key}>
+                <label className="text-muted-foreground text-xs mb-1 block">{f.label}</label>
+                <input
+                  className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-primary/50 transition-colors"
+                  placeholder={f.placeholder}
+                  value={(filters as any)[f.key]}
+                  onChange={(e) => setFilters({ ...filters, [f.key]: e.target.value })}
+                />
               </div>
-            )}
+            ))}
+            <div>
+              <label className="text-muted-foreground text-xs mb-1 block">Bedrooms</label>
+              <select
+                className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary/50 transition-colors"
+                value={filters.bedrooms}
+                onChange={(e) => setFilters({ ...filters, bedrooms: e.target.value })}
+              >
+                <option value="any">Any</option>
+                <option value="0">Studio</option>
+                <option value="1">1 Bed</option>
+                <option value="2">2 Beds</option>
+                <option value="3">3 Beds</option>
+                <option value="4">4+ Beds</option>
+              </select>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Results */}
-      <div className="container mx-auto px-6 py-10">
+      <div>
         {/* Count row */}
         {!loading && !fetchError && (
           <div className="flex items-center justify-between mb-6">
-            <p className="text-white/40 text-sm">
-              <span className="text-white font-semibold">{units.length}</span> properties available
+            <p className="text-muted-foreground text-sm">
+              <span className="text-foreground font-semibold">{units.length}</span> properties available
             </p>
-            <div className="text-white/30 text-xs flex items-center gap-1">
+            <div className="text-muted-foreground text-xs flex items-center gap-1">
               <Shield className="h-3 w-3 text-emerald-400" />
               All landlords verified
             </div>
@@ -319,7 +261,7 @@ export default function PropertiesPage() {
               return (
                 <div
                   key={unit.id}
-                  className="property-card bg-[#0d0d18] border border-white/8 rounded-2xl overflow-hidden cursor-pointer card-appear"
+                  className="property-card bg-card border border-border rounded-2xl overflow-hidden cursor-pointer card-appear"
                   style={{ animationDelay: `${i * 0.06}s` }}
                   onClick={() => router.push(`/properties/${unit.id}`)}
                 >
@@ -429,18 +371,6 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-8 mt-10">
-        <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <Building2 className="h-3.5 w-3.5 text-white" />
-            </div>
-            <span className="text-white font-bold text-sm">PropAI</span>
-          </Link>
-          <p className="text-white/20 text-xs">© 2025 PropAI Ltd. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   );
 }

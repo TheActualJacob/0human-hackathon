@@ -9,7 +9,8 @@ const transporter = nodemailer.createTransport({
     user: process.env.GMAIL_ADDRESS,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
-});
+  socketOptions: { family: 4 }, // force IPv4 — Railway blocks IPv6 outbound
+} as any);
 
 export async function POST(request: NextRequest) {
   try {

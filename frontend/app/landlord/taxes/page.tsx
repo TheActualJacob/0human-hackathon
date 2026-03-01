@@ -156,10 +156,10 @@ export default function LandlordTaxesPage() {
       const band = taxableProfit > BASIC_RATE_LIMIT ? 'higher rate (40%)' : 'basic rate (20%)';
       setAiSummary(
         `Tax Year ${selectedYear} — AI Tax Summary\n\n` +
-        `Gross rental income:    £${Math.round(grossIncome).toLocaleString()}\n` +
-        `Allowable deductions:   £${Math.round(totalDeductions).toLocaleString()}\n` +
-        `Taxable profit:         £${Math.round(taxableProfit).toLocaleString()}\n` +
-        `Estimated tax owed:     £${Math.round(tax.total).toLocaleString()} (${band})\n\n` +
+        `Gross rental income:    €${Math.round(grossIncome).toLocaleString()}\n` +
+        `Allowable deductions:   €${Math.round(totalDeductions).toLocaleString()}\n` +
+        `Taxable profit:         €${Math.round(taxableProfit).toLocaleString()}\n` +
+        `Estimated tax owed:     €${Math.round(tax.total).toLocaleString()} (${band})\n\n` +
         `Common deductions you may be missing:\n` +
         `• Mortgage interest (20% tax credit on finance costs)\n` +
         `• Letting agent & management fees\n` +
@@ -179,12 +179,12 @@ export default function LandlordTaxesPage() {
   const handleExport = () => {
     const rows = [
       [`Tax Year`, String(selectedYear)],
-      [`Gross Rental Income (£)`, Math.round(grossIncome).toString()],
-      [`Total Deductions (£)`, Math.round(totalDeductions).toString()],
-      [`Taxable Profit (£)`, Math.round(taxableProfit).toString()],
-      [`Estimated Tax (£)`, Math.round(tax.total).toString()],
+      [`Gross Rental Income (€)`, Math.round(grossIncome).toString()],
+      [`Total Deductions (€)`, Math.round(totalDeductions).toString()],
+      [`Taxable Profit (€)`, Math.round(taxableProfit).toString()],
+      [`Estimated Tax (€)`, Math.round(tax.total).toString()],
       [''],
-      ['Deduction', 'Amount (£)'],
+      ['Deduction', 'Amount (€)'],
       ...yearDeductions.map(d => [d.label, d.amount.toFixed(2)]),
     ];
     const csv = rows.map(r => r.join(',')).join('\n');
@@ -198,10 +198,10 @@ export default function LandlordTaxesPage() {
   // ── render ────────────────────────────────────────────────────────────────
 
   const summaryRows = [
-    { label: 'Gross Rental Income', value: `£${Math.round(grossIncome).toLocaleString()}`, icon: TrendingUp, color: 'text-primary' },
-    { label: 'Allowable Deductions', value: `−£${Math.round(totalDeductions).toLocaleString()}`, icon: ShieldCheck, color: 'text-green-400' },
-    { label: 'Taxable Profit', value: `£${Math.round(taxableProfit).toLocaleString()}`, icon: Calculator, color: 'text-blue-400' },
-    { label: 'Estimated Tax Owed', value: `£${Math.round(tax.total).toLocaleString()}`, icon: AlertTriangle, color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground' },
+    { label: 'Gross Rental Income', value: `€${Math.round(grossIncome).toLocaleString()}`, icon: TrendingUp, color: 'text-primary' },
+    { label: 'Allowable Deductions', value: `−€${Math.round(totalDeductions).toLocaleString()}`, icon: ShieldCheck, color: 'text-green-400' },
+    { label: 'Taxable Profit', value: `€${Math.round(taxableProfit).toLocaleString()}`, icon: Calculator, color: 'text-blue-400' },
+    { label: 'Estimated Tax Owed', value: `€${Math.round(tax.total).toLocaleString()}`, icon: AlertTriangle, color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground' },
   ];
 
   return (
@@ -260,23 +260,23 @@ export default function LandlordTaxesPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Personal allowance (tax-free)</span>
-              <span>£{Math.min(taxableProfit, PERSONAL_ALLOWANCE).toLocaleString()}</span>
+              <span>€{Math.min(taxableProfit, PERSONAL_ALLOWANCE).toLocaleString()}</span>
             </div>
             {tax.basic > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Basic rate (20%)</span>
-                <span className="text-yellow-400">£{Math.round(tax.basic).toLocaleString()}</span>
+                <span className="text-yellow-400">€{Math.round(tax.basic).toLocaleString()}</span>
               </div>
             )}
             {tax.higher > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Higher rate (40%)</span>
-                <span className="text-red-400">£{Math.round(tax.higher).toLocaleString()}</span>
+                <span className="text-red-400">€{Math.round(tax.higher).toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-border pt-2 font-semibold">
               <span>Estimated total tax</span>
-              <span className="text-primary">£{Math.round(tax.total).toLocaleString()}</span>
+              <span className="text-primary">€{Math.round(tax.total).toLocaleString()}</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground pt-1">
@@ -299,7 +299,7 @@ export default function LandlordTaxesPage() {
             className="flex-1"
           />
           <Input
-            placeholder="£ amount"
+            placeholder="€ amount"
             type="number"
             min="0"
             value={newAmount}
@@ -323,7 +323,7 @@ export default function LandlordTaxesPage() {
               <div key={d.id} className="flex items-center justify-between text-sm py-1.5 border-b border-border/50">
                 <span className="text-foreground">{d.label}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-green-400">−£{d.amount.toLocaleString()}</span>
+                  <span className="text-green-400">−€{d.amount.toLocaleString()}</span>
                   <button onClick={() => removeDeduction(d.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -332,7 +332,7 @@ export default function LandlordTaxesPage() {
             ))}
             <div className="flex justify-between text-sm pt-1 font-semibold">
               <span>Total deductions</span>
-              <span className="text-green-400">−£{Math.round(totalDeductions).toLocaleString()}</span>
+              <span className="text-green-400">−€{Math.round(totalDeductions).toLocaleString()}</span>
             </div>
           </div>
         )}

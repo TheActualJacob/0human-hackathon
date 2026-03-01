@@ -150,17 +150,31 @@ export default function LandlordApplicationsPage() {
       const appData = application.applicant_data as any;
       const email = application.tenants?.email || appData?.email;
       if (email) {
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'accepted',
-            to: email,
-            applicantName: application.tenants?.full_name || appData?.fullName || 'Applicant',
-            propertyAddress: application.units?.address || application.units?.unit_identifier || 'the property',
-            landlordName: 'Robert Ryan',
-          }),
-        }).catch(console.error);
+        try {
+          const emailRes = await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'accepted',
+              to: email,
+              applicantName: application.tenants?.full_name || appData?.fullName || 'Applicant',
+              propertyAddress: application.units?.address || application.units?.unit_identifier || 'the property',
+              landlordName: 'Robert Ryan',
+            }),
+          });
+          if (!emailRes.ok) {
+            const err = await emailRes.json().catch(() => ({}));
+            console.error('Email API error:', err);
+            notify('error', `Application accepted but email failed: ${err.details || 'unknown error'}`);
+            await loadApplications();
+            return;
+          }
+        } catch (emailErr) {
+          console.error('Email fetch error:', emailErr);
+          notify('error', 'Application accepted but email could not be sent.');
+          await loadApplications();
+          return;
+        }
       }
 
       await loadApplications();
@@ -243,18 +257,32 @@ export default function LandlordApplicationsPage() {
       const appData = selectedApplication.applicant_data as any;
       const email = selectedApplication.tenants?.email || appData?.email;
       if (email) {
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'rejected',
-            to: email,
-            applicantName: selectedApplication.tenants?.full_name || appData?.fullName || 'Applicant',
-            propertyAddress: selectedApplication.units?.address || selectedApplication.units?.unit_identifier || 'the property',
-            landlordName: 'Robert Ryan',
-            rejectionReason: rejectReason,
-          }),
-        }).catch(console.error);
+        try {
+          const emailRes = await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'rejected',
+              to: email,
+              applicantName: selectedApplication.tenants?.full_name || appData?.fullName || 'Applicant',
+              propertyAddress: selectedApplication.units?.address || selectedApplication.units?.unit_identifier || 'the property',
+              landlordName: 'Robert Ryan',
+              rejectionReason: rejectReason,
+            }),
+          });
+          if (!emailRes.ok) {
+            const err = await emailRes.json().catch(() => ({}));
+            console.error('Email API error:', err);
+            notify('error', `Application rejected but email failed: ${err.details || 'unknown error'}`);
+            await loadApplications();
+            setShowRejectDialog(false);
+            setRejectReason('');
+            setSelectedApplication(null);
+            return;
+          }
+        } catch (emailErr) {
+          console.error('Email fetch error:', emailErr);
+        }
       }
 
       await loadApplications();

@@ -33,6 +33,7 @@ import {
   Sparkles,
   Info,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -698,8 +699,6 @@ export default function MaintenancePage() {
   const [filterState, setFilterState] = useState('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [showPolicySettings, setShowPolicySettings] = useState(false);
-
   const [formData, setFormData] = useState({ leaseId: '', description: '' });
 
   const DEFAULT_POLICY: AutoApprovalPolicy = {
@@ -841,9 +840,9 @@ export default function MaintenancePage() {
               <Plus className="h-4 w-4" />
               New Request
             </button>
-            <button
-              onClick={() => setShowPolicySettings((v) => !v)}
-              title="Auto-Approval Policy"
+            <Link
+              href="/landlord/settings?tab=automation"
+              title="AI Automation Settings"
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-all',
                 policy.enabled
@@ -851,134 +850,10 @@ export default function MaintenancePage() {
                   : 'bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
               )}
             >
-              <Settings2 className="h-3.5 w-3.5" />
-              {policy.enabled ? 'Policy ON' : 'Policy'}
-            </button>
+              <Sparkles className="h-3.5 w-3.5" />
+              {policy.enabled ? 'Agent ON' : 'Agent OFF'}
+            </Link>
           </div>
-
-          {/* ── Auto-Approval Policy Settings Panel ── */}
-          {showPolicySettings && (
-            <div className="mb-3 bg-card border border-border rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-accent/30">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-semibold">Auto-Approval Policy</span>
-                <div className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {policy.enabled ? 'Active' : 'Off'}
-                  </span>
-                  <button
-                    onClick={() => setPolicy((p) => ({ ...p, enabled: !p.enabled }))}
-                    className={cn(
-                      'relative w-9 h-5 rounded-full transition-colors',
-                      policy.enabled ? 'bg-green-500' : 'bg-border'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform',
-                        policy.enabled && 'translate-x-4'
-                      )}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3 space-y-4">
-                {/* Min confidence */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-muted-foreground">Min. AI Confidence</label>
-                    <span className="text-xs font-bold text-primary">
-                      {Math.round(policy.minConfidence * 100)}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="50"
-                    max="99"
-                    step="1"
-                    value={Math.round(policy.minConfidence * 100)}
-                    onChange={(e) =>
-                      setPolicy((p) => ({ ...p, minConfidence: Number(e.target.value) / 100 }))
-                    }
-                    className="w-full h-1.5 rounded-full appearance-none bg-border cursor-pointer accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-muted-foreground/60">
-                    <span>50%</span>
-                    <span>75%</span>
-                    <span>99%</span>
-                  </div>
-                </div>
-
-                {/* Max cost */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Max. Auto-Approve Cost</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(['low', 'medium', 'high'] as const).map((tier) => (
-                      <button
-                        key={tier}
-                        onClick={() => setPolicy((p) => ({ ...p, maxCostRange: tier }))}
-                        className={cn(
-                          'py-1.5 rounded-lg border text-xs font-medium transition-all',
-                          policy.maxCostRange === tier
-                            ? tier === 'low'
-                              ? 'bg-green-500/20 border-green-500/50 text-green-300'
-                              : tier === 'medium'
-                                ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
-                                : 'bg-red-500/20 border-red-500/50 text-red-300'
-                            : 'bg-card border-border text-muted-foreground hover:border-primary/30'
-                        )}
-                      >
-                        {tier === 'low' ? '< €200' : tier === 'medium' ? '< €800' : 'Any'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Exclude emergency */}
-                <button
-                  onClick={() =>
-                    setPolicy((p) => ({ ...p, excludeEmergency: !p.excludeEmergency }))
-                  }
-                  className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-all text-left',
-                    policy.excludeEmergency
-                      ? 'bg-orange-500/10 border-orange-500/30 text-orange-300'
-                      : 'bg-card border-border text-muted-foreground'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0',
-                      policy.excludeEmergency
-                        ? 'bg-orange-500 border-orange-500'
-                        : 'border-border'
-                    )}
-                  >
-                    {policy.excludeEmergency && (
-                      <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-                    )}
-                  </div>
-                  Emergencies always notify owner
-                </button>
-
-                {/* Info callout */}
-                <div className="flex items-start gap-2 p-2.5 bg-primary/5 border border-primary/15 rounded-lg">
-                  <Info className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    When AI confidence ≥ {Math.round(policy.minConfidence * 100)}% and cost ≤{' '}
-                    {policy.maxCostRange === 'low'
-                      ? '€200'
-                      : policy.maxCostRange === 'medium'
-                        ? '€800'
-                        : 'any amount'}
-                    {policy.excludeEmergency ? ' (non-emergency)' : ''}, requests are approved
-                    automatically without owner input.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-2">
             <div className="relative">

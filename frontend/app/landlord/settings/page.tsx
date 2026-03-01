@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   User, Bell, Shield, Key, Globe, Palette, 
-  Building, CreditCard, Save, Check
+  Building, CreditCard, Save, Check,
+  Brain, Wrench, Zap, Info, CheckCircle2
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,11 +19,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import useAuthStore from '@/lib/store/auth';
 import { getCurrentUser } from '@/lib/auth/client';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
+import type { AutoApprovalPolicy } from '@/types';
+
+const POLICY_KEY = 'maintenance_auto_approval_policy';
+
+const DEFAULT_POLICY: AutoApprovalPolicy = {
+  enabled: false,
+  minConfidence: 0.9,
+  maxCostRange: 'low',
+  excludeEmergency: true,
+};
 
 export default function LandlordSettingsPage() {
   // const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') ?? 'profile');
+  const [policySaved, setPolicySaved] = useState(false);
+  const [policy, setPolicy] = useState<AutoApprovalPolicy>(() => {
+    if (typeof window === 'undefined') return DEFAULT_POLICY;
+    try {
+      const stored = localStorage.getItem(POLICY_KEY);
+      return stored ? { ...DEFAULT_POLICY, ...JSON.parse(stored) } : DEFAULT_POLICY;
+    } catch {
+      return DEFAULT_POLICY;
+    }
+  });
   const [isLoading, setIsLoading] = useState(true);
   const { user, setUser } = useAuthStore();
   const supabase = createClient();
@@ -47,6 +71,18 @@ export default function LandlordSettingsPage() {
     portfolioSize: '5-10',
     paymentTerms: ''
   });
+
+  // Sync policy from Supabase when user loads (cross-device consistency)
+  useEffect(() => {
+    if (user?.entity?.notification_preferences?.maintenance_policy) {
+      const dbPolicy = {
+        ...DEFAULT_POLICY,
+        ...user.entity.notification_preferences.maintenance_policy,
+      } as AutoApprovalPolicy;
+      setPolicy(dbPolicy);
+      try { localStorage.setItem(POLICY_KEY, JSON.stringify(dbPolicy)); } catch {}
+    }
+  }, [user?.entityId]);
 
   // Load user data on mount
   useEffect(() => {
@@ -132,17 +168,37 @@ export default function LandlordSettingsPage() {
         });
       }
 
-      // toast({
-      //   title: "Settings saved",
-      //   description: "Your changes have been saved successfully.",
-      // });
-      alert('Settings saved successfully!');
+      setPolicySaved(true);
+      setTimeout(() => setPolicySaved(false), 2500);
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Error saving settings. Please try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const savePolicy = async (next: AutoApprovalPolicy) => {
+    // Always update localStorage immediately for instant UI feedback
+    try { localStorage.setItem(POLICY_KEY, JSON.stringify(next)); } catch {}
+    setPolicy(next);
+
+    // Persist to Supabase so the server can enforce it on any device / tenant submission
+    if (user?.entityId) {
+      try {
+        const currentPrefs = user.entity?.notification_preferences || {};
+        await supabase
+          .from('landlords')
+          .update({
+            notification_preferences: { ...currentPrefs, maintenance_policy: next },
+          })
+          .eq('id', user.entityId);
+      } catch (err) {
+        console.error('Failed to persist maintenance policy:', err);
+      }
+    }
+
+    setPolicySaved(true);
+    setTimeout(() => setPolicySaved(false), 2000);
   };
 
   return (
@@ -156,9 +212,13 @@ export default function LandlordSettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="automation" className="flex items-center gap-1.5">
+            <Brain className="h-3.5 w-3.5" />
+            AI
+          </TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
@@ -333,6 +393,175 @@ export default function LandlordSettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* AI & Automation Tab */}
+        <TabsContent value="automation" className="space-y-4 mt-6">
+          {/* Master toggle */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-1 flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              Maintenance Request Handling
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Choose whether the AI agent automatically handles incoming maintenance requests or you review each one manually.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Manual card */}
+              <button
+                onClick={() => savePolicy({ ...policy, enabled: false })}
+                className={cn(
+                  'relative flex flex-col items-start gap-2 rounded-xl border-2 p-5 text-left transition-all',
+                  !policy.enabled
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
+                )}
+              >
+                {!policy.enabled && (
+                  <CheckCircle2 className="absolute top-3 right-3 h-4 w-4 text-primary" />
+                )}
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                    <Wrench className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <span className="font-semibold">Manual Approval</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You review and approve every maintenance request before any action is taken. Full control, every time.
+                </p>
+              </button>
+
+              {/* Agent card */}
+              <button
+                onClick={() => savePolicy({ ...policy, enabled: true })}
+                className={cn(
+                  'relative flex flex-col items-start gap-2 rounded-xl border-2 p-5 text-left transition-all',
+                  policy.enabled
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
+                )}
+              >
+                {policy.enabled && (
+                  <CheckCircle2 className="absolute top-3 right-3 h-4 w-4 text-primary" />
+                )}
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="font-semibold">AI Agent Handles It</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  The AI classifies, approves, and coordinates maintenance automatically based on the rules you set below.
+                </p>
+              </button>
+            </div>
+
+            {/* Rules — only visible when agent mode is on */}
+            {policy.enabled && (
+              <div className="space-y-5 pt-5 border-t border-border">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  Auto-Approval Rules
+                </p>
+
+                {/* Confidence slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Minimum AI Confidence</Label>
+                    <span className="text-sm font-bold text-primary">
+                      {Math.round(policy.minConfidence * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="99"
+                    step="1"
+                    value={Math.round(policy.minConfidence * 100)}
+                    onChange={(e) =>
+                      savePolicy({ ...policy, minConfidence: Number(e.target.value) / 100 })
+                    }
+                    className="w-full h-2 rounded-full appearance-none bg-border cursor-pointer accent-primary"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground/60">
+                    <span>50% — permissive</span>
+                    <span>99% — strict</span>
+                  </div>
+                </div>
+
+                {/* Max cost */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Maximum Cost the Agent Can Approve</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['low', 'medium', 'high'] as const).map((tier) => (
+                      <button
+                        key={tier}
+                        onClick={() => savePolicy({ ...policy, maxCostRange: tier })}
+                        className={cn(
+                          'py-2 rounded-lg border text-sm font-medium transition-all',
+                          policy.maxCostRange === tier
+                            ? tier === 'low'
+                              ? 'bg-green-500/20 border-green-500/50 text-green-300'
+                              : tier === 'medium'
+                                ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
+                                : 'bg-red-500/20 border-red-500/50 text-red-300'
+                            : 'bg-card border-border text-muted-foreground hover:border-primary/40'
+                        )}
+                      >
+                        {tier === 'low' ? '< €200' : tier === 'medium' ? '< €800' : 'Any amount'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Emergency toggle */}
+                <div className="flex items-center justify-between py-3 px-4 rounded-lg border border-border bg-card">
+                  <div>
+                    <p className="text-sm font-medium">Always notify me for emergencies</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Emergency requests skip auto-approval and come straight to you
+                    </p>
+                  </div>
+                  <Switch
+                    checked={policy.excludeEmergency}
+                    onCheckedChange={(checked) =>
+                      savePolicy({ ...policy, excludeEmergency: checked })
+                    }
+                  />
+                </div>
+
+                {/* Summary callout */}
+                <div className="flex items-start gap-2.5 p-3.5 bg-primary/5 border border-primary/15 rounded-lg">
+                  <Info className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    The agent will auto-approve requests where AI confidence ≥{' '}
+                    <span className="text-foreground font-medium">
+                      {Math.round(policy.minConfidence * 100)}%
+                    </span>{' '}
+                    and estimated cost is{' '}
+                    <span className="text-foreground font-medium">
+                      {policy.maxCostRange === 'low'
+                        ? 'under €200'
+                        : policy.maxCostRange === 'medium'
+                          ? 'under €800'
+                          : 'any amount'}
+                    </span>
+                    {policy.excludeEmergency ? ', excluding emergencies' : ''}.
+                    Everything else comes to you for manual review.
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Saved indicator */}
+          {policySaved && (
+            <div className="flex items-center gap-2 text-sm text-green-400 justify-end">
+              <CheckCircle2 className="h-4 w-4" />
+              Saved
+            </div>
+          )}
+        </TabsContent>
+
         {/* Security Tab */}
         <TabsContent value="security" className="space-y-4 mt-6">
           <Card className="p-6">
@@ -489,8 +718,14 @@ export default function LandlordSettingsPage() {
       </Tabs>
 
       {/* Save Button */}
-      <div className="flex justify-end pt-6">
-        <Button 
+      <div className="flex items-center justify-end gap-3 pt-6">
+        {policySaved && (
+          <span className="flex items-center gap-1.5 text-sm text-green-400">
+            <CheckCircle2 className="h-4 w-4" />
+            Saved
+          </span>
+        )}
+        <Button
           onClick={handleSave}
           disabled={saving}
           className="min-w-32"

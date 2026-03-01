@@ -16,7 +16,6 @@ import { AIDecisionPanel } from '@/components/maintenance/AIDecisionPanel';
 import { OwnerActionPanel } from '@/components/maintenance/OwnerActionPanel';
 import { VendorCoordinationPanel } from '@/components/maintenance/VendorCoordinationPanel';
 import { ResolutionPanel } from '@/components/maintenance/ResolutionPanel';
-import { DebugPanel } from '@/components/maintenance/DebugPanel';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { WorkflowState } from '@/types';
@@ -405,8 +404,6 @@ export default function LandlordMaintenancePage() {
         </div>
       </div>
       
-      {/* Debug Panel */}
-      <DebugPanel />
     </div>
   );
 }

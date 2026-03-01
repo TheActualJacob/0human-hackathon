@@ -157,7 +157,36 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabase();
-    const policy: AutoApprovalPolicy | null = auto_approval_policy ?? null;
+
+    // Resolve the landlord's stored policy from Supabase.
+    // The client may pass it directly (legacy path), but if not we look it up
+    // so tenant submissions and cross-device requests are always enforced.
+    let policy: AutoApprovalPolicy | null = auto_approval_policy ?? null;
+
+    if (!policy) {
+      try {
+        const { data: lease } = await supabase
+          .from('leases')
+          .select('landlord_id')
+          .eq('id', lease_id)
+          .single();
+
+        if (lease?.landlord_id) {
+          const { data: landlord } = await supabase
+            .from('landlords')
+            .select('notification_preferences')
+            .eq('id', lease.landlord_id)
+            .single();
+
+          const stored = landlord?.notification_preferences?.maintenance_policy;
+          if (stored) {
+            policy = { enabled: false, minConfidence: 0.9, maxCostRange: 'low', excludeEmergency: true, ...stored } as AutoApprovalPolicy;
+          }
+        }
+      } catch (err) {
+        console.warn('[submit] Could not load landlord policy from DB, proceeding with manual flow:', err);
+      }
+    }
 
     // ── 1. AI Analysis ────────────────────────────────────────────────────────
     let aiAnalysis: AIAnalysis;

@@ -241,7 +241,7 @@ async function exportToPDF(data: PDFData) {
 
   if (data.isMock) {
     rect(margin, y - 16, contentWidth, 22, rgb(0.95, 0.85, 0.1));
-    text('⚠  DEMO DATA — This report uses mock data for illustration purposes only', margin + 8, y - 10, { size: 9, font: bold, color: rgb(0.4, 0.3, 0) });
+    text('DEMO DATA - This report uses mock data for illustration purposes only', margin + 8, y - 10, { size: 9, font: bold, color: rgb(0.4, 0.3, 0) });
     y -= 36;
   }
 

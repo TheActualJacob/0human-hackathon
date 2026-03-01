@@ -131,16 +131,15 @@ export default function LandlordDashboard() {
     .reduce((sum, l) => sum + (l.monthly_rent || 0), 0);
 
   const now = new Date();
-  const collectedThisMonth = payments
-    .filter((p) => {
-      const d = new Date(p.paid_date || '');
-      return (
-        p.status === 'paid' &&
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      );
-    })
+  const thisMonthPayments = payments.filter((p) => {
+    const d = new Date(p.due_date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const collectedThisMonth = thisMonthPayments
+    .filter((p) => p.status === 'paid')
     .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+  const expectedThisMonth = thisMonthPayments
+    .reduce((sum, p) => sum + (p.amount_due || 0), 0);
 
   const activeMaintenanceRequests = maintenanceRequests.filter((r) =>
     ['open', 'assigned', 'in_progress'].includes(r.status || '')
@@ -152,10 +151,13 @@ export default function LandlordDashboard() {
       (p.status === 'pending' && new Date(p.due_date) < now)
   ).length;
 
-  const collectionRate =
-    payments.length > 0
-      ? Math.round((payments.filter((p) => p.status === 'paid').length / payments.length) * 100)
-      : 0;
+  const totalExpected = payments.reduce((sum, p) => sum + (p.amount_due || 0), 0);
+  const totalCollected = payments
+    .filter((p) => p.status === 'paid')
+    .reduce((sum, p) => sum + (p.amount_paid || 0), 0);
+  const collectionRate = totalExpected > 0
+    ? Math.round((totalCollected / totalExpected) * 100)
+    : 0;
 
   // Portfolio health: composite of occupancy, collection rate, maintenance health
   const maintenanceHealth = activeMaintenanceRequests === 0 ? 100 : Math.max(0, 100 - activeMaintenanceRequests * 6);
@@ -283,7 +285,7 @@ export default function LandlordDashboard() {
             </div>
           </div>
           <div className="mt-4">
-            <CollectionBar collected={collectedThisMonth} total={totalMonthlyRent} />
+            <CollectionBar collected={collectedThisMonth} total={expectedThisMonth || totalMonthlyRent} />
           </div>
         </div>
 

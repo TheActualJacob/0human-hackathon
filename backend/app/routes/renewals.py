@@ -199,7 +199,7 @@ async def get_renewal_dashboard(
     # Fetch leases for this landlord
     leases_res = (
         sb.table("leases")
-        .select("id, start_date, end_date, rent_amount, status, renewal_status, units!inner(landlord_id, address, unit_identifier), tenants(full_name, whatsapp_number, email)")
+        .select("id, start_date, end_date, monthly_rent, status, renewal_status, units!inner(landlord_id, address, unit_identifier), tenants(full_name, whatsapp_number, email)")
         .eq("units.landlord_id", landlord_id)
         .eq("status", "active")
         .execute()
@@ -242,12 +242,12 @@ async def get_renewal_dashboard(
             sb.table("renewal_negotiation_logs")
             .select("id, tenant_message, ai_suggested_response, classification, sentiment_label, ai_suggested_counter_rent, ai_new_renewal_probability, created_at")
             .eq("lease_id", lease_id)
-            .order("created_at", ascending=True)
+            .order("created_at", desc=False)
             .execute()
         )
         negotiation_history = neg_res.data or []
 
-        current_rent = float(lease.get("rent_amount") or 0)
+        current_rent = float(lease.get("monthly_rent") or 0)
         unit_raw = lease.get("units")
         unit = (unit_raw[0] if isinstance(unit_raw, list) else unit_raw) or {}
         tenant_raw = lease.get("tenants")

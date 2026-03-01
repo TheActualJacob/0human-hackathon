@@ -220,7 +220,7 @@ async def analyse_tenant_response(
     tenant_name = tenant.get("full_name", "Tenant")
     tenant_phone = tenant.get("whatsapp_number")
     proposed_rent = float(offer.get("proposed_rent") or 0)
-    original_rent = float(lease.get("rent_amount") or 0)
+    original_rent = float(lease.get("monthly_rent") or 0)
     lease_end = lease.get("end_date", "")
     lease_id = offer.get("lease_id")
     landlord_id = unit.get("landlord_id")

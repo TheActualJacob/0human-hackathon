@@ -181,7 +181,7 @@ async def score_lease(lease_id: str, market_rent: float | None = None) -> dict[s
     except (KeyError, ValueError):
         lease_months = 12.0
 
-    current_rent = float(lease.get("rent_amount") or 0)
+    current_rent = float(lease.get("monthly_rent") or 0)
     if market_rent is None:
         market_rent = current_rent * 1.05  # fallback: assume 5% above current
 

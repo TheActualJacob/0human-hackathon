@@ -118,7 +118,7 @@ async def initiate_renewal(lease_id: str, market_rent: float | None = None, land
     whatsapp = tenant.get("whatsapp_number")
     email = tenant.get("email")
     property_address = f"{unit.get('address', '')}, {unit.get('city', '')}".strip(", ")
-    current_rent = float(lease.get("rent_amount") or 0)
+    current_rent = float(lease.get("monthly_rent") or 0)
 
     # ── Pricing simulation ────────────────────────────────────────────────────
     sim = await run_pricing_simulation(lease_id, market_rent=market_rent)

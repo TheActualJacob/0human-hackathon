@@ -17,7 +17,6 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   const isPublicPage =
     pathname === '/' ||
     pathname.startsWith('/pay/') ||
-    pathname.startsWith('/properties') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/demo');
 

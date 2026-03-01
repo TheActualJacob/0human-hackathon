@@ -176,7 +176,7 @@ export default function LandlordApplicationsPage() {
       pending: { variant: 'secondary' as const, icon: Clock, label: 'Pending' },
       ai_screening: { variant: 'outline' as const, icon: Brain, label: 'AI Screening' },
       under_review: { variant: 'outline' as const, icon: AlertCircle, label: 'Under Review' },
-      accepted: { variant: 'success' as const, icon: CheckCircle, label: 'Accepted' },
+      accepted: { variant: 'default' as const, icon: CheckCircle, label: 'Accepted' },
       rejected: { variant: 'destructive' as const, icon: XCircle, label: 'Rejected' },
       withdrawn: { variant: 'secondary' as const, icon: XCircle, label: 'Withdrawn' }
     };
@@ -270,7 +270,10 @@ export default function LandlordApplicationsPage() {
               </CardContent>
             </Card>
           ) : (
-            filteredApplications.map((application) => (
+            filteredApplications.map((application) => {
+              const appData = application.applicant_data as any;
+              const screeningResult = application.ai_screening_result as any;
+              return (
               <Card key={application.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -323,99 +326,99 @@ export default function LandlordApplicationsPage() {
                     <div>
                       <p className="text-muted-foreground">Monthly Income</p>
                       <p className="font-medium">
-                        {application.applicant_data?.monthlyIncome || 'Not provided'}
+                        {appData?.monthlyIncome || 'Not provided'}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Employment</p>
                       <p className="font-medium">
-                        {application.applicant_data?.employmentStatus?.replace(/_/g, ' ') || 'Not provided'}
+                        {appData?.employmentStatus?.replace(/_/g, ' ') || 'Not provided'}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Move-in Date</p>
                       <p className="font-medium">
-                        {application.applicant_data?.preferredMoveInDate 
-                          ? format(new Date(application.applicant_data.preferredMoveInDate), 'MMM d, yyyy')
+                        {appData?.preferredMoveInDate 
+                          ? format(new Date(appData.preferredMoveInDate), 'MMM d, yyyy')
                           : 'ASAP'}
                       </p>
                     </div>
                   </div>
 
                   {/* AI Screening Results */}
-                  {application.ai_screening_result && (
+                  {screeningResult && (
                     <Alert className="bg-primary/5">
                       <Brain className="h-4 w-4" />
                       <AlertDescription>
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <p className="font-medium">AI Screening Summary</p>
-                            {application.ai_screening_result.details?.aiProvider && (
+                            {screeningResult.details?.aiProvider && (
                               <Badge variant="outline" className="text-xs">
-                                {application.ai_screening_result.details.aiProvider === 'claude-3-sonnet' ? 'Claude AI' : 'Rule-based'}
+                                {screeningResult.details.aiProvider === 'claude-3-sonnet' ? 'Claude AI' : 'Rule-based'}
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm">{application.ai_screening_result.summary}</p>
+                          <p className="text-sm">{screeningResult.summary}</p>
                           
                           {/* Risk Factors */}
-                          {application.ai_screening_result.details?.riskFactors && (
+                          {screeningResult.details?.riskFactors && (
                             <div className="flex gap-4 text-sm">
                               <div className="flex items-center gap-1">
                                 <span className="font-medium">Financial:</span>
                                 <Badge 
                                   variant={
-                                    application.ai_screening_result.details.riskFactors.financialRisk === 'low' ? 'default' :
-                                    application.ai_screening_result.details.riskFactors.financialRisk === 'medium' ? 'secondary' : 'destructive'
+                                    screeningResult.details.riskFactors.financialRisk === 'low' ? 'default' :
+                                    screeningResult.details.riskFactors.financialRisk === 'medium' ? 'secondary' : 'destructive'
                                   }
                                   className="text-xs"
                                 >
-                                  {application.ai_screening_result.details.riskFactors.financialRisk}
+                                  {screeningResult.details.riskFactors.financialRisk}
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="font-medium">Stability:</span>
                                 <Badge 
                                   variant={
-                                    application.ai_screening_result.details.riskFactors.stabilityRisk === 'low' ? 'default' :
-                                    application.ai_screening_result.details.riskFactors.stabilityRisk === 'medium' ? 'secondary' : 'destructive'
+                                    screeningResult.details.riskFactors.stabilityRisk === 'low' ? 'default' :
+                                    screeningResult.details.riskFactors.stabilityRisk === 'medium' ? 'secondary' : 'destructive'
                                   }
                                   className="text-xs"
                                 >
-                                  {application.ai_screening_result.details.riskFactors.stabilityRisk}
+                                  {screeningResult.details.riskFactors.stabilityRisk}
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="font-medium">Property:</span>
                                 <Badge 
                                   variant={
-                                    application.ai_screening_result.details.riskFactors.propertyRisk === 'low' ? 'default' :
-                                    application.ai_screening_result.details.riskFactors.propertyRisk === 'medium' ? 'secondary' : 'destructive'
+                                    screeningResult.details.riskFactors.propertyRisk === 'low' ? 'default' :
+                                    screeningResult.details.riskFactors.propertyRisk === 'medium' ? 'secondary' : 'destructive'
                                   }
                                   className="text-xs"
                                 >
-                                  {application.ai_screening_result.details.riskFactors.propertyRisk}
+                                  {screeningResult.details.riskFactors.propertyRisk}
                                 </Badge>
                               </div>
                             </div>
                           )}
                           
-                          {application.ai_screening_result.strengths?.length > 0 && (
+                          {screeningResult.strengths?.length > 0 && (
                             <div>
                               <p className="text-sm font-medium text-green-600">Strengths:</p>
                               <ul className="text-sm list-disc list-inside">
-                                {application.ai_screening_result.strengths.map((strength: string, i: number) => (
+                                {screeningResult.strengths.map((strength: string, i: number) => (
                                   <li key={i}>{strength}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
                           
-                          {application.ai_screening_result.concerns?.length > 0 && (
+                          {screeningResult.concerns?.length > 0 && (
                             <div>
                               <p className="text-sm font-medium text-yellow-600">Concerns:</p>
                               <ul className="text-sm list-disc list-inside">
-                                {application.ai_screening_result.concerns.map((concern: string, i: number) => (
+                                {screeningResult.concerns.map((concern: string, i: number) => (
                                   <li key={i}>{concern}</li>
                                 ))}
                               </ul>
@@ -423,11 +426,11 @@ export default function LandlordApplicationsPage() {
                           )}
                           
                           {/* Verification Needed */}
-                          {application.ai_screening_result.details?.verificationNeeded?.length > 0 && (
+                          {screeningResult.details?.verificationNeeded?.length > 0 && (
                             <div>
                               <p className="text-sm font-medium text-blue-600">Verification Required:</p>
                               <ul className="text-sm list-disc list-inside">
-                                {application.ai_screening_result.details.verificationNeeded.map((item: string, i: number) => (
+                                {screeningResult.details.verificationNeeded.map((item: string, i: number) => (
                                   <li key={i}>{item}</li>
                                 ))}
                               </ul>
@@ -435,19 +438,19 @@ export default function LandlordApplicationsPage() {
                           )}
                           
                           {/* Additional Insights */}
-                          {application.ai_screening_result.details?.additionalInsights && (
+                          {screeningResult.details?.additionalInsights && (
                             <div className="bg-muted/50 p-3 rounded text-sm">
                               <p className="font-medium mb-1">Additional Insights:</p>
-                              <p>{application.ai_screening_result.details.additionalInsights}</p>
+                              <p>{screeningResult.details.additionalInsights}</p>
                             </div>
                           )}
                           
                           {/* Suggested Questions */}
-                          {application.ai_screening_result.details?.suggestedQuestions?.length > 0 && (
+                          {screeningResult.details?.suggestedQuestions?.length > 0 && (
                             <div>
                               <p className="text-sm font-medium text-purple-600">Suggested Follow-up Questions:</p>
                               <ul className="text-sm list-disc list-inside">
-                                {application.ai_screening_result.details.suggestedQuestions.map((question: string, i: number) => (
+                                {screeningResult.details.suggestedQuestions.map((question: string, i: number) => (
                                   <li key={i}>{question}</li>
                                 ))}
                               </ul>
@@ -459,13 +462,13 @@ export default function LandlordApplicationsPage() {
                   )}
 
                   {/* Cover Letter */}
-                  {application.applicant_data?.coverLetter && (
+                  {appData?.coverLetter && (
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <p className="text-sm font-medium mb-2 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
                         Cover Letter
                       </p>
-                      <p className="text-sm">{application.applicant_data.coverLetter}</p>
+                      <p className="text-sm">{appData?.coverLetter}</p>
                     </div>
                   )}
 
@@ -527,7 +530,8 @@ export default function LandlordApplicationsPage() {
                   )}
                 </CardContent>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>
       </Tabs>

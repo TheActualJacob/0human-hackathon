@@ -209,11 +209,10 @@ def _upload_lease_preview_pdf(
         from app.routes.signing import generate_lease_preview_pdf
         pdf_bytes = generate_lease_preview_pdf(applicant_name, unit_address, monthly_rent, lease_content)
         filename = f"lease_preview_{token_id[:8]}_{datetime.now().strftime('%Y%m%d')}.pdf"
-        upload_res = sb.storage.from_("leases-signed").upload(
-            filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "false"}
+        sb.storage.from_("leases-signed").upload(
+            filename, pdf_bytes, {"content-type": "application/pdf", "upsert": "true"}
         )
-        if upload_res:
-            return sb.storage.from_("leases-signed").get_public_url(filename)
+        return sb.storage.from_("leases-signed").get_public_url(filename)
     except Exception as exc:
         print(f"Review agent: lease preview PDF generation/upload failed: {exc}")
     return None
@@ -418,49 +417,78 @@ async def run_application_review(application_id: str) -> None:
 
 
 _DEFAULT_LEASE_TEMPLATE = """\
-ASSURED SHORTHOLD TENANCY AGREEMENT
+This Assured Shorthold Tenancy Agreement ("the Agreement") is entered into between the Landlord \
+and the Tenant identified below, in respect of the residential property described herein.
 
-This agreement is made between the Landlord and the Tenant named below.
+Tenant: {{tenant_name}}
+Property: {{unit_address}}
+Monthly Rent: {{monthly_rent}}
+Tenancy Start Date: {{start_date}}
+Fixed Term: 12 months
 
-TENANT: {{tenant_name}}
-PROPERTY: {{unit_address}}
-MONTHLY RENT: {{monthly_rent}}
-TENANCY START DATE: {{start_date}}
-TENANCY TERM: 12 months (fixed term)
+1. RENT PAYMENT
+The Tenant agrees to pay the monthly rent of {{monthly_rent}} on or before the first day of each \
+calendar month, in advance, by bank transfer or standing order to an account designated by the \
+Landlord. Rent is payable without deduction or set-off unless otherwise agreed in writing.
 
-1. RENT
-The Tenant agrees to pay the monthly rent of {{monthly_rent}} on the first day of each month,
-in advance, by bank transfer or standing order.
-
-2. DEPOSIT
-A tenancy deposit equivalent to five weeks' rent is required before move-in. This will be
-protected in a government-approved tenancy deposit scheme.
+2. TENANCY DEPOSIT
+A tenancy deposit equivalent to five weeks' rent is payable by the Tenant before the commencement \
+of the tenancy. The deposit will be registered with a government-authorised Tenancy Deposit Scheme \
+within 30 days of receipt. The Landlord will provide the Tenant with the prescribed information \
+relating to the deposit scheme used.
 
 3. TENANT OBLIGATIONS
-The Tenant agrees to:
-(a) Pay rent on time and in full.
-(b) Keep the property clean and in good condition.
-(c) Not sublet the property or take in lodgers without written consent from the Landlord.
-(d) Report any repairs or maintenance issues promptly.
-(e) Allow access for inspections with reasonable notice (at least 24 hours).
-(f) Not cause nuisance or annoyance to neighbours.
+The Tenant agrees to: (a) Pay rent on the due date in full. (b) Use the property solely as a \
+private residence. (c) Keep the interior of the property clean and in good condition throughout \
+the tenancy. (d) Not carry out any alterations, decorations, or works without the prior written \
+consent of the Landlord. (e) Not sublet the property or any part thereof, nor take in lodgers, \
+without the Landlord's written consent. (f) Report promptly to the Landlord any defects, damage, \
+or repairs required. (g) Allow the Landlord or their agents access to the property for inspection \
+or repairs upon giving at least 24 hours' written notice, except in emergencies. (h) Not cause \
+nuisance or annoyance to neighbours or adjoining occupiers.
 
 4. LANDLORD OBLIGATIONS
-The Landlord agrees to:
-(a) Keep the structure and exterior of the property in repair.
-(b) Maintain installations for water, gas, electricity, and heating.
-(c) Ensure the property meets all legal safety requirements.
+The Landlord agrees to: (a) Keep the structure and exterior of the property (including the roof, \
+external walls, windows, and doors) in good repair. (b) Maintain in good repair and proper working \
+order the installations for the supply of water, gas, electricity, sanitation, space heating, and \
+water heating. (c) Ensure the property complies with all applicable health and safety regulations, \
+including gas safety checks (annual), electrical installation condition reports (every 5 years), \
+and the provision of working smoke and carbon monoxide alarms. (d) Ensure the property is fit for \
+human habitation at the commencement of the tenancy and throughout.
 
-5. NOTICE PERIODS
-Either party may end the tenancy after the fixed term by giving at least 2 months' written
-notice (Landlord) or 1 month's written notice (Tenant).
+5. UTILITIES AND COUNCIL TAX
+The Tenant is responsible for paying all utility bills (gas, electricity, water, broadband, and \
+telephone) and Council Tax in respect of the property during the tenancy, unless otherwise agreed \
+in writing.
 
-6. UTILITIES AND COUNCIL TAX
-The Tenant is responsible for paying all utility bills and Council Tax during the tenancy.
+6. REPAIRS AND MAINTENANCE
+The Tenant must notify the Landlord in writing of any repairs required as soon as reasonably \
+practicable. The Landlord will arrange for necessary repairs within a reasonable time. The Tenant \
+is responsible for minor maintenance tasks such as replacing light bulbs and keeping drains clear.
 
-7. GOVERNING LAW
-This agreement is governed by the laws of England and Wales.
+7. ALTERATIONS AND DECORATION
+The Tenant must not make any alterations, additions, or improvements to the property, nor redecorate \
+any part of it, without the prior written consent of the Landlord. Any unauthorised alterations may \
+be required to be reversed at the Tenant's cost at the end of the tenancy.
 
-TENANT SIGNATURE: ___________________________  Date: ___________
-LANDLORD SIGNATURE: ___________________________  Date: ___________
+8. SUBLETTING AND ASSIGNMENT
+The Tenant must not assign, sublet, part with possession of, or share occupation of the whole or \
+any part of the property without the prior written consent of the Landlord. Any consent given will \
+not constitute a waiver of this condition in relation to future requests.
+
+9. NOTICE PERIODS
+After the expiry of the fixed term, either party may end the tenancy by serving written notice as \
+follows: the Landlord must give at least 2 months' written notice; the Tenant must give at least \
+1 month's written notice. During the fixed term, the tenancy may only be ended early by mutual \
+written agreement or in accordance with any break clause set out in a schedule to this agreement.
+
+10. END OF TENANCY
+At the end of the tenancy the Tenant must: (a) Return all keys and access devices to the Landlord. \
+(b) Leave the property in the same state of cleanliness and condition as at the start of the \
+tenancy (fair wear and tear excepted). (c) Remove all personal possessions and clear all rubbish. \
+(d) Provide a forwarding address for the return of the deposit and any correspondence.
+
+11. GOVERNING LAW
+This Agreement is governed by and shall be construed in accordance with the laws of England and \
+Wales. Both parties submit to the exclusive jurisdiction of the courts of England and Wales.
 """

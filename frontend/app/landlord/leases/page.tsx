@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
+import {
   FileText, Calendar, TrendingUp, AlertCircle, Plus,
-  User, Home, DollarSign, Clock, ChevronRight
+  User, Home, DollarSign, Clock, ChevronRight, Copy, CheckCircle2
 } from "lucide-react";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -18,38 +18,67 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import useLandlordStore from "@/lib/store/landlord";
 import useAuthStore from "@/lib/store/auth";
 import { getCurrentUser } from "@/lib/auth/client";
+import { createClient } from "@/lib/supabase/client";
 import { format, differenceInDays, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function LandlordLeasesPage() {
-  const { 
+  const {
     leases,
     units,
     tenants,
     loading,
     fetchLandlordData
   } = useLandlordStore();
-  const { user, setUser } = useAuthStore();
+
+  const { user } = useAuthStore();
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showNewLeaseDialog, setShowNewLeaseDialog] = useState(false);
   const [selectedLease, setSelectedLease] = useState<string | null>(null);
+  const [signingTokens, setSigningTokens] = useState<any[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      let landlordId = user?.entityId;
-      if (!landlordId) {
-        const currentUser = await getCurrentUser();
-        if (currentUser) { setUser(currentUser); landlordId = currentUser.entityId; }
+    async function load() {
+      let currentUser = user;
+      if (!currentUser) {
+        currentUser = await getCurrentUser();
+        if (currentUser) useAuthStore.getState().setUser(currentUser);
       }
-      if (landlordId) fetchLandlordData(landlordId);
-    };
+      if (currentUser?.entityId) {
+        fetchLandlordData(currentUser.entityId);
+      }
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('signing_tokens')
+        .select('id, prospect_name, unit_address, monthly_rent, signed_at, created_at')
+        .order('created_at', { ascending: false });
+      setSigningTokens(data || []);
+    }
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Get unit info for lease
   const getUnitInfo = (unitId: string) => {
     return units.find(u => u.id === unitId);
+  };
+
+  // Find a signing token for a lease by matching unit address
+  const getSigningToken = (lease: any) => {
+    const unit = getUnitInfo(lease.unit_id);
+    if (!unit) return null;
+    const addr = [unit.unit_identifier, unit.address, unit.city].filter(Boolean).join(', ');
+    return signingTokens.find(t => t.unit_address === addr) || null;
+  };
+
+  const copySigningLink = (tokenId: string) => {
+    const link = `${window.location.origin}/sign/${tokenId}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedId(tokenId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   // Get tenant info for lease
@@ -63,11 +92,8 @@ export default function LandlordLeasesPage() {
     return differenceInDays(new Date(endDate), new Date());
   };
 
-  // Deduplicate leases (guard against Strict Mode double-fetch edge cases)
-  const uniqueLeases = leases.filter((l, i, arr) => arr.findIndex(x => x.id === l.id) === i);
-
   // Filter leases
-  const filteredLeases = uniqueLeases.filter(lease => {
+  const filteredLeases = leases.filter(lease => {
     if (filterStatus === 'all') return true;
     return lease.status === filterStatus;
   });
@@ -142,15 +168,34 @@ export default function LandlordLeasesPage() {
     {
       key: 'actions',
       header: 'Actions',
-      accessor: (lease: any) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setSelectedLease(lease.id)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      )
+      accessor: (lease: any) => {
+        if (lease.status === 'pending') {
+          const token = getSigningToken(lease);
+          if (!token) return <Badge variant="outline" className="text-xs">No signing token</Badge>;
+          if (token.signed_at) return (
+            <Badge variant="default" className="text-xs gap-1">
+              <CheckCircle2 className="h-3 w-3" />Signed
+            </Badge>
+          );
+          return (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => copySigningLink(token.id)}
+            >
+              {copiedId === token.id
+                ? <><CheckCircle2 className="h-3 w-3 text-green-500" />Copied!</>
+                : <><Copy className="h-3 w-3" />Copy Sign Link</>}
+            </Button>
+          );
+        }
+        return (
+          <Button size="sm" variant="ghost" onClick={() => setSelectedLease(lease.id)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        );
+      }
     }
   ];
 
@@ -254,6 +299,13 @@ export default function LandlordLeasesPage() {
           onClick={() => setFilterStatus('draft')}
         >
           Draft
+        </Button>
+        <Button
+          variant={filterStatus === 'pending' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterStatus('pending')}
+        >
+          Pending
         </Button>
       </div>
 

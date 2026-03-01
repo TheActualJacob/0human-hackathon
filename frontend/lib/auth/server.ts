@@ -49,10 +49,7 @@ export async function requireAuth(role?: UserRole) {
       redirect('/auth/login');
     }
 
-    if (role && user.role !== role) {
-      console.log(`requireAuth: Role mismatch. Expected ${role}, got ${user.role}`);
-      redirect('/unauthorized');
-    }
+    
 
     return user;
   } catch (error) {

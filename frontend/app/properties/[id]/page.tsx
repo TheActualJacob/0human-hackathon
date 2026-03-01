@@ -10,6 +10,8 @@ import {
   Layers, Wind, CheckCircle2, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
+import { geocodeAddress } from '@/lib/utils/geocode';
+import type { GeocodedPin } from '@/components/properties/MapView';
 
 const MapView = dynamic(() => import('@/components/properties/MapView'), { ssr: false });
 
@@ -21,6 +23,8 @@ export default function PropertyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
+  const [mapPin, setMapPin] = useState<GeocodedPin[]>([]);
+  const [geocodingMap, setGeocodingMap] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -44,6 +48,12 @@ export default function PropertyDetailPage() {
         setNotFound(true);
       } else {
         setUnit(data);
+        setGeocodingMap(true);
+        const coords = await geocodeAddress(data.address, data.postcode, data.city);
+        if (coords) {
+          setMapPin([{ id: data.id, lat: coords.lat, lng: coords.lng, unit: data }]);
+        }
+        setGeocodingMap(false);
       }
       setLoading(false);
     })();
@@ -252,7 +262,8 @@ export default function PropertyDetailPage() {
               <h2 className="text-white font-bold text-lg mb-3">Location</h2>
               <div className="rounded-2xl overflow-hidden border border-white/8" style={{ height: 320 }}>
                 <MapView
-                  units={[unit]}
+                  pins={mapPin}
+                  geocoding={geocodingMap}
                   highlightedId={null}
                   selectedId={null}
                   onSelect={() => {}}

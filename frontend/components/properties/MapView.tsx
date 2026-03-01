@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { geocodeAddress } from '@/lib/utils/geocode';
 import type { Database } from '@/lib/supabase/database.types';
 
 type Unit = Database['public']['Tables']['units']['Row'];
@@ -13,7 +12,7 @@ export interface UnitWithAttributes extends Unit {
   unit_attributes?: UnitAttributes;
 }
 
-interface GeocodedPin {
+export interface GeocodedPin {
   id: string;
   lat: number;
   lng: number;
@@ -21,7 +20,8 @@ interface GeocodedPin {
 }
 
 interface MapViewProps {
-  units: UnitWithAttributes[];
+  pins: GeocodedPin[];
+  geocoding: boolean;
   highlightedId: string | null;
   selectedId: string | null;
   onSelect: (unit: UnitWithAttributes | null) => void;
@@ -67,43 +67,7 @@ function MapResizer({ isSplit }: { isSplit: boolean }) {
   return null;
 }
 
-export default function MapView({ units, highlightedId, selectedId, onSelect, isSplit }: MapViewProps) {
-  const [pins, setPins] = useState<GeocodedPin[]>([]);
-  const [geocoding, setGeocoding] = useState(false);
-
-  useEffect(() => {
-    if (units.length === 0) {
-      setPins([]);
-      return;
-    }
-
-    // Reset BEFORE firing requests so we never append to stale data
-    setPins([]);
-    let cancelled = false;
-    setGeocoding(true);
-
-    // Fire all requests concurrently — in-flight deduplication in geocode.ts
-    // means React StrictMode double-invocations share one server request each.
-    // The server queue serialises calls to Nominatim at 400ms intervals.
-    let remaining = units.length;
-    units.forEach(async (unit) => {
-      try {
-        const coords = await geocodeAddress(unit.address, unit.postcode, unit.city);
-        if (coords && !cancelled) {
-          setPins(prev => {
-            // Avoid duplicates if effect fires more than once
-            if (prev.some(p => p.id === unit.id)) return prev;
-            return [...prev, { id: unit.id, lat: coords.lat, lng: coords.lng, unit }];
-          });
-        }
-      } finally {
-        remaining--;
-        if (remaining === 0 && !cancelled) setGeocoding(false);
-      }
-    });
-
-    return () => { cancelled = true; };
-  }, [units]);
+export default function MapView({ pins, geocoding, highlightedId, selectedId, onSelect, isSplit }: MapViewProps) {
 
   const getBeds = (unit: UnitWithAttributes) =>
     unit.unit_attributes?.bedrooms ?? unit.bedrooms ?? null;

@@ -128,7 +128,7 @@ Property Management`;
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const resp = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       temperature: 0.3 as any,
       messages: [
@@ -162,14 +162,17 @@ export async function POST(request: NextRequest) {
     // ── 1. AI Analysis ────────────────────────────────────────────────────────
     let aiAnalysis: AIAnalysis;
 
-    if (process.env.ANTHROPIC_API_KEY) {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    console.log('[AI analysis] ANTHROPIC_API_KEY present:', !!apiKey, 'length:', apiKey?.length ?? 0);
+
+    if (apiKey) {
+      const anthropic = new Anthropic({ apiKey });
       let parsed: AIAnalysis | null = null;
 
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const response = await anthropic.messages.create({
-            model: 'claude-3-5-haiku-20241022',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 1024,
             temperature: 0.1 as any,
             system: MAINTENANCE_SYSTEM_PROMPT,
@@ -208,11 +211,15 @@ Required JSON format:
               }
             }
           }
-        } catch {
+        } catch (err: any) {
+          console.error(`[AI analysis] attempt ${attempt + 1} failed:`, err?.message ?? err);
           if (attempt === 2) break;
         }
       }
 
+      if (!parsed) {
+        console.warn('[AI analysis] All attempts failed, falling back to rule-based analysis');
+      }
       aiAnalysis = parsed ?? getRuleBasedAnalysis(description);
     } else {
       aiAnalysis = getRuleBasedAnalysis(description);

@@ -63,7 +63,8 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/auth/') ||
     request.nextUrl.pathname.startsWith('/demo') ||
     request.nextUrl.pathname.startsWith('/properties') ||
-    request.nextUrl.pathname.startsWith('/pay/');
+    request.nextUrl.pathname.startsWith('/pay/') ||
+    request.nextUrl.pathname.startsWith('/sign/');
 
   // If not authenticated and trying to access protected route
   if (!user && !isPublicRoute) {

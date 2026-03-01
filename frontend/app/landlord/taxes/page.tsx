@@ -117,37 +117,37 @@ const MOCK_LEASES = [
     id: 'mock-1',
     start_date: '2024-01-01',
     end_date: null,
-    monthly_rent: 1_850,
+    monthly_rent: 1_100,
     status: 'active',
-    units: { address: '12 Rathmines Road, Dublin 6', unit_identifier: 'Apt 3' },
-    tenants: { full_name: 'Sarah O\'Brien' },
+    units: { address: 'Vouliagmenis 48, Glyfada', unit_identifier: 'Apt 2B' },
+    tenants: { full_name: 'Nikos Papadimitriou' },
   },
   {
     id: 'mock-2',
-    start_date: '2024-03-15',
-    end_date: '2024-12-14',
-    monthly_rent: 1_400,
+    start_date: '2024-04-01',
+    end_date: '2024-11-30',
+    monthly_rent: 850,
     status: 'expired',
-    units: { address: '7 Clontarf Road, Dublin 3', unit_identifier: 'Ground Floor' },
-    tenants: { full_name: 'James Murphy' },
+    units: { address: 'Ermou 12, Kolonaki, Athens', unit_identifier: 'Floor 3' },
+    tenants: { full_name: 'Maria Economou' },
   },
   {
     id: 'mock-3',
-    start_date: '2023-06-01',
+    start_date: '2023-09-01',
     end_date: null,
-    monthly_rent: 2_200,
+    monthly_rent: 1_400,
     status: 'active',
-    units: { address: '45 Sandymount Ave, Dublin 4', unit_identifier: 'Unit A' },
-    tenants: { full_name: 'Emily Chen' },
+    units: { address: 'Poseidonos 7, Paleo Faliro', unit_identifier: 'Studio A' },
+    tenants: { full_name: 'Dimitris Alexiou' },
   },
 ];
 
 const MOCK_DEDUCTIONS: Deduction[] = [
-  { id: 'm1', label: 'Mortgage interest (Rathmines)', amount: 4_200, category: 'Mortgage interest' },
-  { id: 'm2', label: 'Letting agent fees (all properties)', amount: 3_060, category: 'Agent / management fees' },
-  { id: 'm3', label: 'Boiler service & repair', amount: 850, category: 'Repairs & maintenance' },
-  { id: 'm4', label: 'Landlord insurance (all)', amount: 1_440, category: 'Insurance' },
-  { id: 'm5', label: 'Accountant fees', amount: 600, category: 'Professional fees' },
+  { id: 'm1', label: 'Mortgage interest (Glyfada property)', amount: 2_800, category: 'Mortgage interest' },
+  { id: 'm2', label: 'Property management fees (all)', amount: 1_980, category: 'Agent / management fees' },
+  { id: 'm3', label: 'Plumbing & AC maintenance', amount: 620, category: 'Repairs & maintenance' },
+  { id: 'm4', label: 'Landlord insurance (all properties)', amount: 960, category: 'Insurance' },
+  { id: 'm5', label: 'Accountant / tax advisor fees', amount: 500, category: 'Professional fees' },
 ];
 
 // ── PDF export ─────────────────────────────────────────────────────────────────
@@ -634,7 +634,7 @@ export default function LandlordTaxesPage() {
         <div className="flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
           <FlaskConical className="h-4 w-4 shrink-0" />
           <span>
-            <strong>Demo Mode</strong> — Using mock landlord data (Manolis Papadopoulos, 3 properties).
+            <strong>Demo Mode</strong> — Using mock landlord data (Manolis Papadopoulos, 3 Athens-area apartments).
             Export PDF to see the full formatted report.
           </span>
         </div>

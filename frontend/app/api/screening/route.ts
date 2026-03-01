@@ -174,7 +174,7 @@ Consider factors like:
           ai_screening_score: enhancedResult.score,
           status: 'under_review',
           updated_at: new Date().toISOString()
-        })
+        } as never)
         .eq('id', applicationId);
     }
 

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import useLandlordStore from '@/lib/store/landlord';
 import useStore from '@/lib/store/useStore';
+import { getCurrentUser } from '@/lib/auth/client';
 import { WorkflowTimeline } from '@/components/maintenance/WorkflowTimeline';
 import { CommunicationFeed } from '@/components/maintenance/CommunicationFeed';
 import { AIDecisionPanel } from '@/components/maintenance/AIDecisionPanel';
@@ -25,6 +26,7 @@ export default function LandlordMaintenancePage() {
     maintenanceRequests,
     units,
     tenants,
+    leases,
     loading,
     fetchLandlordData
   } = useLandlordStore();
@@ -45,8 +47,21 @@ export default function LandlordMaintenancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchLandlordData();
+    const load = async () => {
+      const currentUser = await getCurrentUser();
+      if (currentUser?.entityId) {
+        fetchLandlordData(currentUser.entityId);
+      }
+    };
+    load();
   }, []);
+
+  // Resolve unit for a maintenance request via lease_id → lease → unit_id → unit
+  const getUnitForRequest = (request: any) => {
+    if (!request) return null;
+    const lease = leases.find(l => l.id === request.lease_id);
+    return lease ? units.find(u => u.id === lease.unit_id) ?? null : null;
+  };
 
   // Get current workflow details
   const currentWorkflow = selectedWorkflow ? getWorkflowWithDetails(selectedWorkflow) : null;
@@ -64,9 +79,8 @@ export default function LandlordMaintenancePage() {
       return false;
     }
     if (searchTerm) {
-      // Search in description or unit identifier
       const request = maintenanceRequests.find(r => r.id === workflow.maintenance_request_id);
-      const unit = units.find(u => u.id === request?.unit_id);
+      const unit = getUnitForRequest(request);
       
       return (
         request?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -198,7 +212,7 @@ export default function LandlordMaintenancePage() {
             ) : (
               filteredWorkflows.map(workflow => {
                 const request = maintenanceRequests.find(r => r.id === workflow.maintenance_request_id);
-                const unit = units.find(u => u.id === request?.unit_id);
+                const unit = getUnitForRequest(request);
                 const tenant = tenants.find(t => t.lease_id === request?.lease_id);
                 const isSelected = selectedWorkflow === workflow.id;
                 const analysis = workflow.ai_analysis ? 
@@ -260,9 +274,16 @@ export default function LandlordMaintenancePage() {
                 {(() => {
                   const request = maintenanceRequests.find(r => r.id === currentWorkflow.maintenance_request_id);
                   const tenant = tenants.find(t => t.lease_id === request?.lease_id);
+                  const unit = getUnitForRequest(request);
                   const photos: string[] = (request as any)?.photos || [];
                   return (
                     <div className="space-y-3">
+                      {unit && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Unit</p>
+                          <p className="font-medium">{unit.unit_identifier || unit.address || unit.name || 'Unknown Unit'}</p>
+                        </div>
+                      )}
                       {request?.title && (
                         <div>
                           <p className="text-sm text-muted-foreground">Title</p>

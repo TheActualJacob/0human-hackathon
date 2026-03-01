@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useLandlordStore from "@/lib/store/landlord";
 import useStore from "@/lib/store/useStore";
+import { getCurrentUser } from "@/lib/auth/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,13 @@ export default function LandlordPaymentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
   useEffect(() => {
-    fetchLandlordData();
+    const load = async () => {
+      const currentUser = await getCurrentUser();
+      if (currentUser?.entityId) {
+        fetchLandlordData(currentUser.entityId);
+      }
+    };
+    load();
   }, []);
 
   // Get payment with details

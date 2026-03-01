@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import useLandlordStore from "@/lib/store/landlord";
 import useStore from "@/lib/store/useStore";
+import { getCurrentUser } from "@/lib/auth/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -42,8 +43,13 @@ export default function TenantsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
-    // Fetch landlord data on mount
-    fetchLandlordData();
+    const load = async () => {
+      const currentUser = await getCurrentUser();
+      if (currentUser?.entityId) {
+        fetchLandlordData(currentUser.entityId);
+      }
+    };
+    load();
   }, []);
 
   // Get active tenants with their lease and unit information

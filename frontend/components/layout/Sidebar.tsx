@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { 
   Brain, LayoutDashboard, Building2, Users, FileText, 
   DollarSign, Wrench, UserCircle, Settings, Home, FolderOpen, User,
-  ClipboardList, MessageSquare, TrendingUp
+  ClipboardList, MessageSquare, TrendingUp, Activity
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -60,6 +60,11 @@ const landlordNavItems: NavItem[] = [
     title: "Revenue AI",
     href: "/landlord/revenue",
     icon: TrendingUp,
+  },
+  {
+    title: "Predictive Maintenance",
+    href: "/landlord/predictive-maintenance",
+    icon: Activity,
   },
   {
     title: "Contractors",

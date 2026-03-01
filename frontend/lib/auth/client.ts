@@ -150,7 +150,19 @@ export async function signUpTenant(data: {
         .select()
         .single();
 
-      if (tenantError) throw tenantError;
+      if (tenantError) {
+        const tmsg: string = tenantError?.message ?? '';
+        if (tmsg.includes('tenants_whatsapp_number_key') || tmsg.includes('whatsapp_number')) {
+          throw new Error('An account with this WhatsApp number already exists. Please use a different number or sign in.');
+        }
+        if (tmsg.includes('tenants_email_key') || (tmsg.includes('unique') && tmsg.includes('email'))) {
+          throw new Error('An account with this email address already exists. Please sign in instead.');
+        }
+        if ((tenantError as any)?.code === '23505') {
+          throw new Error('An account with these details already exists. Please check your information or sign in.');
+        }
+        throw tenantError;
+      }
 
       // 4. Create auth_users mapping
       const { error: mappingError } = await supabase
@@ -218,8 +230,21 @@ export async function signUpTenant(data: {
     if (mappingError) throw mappingError;
 
     return { user: authData.user, tenant };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Tenant signup error:', error);
+
+    // Translate database constraint errors into user-friendly messages
+    const msg: string = error?.message ?? '';
+    if (msg.includes('tenants_whatsapp_number_key') || msg.includes('whatsapp_number')) {
+      throw new Error('An account with this WhatsApp number already exists. Please use a different number or sign in.');
+    }
+    if (msg.includes('tenants_email_key') || (msg.includes('unique') && msg.includes('email'))) {
+      throw new Error('An account with this email address already exists. Please sign in instead.');
+    }
+    if (error?.code === '23505') {
+      throw new Error('An account with these details already exists. Please check your information or sign in.');
+    }
+
     throw error;
   }
 }

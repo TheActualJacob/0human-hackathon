@@ -223,26 +223,26 @@ const useStore = create<AppState>((set, get) => ({
       ] = await Promise.all([
         supabase.from('landlords').select('*').order('full_name'),
         supabase.from('units').select('*').order('unit_identifier'),
-        supabase.from('unit_attributes').select('*').limit(500),
-        supabase.from('unit_status').select('*').limit(200),
-        supabase.from('unit_documents').select('*').order('expiry_date').limit(200),
-        supabase.from('unit_appliances').select('*').limit(200),
-        supabase.from('leases').select('*').order('start_date', { ascending: false }).limit(200),
-        supabase.from('tenants').select('*').order('full_name').limit(200),
-        supabase.from('payments').select('*').order('due_date', { ascending: false }).limit(200),
-        supabase.from('payment_plans').select('*').order('start_date', { ascending: false }).limit(100),
-        supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('maintenance_issues').select('*').order('last_reported_at', { ascending: false }).limit(100),
-        supabase.from('contractors').select('*').order('name').limit(100),
+        supabase.from('unit_attributes').select('*'),
+        supabase.from('unit_status').select('*'),
+        supabase.from('unit_documents').select('*').order('expiry_date'),
+        supabase.from('unit_appliances').select('*'),
+        supabase.from('leases').select('*').order('start_date', { ascending: false }),
+        supabase.from('tenants').select('*').order('full_name'),
+        supabase.from('payments').select('*').order('due_date', { ascending: false }),
+        supabase.from('payment_plans').select('*').order('start_date', { ascending: false }),
+        supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('maintenance_issues').select('*').order('last_reported_at', { ascending: false }),
+        supabase.from('contractors').select('*').order('name'),
         supabase.from('conversations').select('*').order('timestamp', { ascending: false }).limit(100),
-        supabase.from('conversation_context').select('*').limit(100),
-        supabase.from('disputes').select('*').order('opened_at', { ascending: false }).limit(100),
-        supabase.from('legal_actions').select('*').order('issued_at', { ascending: false }).limit(100),
+        supabase.from('conversation_context').select('*'),
+        supabase.from('disputes').select('*').order('opened_at', { ascending: false }),
+        supabase.from('legal_actions').select('*').order('issued_at', { ascending: false }),
         supabase.from('landlord_notifications').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('agent_actions').select('*').order('timestamp', { ascending: false }).limit(50),
-        supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('workflow_communications').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('vendor_bids').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }),
+        supabase.from('workflow_communications').select('*').order('created_at', { ascending: false }),
+        supabase.from('vendor_bids').select('*').order('created_at', { ascending: false }),
       ]);
 
       // Check for errors and log them
@@ -729,28 +729,33 @@ const useStore = create<AppState>((set, get) => ({
   // Real-time subscriptions
   setupSubscriptions: () => {
     const subscriptions: RealtimeChannel[] = [];
-    
-    // Subscribe to maintenance requests
+
+    // Subscribe to maintenance requests — inline state update, no full refetch
     const maintenanceChannel = supabase
       .channel('maintenance-requests-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'maintenance_requests' },
-        async (payload) => {
-          console.log('Maintenance request change:', payload);
-          const { data } = await supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }).limit(100);
-          if (data) set({ maintenanceRequests: data });
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            set((state) => ({ maintenanceRequests: [payload.new as MaintenanceRequest, ...state.maintenanceRequests] }));
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new as MaintenanceRequest;
+            set((state) => ({ maintenanceRequests: state.maintenanceRequests.map(r => r.id === updated.id ? updated : r) }));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            const removed = payload.old as { id: string };
+            set((state) => ({ maintenanceRequests: state.maintenanceRequests.filter(r => r.id !== removed.id) }));
+          }
         }
       )
       .subscribe();
     subscriptions.push(maintenanceChannel);
-    
-    // Subscribe to conversations
+
+    // Subscribe to conversations — inline insert only
     const conversationsChannel = supabase
       .channel('conversations-changes')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversations' },
         (payload) => {
-          console.log('New conversation:', payload);
           if (payload.new) {
             set((state) => ({
               conversations: [payload.new as Conversation, ...state.conversations].slice(0, 100)
@@ -760,28 +765,33 @@ const useStore = create<AppState>((set, get) => ({
       )
       .subscribe();
     subscriptions.push(conversationsChannel);
-    
-    // Subscribe to payments
+
+    // Subscribe to payments — inline state update, no full refetch
     const paymentsChannel = supabase
       .channel('payments-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'payments' },
-        async (payload) => {
-          console.log('Payment change:', payload);
-          const { data } = await supabase.from('payments').select('*').order('due_date', { ascending: false }).limit(200);
-          if (data) set({ payments: data });
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            set((state) => ({ payments: [payload.new as Payment, ...state.payments] }));
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new as Payment;
+            set((state) => ({ payments: state.payments.map(p => p.id === updated.id ? updated : p) }));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            const removed = payload.old as { id: string };
+            set((state) => ({ payments: state.payments.filter(p => p.id !== removed.id) }));
+          }
         }
       )
       .subscribe();
     subscriptions.push(paymentsChannel);
-    
-    // Subscribe to landlord notifications
+
+    // Subscribe to landlord notifications — inline insert only
     const notificationsChannel = supabase
       .channel('notifications-changes')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'landlord_notifications' },
         (payload) => {
-          console.log('New notification:', payload);
           if (payload.new) {
             set((state) => ({
               landlordNotifications: [payload.new as LandlordNotification, ...state.landlordNotifications].slice(0, 50)
@@ -791,42 +801,53 @@ const useStore = create<AppState>((set, get) => ({
       )
       .subscribe();
     subscriptions.push(notificationsChannel);
-    
-    // Subscribe to disputes
+
+    // Subscribe to disputes — inline state update, no full refetch
     const disputesChannel = supabase
       .channel('disputes-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'disputes' },
-        async (payload) => {
-          console.log('Dispute change:', payload);
-          const { data } = await supabase.from('disputes').select('*').order('opened_at', { ascending: false }).limit(100);
-          if (data) set({ disputes: data });
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            set((state) => ({ disputes: [payload.new as Dispute, ...state.disputes] }));
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new as Dispute;
+            set((state) => ({ disputes: state.disputes.map(d => d.id === updated.id ? updated : d) }));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            const removed = payload.old as { id: string };
+            set((state) => ({ disputes: state.disputes.filter(d => d.id !== removed.id) }));
+          }
         }
       )
       .subscribe();
     subscriptions.push(disputesChannel);
-    
-    // Subscribe to maintenance workflows
+
+    // Subscribe to maintenance workflows — inline state update, no full refetch
     const workflowsChannel = supabase
       .channel('workflows-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'maintenance_workflows' },
-        async (payload) => {
-          console.log('Workflow change:', payload);
-          const { data } = await supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }).limit(100);
-          if (data) set({ maintenanceWorkflows: data });
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            set((state) => ({ maintenanceWorkflows: [payload.new as MaintenanceWorkflow, ...state.maintenanceWorkflows] }));
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new as MaintenanceWorkflow;
+            set((state) => ({ maintenanceWorkflows: state.maintenanceWorkflows.map(w => w.id === updated.id ? updated : w) }));
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            const removed = payload.old as { id: string };
+            set((state) => ({ maintenanceWorkflows: state.maintenanceWorkflows.filter(w => w.id !== removed.id) }));
+          }
         }
       )
       .subscribe();
     subscriptions.push(workflowsChannel);
-    
-    // Subscribe to workflow communications
+
+    // Subscribe to workflow communications — inline insert only
     const workflowCommsChannel = supabase
       .channel('workflow-comms-changes')
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'workflow_communications' },
         (payload) => {
-          console.log('New workflow communication:', payload);
           if (payload.new) {
             set((state) => ({
               workflowCommunications: [...state.workflowCommunications, payload.new as WorkflowCommunication]
@@ -836,7 +857,7 @@ const useStore = create<AppState>((set, get) => ({
       )
       .subscribe();
     subscriptions.push(workflowCommsChannel);
-    
+
     set({ subscriptions });
   },
   

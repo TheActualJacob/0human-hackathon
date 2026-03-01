@@ -63,24 +63,19 @@ const useLandlordStore = create<LandlordState>()(
         const supabase = createClient();
 
         try {
-          console.log('Fetching data for landlordId:', landlordId);
+          // Fetch units and contractors in parallel — they're independent of each other
+          const [unitsRes, contractorsRes] = await Promise.all([
+            supabase.from('units').select('*').eq('landlord_id', landlordId).order('created_at', { ascending: false }),
+            supabase.from('contractors').select('*').eq('landlord_id', landlordId).order('created_at', { ascending: false }),
+          ]);
 
-          // Fetch units for this landlord only
-          const { data: units, error: unitsError } = await supabase
-            .from('units')
-            .select('*')
-            .eq('landlord_id', landlordId)
-            .order('created_at', { ascending: false });
+          if (unitsRes.error) throw unitsRes.error;
+          if (contractorsRes.error) throw contractorsRes.error;
 
-          if (unitsError) {
-            console.error('units query failed:', unitsError.message, unitsError.code, unitsError.details, unitsError.hint);
-            throw unitsError;
-          }
-          console.log('Units fetched:', units?.length);
+          const units = unitsRes.data || [];
+          const contractors = contractorsRes.data || [];
+          const unitIds = units.map(u => u.id);
 
-          const unitIds = units?.map(u => u.id) || [];
-
-          // Only fetch dependent data if there are units
           let leases: any[] = [];
           let tenants: any[] = [];
           let payments: any[] = [];
@@ -126,18 +121,6 @@ const useLandlordStore = create<LandlordState>()(
                 maintenanceWorkflows = workflowsData || [];
               }
             }
-          }
-
-          // Fetch contractors for this landlord (independent of units)
-          const { data: contractors, error: contractorsError } = await supabase
-            .from('contractors')
-            .select('*')
-            .eq('landlord_id', landlordId)
-            .order('created_at', { ascending: false });
-
-          if (contractorsError) {
-            console.error('contractors query failed:', contractorsError.message, contractorsError.code, contractorsError.details, contractorsError.hint);
-            throw contractorsError;
           }
 
           set({

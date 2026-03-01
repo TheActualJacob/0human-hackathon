@@ -197,6 +197,7 @@ async function exportToPDF(data: PDFData) {
       .replace(/\u201c/g, '"')   // LEFT DOUBLE QUOTATION → quote
       .replace(/\u201d/g, '"')   // RIGHT DOUBLE QUOTATION → quote
       .replace(/\u00b7/g, '.')   // MIDDLE DOT → period
+      .replace(/\u20ac/g, 'EUR') // EURO SIGN → EUR (not in WinAnsi)
       .replace(/[^\x00-\xff]/g, '?'); // catch-all for anything else outside Latin-1
 
   const line = (x1: number, y1: number, x2: number, y2: number, color = muted, thickness = 0.5) => {
@@ -259,10 +260,10 @@ async function exportToPDF(data: PDFData) {
   // ─ 4 summary boxes
   const boxW = (contentWidth - 12) / 4;
   const summaryBoxes = [
-    { label: 'Gross Rental Income', value: `€${data.grossIncome.toLocaleString()}`, color: accent },
-    { label: 'Allowable Deductions', value: `-€${data.totalDeductions.toLocaleString()}`, color: rgb(0.2, 0.7, 0.4) },
-    { label: 'Taxable Profit', value: `€${data.taxableProfit.toLocaleString()}`, color: rgb(0.3, 0.6, 0.95) },
-    { label: 'Estimated Tax Owed', value: `€${data.tax.total.toLocaleString()}`, color: data.tax.total > 0 ? yellow : accent },
+    { label: 'Gross Rental Income', value: `\xa3${data.grossIncome.toLocaleString()}`, color: accent },
+    { label: 'Allowable Deductions', value: `-\xa3${data.totalDeductions.toLocaleString()}`, color: rgb(0.2, 0.7, 0.4) },
+    { label: 'Taxable Profit', value: `\xa3${data.taxableProfit.toLocaleString()}`, color: rgb(0.3, 0.6, 0.95) },
+    { label: 'Estimated Tax Owed', value: `\xa3${data.tax.total.toLocaleString()}`, color: data.tax.total > 0 ? yellow : accent },
   ];
   summaryBoxes.forEach((box, i) => {
     const bx = margin + i * (boxW + 4);
@@ -283,9 +284,9 @@ async function exportToPDF(data: PDFData) {
   const gr2 = data.taxableProfit > 12_000 ? Math.round(Math.min(data.taxableProfit - 12_000, 23_000) * 0.35) : 0;
   const gr3 = data.taxableProfit > 35_000 ? Math.round((data.taxableProfit - 35_000) * 0.45) : 0;
   const taxRows: [string, string, string][] = [
-    ['Band 1: up to EUR 12,000 @ 15%', '', `EUR ${gr1.toLocaleString()}`],
-    ...(gr2 > 0 ? [['Band 2: EUR 12,001-35,000 @ 35%', '', `EUR ${gr2.toLocaleString()}`] as [string, string, string]] : []),
-    ...(gr3 > 0 ? [['Band 3: above EUR 35,000 @ 45%', '', `EUR ${gr3.toLocaleString()}`] as [string, string, string]] : []),
+    ['Band 1: up to GBP 12,000 @ 15%', '', `\xa3${gr1.toLocaleString()}`],
+    ...(gr2 > 0 ? [['Band 2: GBP 12,001-35,000 @ 35%', '', `\xa3${gr2.toLocaleString()}`] as [string, string, string]] : []),
+    ...(gr3 > 0 ? [['Band 3: above GBP 35,000 @ 45%', '', `\xa3${gr3.toLocaleString()}`] as [string, string, string]] : []),
   ];
   taxRows.forEach(([label, sub, val]) => {
     text(label, margin, y, { size: 10 });
@@ -298,7 +299,7 @@ async function exportToPDF(data: PDFData) {
   y -= 14;
   text('TOTAL ESTIMATED TAX', margin, y, { size: 10, font: bold });
   text(`${data.tax.effectiveRate.toFixed(1)}% effective rate`, margin + 180, y, { size: 9, color: muted });
-  text(`€${data.tax.total.toLocaleString()}`, W - margin, y, { align: 'right', size: 12, font: bold, color: red });
+  text(`\xa3${data.tax.total.toLocaleString()}`, W - margin, y, { align: 'right', size: 12, font: bold, color: red });
   y -= 30;
 
   // ─ Income per property
@@ -319,8 +320,8 @@ async function exportToPDF(data: PDFData) {
     if (i % 2 === 0) rect(margin, y - 4, contentWidth, 18, rgb(0.98, 0.98, 0.99));
     text(row.address, margin + 6, y + 2, { size: 9 });
     text(String(row.months), margin + 320, y + 2, { size: 9, align: 'right' });
-    text(`€${row.rent.toLocaleString()}/mo`, margin + 400, y + 2, { size: 9, align: 'right' });
-    text(`€${row.income.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: accent });
+    text(`\xa3${row.rent.toLocaleString()}/mo`, margin + 400, y + 2, { size: 9, align: 'right' });
+    text(`\xa3${row.income.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: accent });
     y -= 20;
   });
 
@@ -328,7 +329,7 @@ async function exportToPDF(data: PDFData) {
   line(margin, y, W - margin, y);
   y -= 14;
   text('Total gross rental income', margin, y, { size: 10, font: bold });
-  text(`€${data.grossIncome.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right' });
+  text(`\xa3${data.grossIncome.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right' });
   y -= 28;
 
   // ─ Deductions
@@ -352,7 +353,7 @@ async function exportToPDF(data: PDFData) {
       if (i % 2 === 0) rect(margin, y - 4, contentWidth, 18, rgb(0.98, 0.98, 0.99));
       text(d.label, margin + 6, y + 2, { size: 9 });
       text(d.category, margin + 320, y + 2, { size: 9, color: muted });
-      text(`−€${d.amount.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
+      text(`-\xa3${d.amount.toLocaleString()}`, W - margin, y + 2, { size: 9, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
       y -= 20;
     });
 
@@ -360,7 +361,7 @@ async function exportToPDF(data: PDFData) {
     line(margin, y, W - margin, y);
     y -= 14;
     text('Total deductions', margin, y, { size: 10, font: bold });
-    text(`−€${data.totalDeductions.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
+    text(`-\xa3${data.totalDeductions.toLocaleString()}`, W - margin, y, { size: 10, font: bold, align: 'right', color: rgb(0.15, 0.65, 0.35) });
     y -= 28;
   }
 
@@ -519,26 +520,26 @@ export default function LandlordTaxesPage() {
     setTimeout(() => {
       const band = taxableProfit > 35_000 ? 'top band (45%)' : taxableProfit > 12_000 ? 'middle band (35%)' : 'first band (15%)';
       setAiSummary(
-        `Tax Year ${selectedYear} — AI Tax Summary (Greek rates)\n\n` +
-        `Gross rental income:      €${Math.round(grossIncome).toLocaleString()}\n` +
-        `Allowable deductions:     €${Math.round(totalDeductions).toLocaleString()}\n` +
-        `Taxable profit:           €${Math.round(taxableProfit).toLocaleString()}\n\n` +
+        `Tax Year ${selectedYear} — AI Tax Summary (UK rates)\n\n` +
+        `Gross rental income:      \xa3${Math.round(grossIncome).toLocaleString()}\n` +
+        `Allowable deductions:     \xa3${Math.round(totalDeductions).toLocaleString()}\n` +
+        `Taxable profit:           \xa3${Math.round(taxableProfit).toLocaleString()}\n\n` +
         `  Income tax (${band}):\n` +
-        `    Band 1 up to €12,000 @ 15%:     €${Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}\n` +
-        (taxableProfit > 12_000 ? `    Band 2 €12k-€35k @ 35%:          €${Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}\n` : '') +
-        (taxableProfit > 35_000 ? `    Band 3 above €35,000 @ 45%:      €${Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}\n` : '') +
+        `    Band 1 up to \xa312,000 @ 15%:     \xa3${Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}\n` +
+        (taxableProfit > 12_000 ? `    Band 2 \xa312k-\xa335k @ 35%:          \xa3${Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}\n` : '') +
+        (taxableProfit > 35_000 ? `    Band 3 above \xa335,000 @ 45%:      \xa3${Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}\n` : '') +
         `  ─────────────────────────────────\n` +
-        `  Estimated total tax:    €${tax.total.toLocaleString()}\n` +
+        `  Estimated total tax:    \xa3${tax.total.toLocaleString()}\n` +
         `  Effective rate:         ${tax.effectiveRate.toFixed(1)}%\n\n` +
-        `Deductions you may be missing (Greek tax law):\n` +
+        `Deductions you may be missing (UK tax law):\n` +
         `• Property repair & maintenance costs\n` +
         `• Letting agent & management fees\n` +
         `• Insurance premiums\n` +
-        `• Depreciation allowance (where applicable)\n` +
+        `• Replacement of domestic items relief\n` +
         `• Accountancy & legal fees\n` +
         `• Void period utility costs\n\n` +
-        `Filing deadline: 30 June ${selectedYear + 1} via Taxisnet (E1/E2 forms).\n` +
-        `Keep all receipts for at least 5 years. Consult a certified Greek accountant.`
+        `Filing deadline: 31 January ${selectedYear + 2} via HMRC Self Assessment.\n` +
+        `Keep all receipts for at least 5 years. Consult a certified UK accountant.`
       );
       setSummaryLoading(false);
     }, 800);
@@ -576,10 +577,10 @@ export default function LandlordTaxesPage() {
   const isLoading = !demoMode && loading;
 
   const summaryCards = [
-    { label: 'Gross Rental Income', value: `€${Math.round(grossIncome).toLocaleString()}`, icon: TrendingUp, color: 'text-primary' },
-    { label: 'Allowable Deductions', value: `−€${Math.round(totalDeductions).toLocaleString()}`, icon: ShieldCheck, color: 'text-green-400' },
-    { label: 'Taxable Profit', value: `€${Math.round(taxableProfit).toLocaleString()}`, icon: Calculator, color: 'text-blue-400' },
-    { label: 'Estimated Tax Owed', value: `€${tax.total.toLocaleString()}`, icon: AlertTriangle, color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground' },
+    { label: 'Gross Rental Income', value: `£${Math.round(grossIncome).toLocaleString()}`, icon: TrendingUp, color: 'text-primary' },
+    { label: 'Allowable Deductions', value: `-£${Math.round(totalDeductions).toLocaleString()}`, icon: ShieldCheck, color: 'text-green-400' },
+    { label: 'Taxable Profit', value: `£${Math.round(taxableProfit).toLocaleString()}`, icon: Calculator, color: 'text-blue-400' },
+    { label: 'Estimated Tax Owed', value: `£${tax.total.toLocaleString()}`, icon: AlertTriangle, color: tax.total > 0 ? 'text-yellow-400' : 'text-muted-foreground' },
   ];
 
   return (
@@ -657,35 +658,35 @@ export default function LandlordTaxesPage() {
       {!isLoading && taxableProfit > 0 && (
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">Tax Breakdown (Greece 2024)</h2>
+            <h2 className="text-sm font-medium text-muted-foreground">Tax Breakdown (UK {selectedYear})</h2>
             <Badge variant="outline" className="text-xs">
               {tax.effectiveRate.toFixed(1)}% effective rate
             </Badge>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Band 1: up to €12,000 (15%)</span>
-              <span className="font-medium">€{Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}</span>
+              <span className="text-muted-foreground">Band 1: up to £12,000 (15%)</span>
+              <span className="font-medium">£{Math.round(Math.min(taxableProfit, 12_000) * 0.15).toLocaleString()}</span>
             </div>
             {taxableProfit > 12_000 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Band 2: €12,001 – €35,000 (35%)</span>
-                <span className="font-medium">€{Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}</span>
+                <span className="text-muted-foreground">Band 2: £12,001 – £35,000 (35%)</span>
+                <span className="font-medium">£{Math.round(Math.min(taxableProfit - 12_000, 23_000) * 0.35).toLocaleString()}</span>
               </div>
             )}
             {taxableProfit > 35_000 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Band 3: above €35,000 (45%)</span>
-                <span className="font-medium">€{Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}</span>
+                <span className="text-muted-foreground">Band 3: above £35,000 (45%)</span>
+                <span className="font-medium">£{Math.round((taxableProfit - 35_000) * 0.45).toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-border pt-2 font-semibold">
               <span>Estimated total tax owed</span>
-              <span className="text-yellow-400">€{tax.total.toLocaleString()}</span>
+              <span className="text-yellow-400">£{tax.total.toLocaleString()}</span>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Estimate only. Does not account for other income sources, deductions, or individual circumstances. Consult a Greek tax advisor (E1/E2 form) before filing.
+            Estimate only. Does not account for other income sources, deductions, or individual circumstances. Consult a qualified UK tax advisor before filing your Self Assessment.
           </p>
         </Card>
       )}
@@ -701,14 +702,14 @@ export default function LandlordTaxesPage() {
               <div key={i} className="flex items-center justify-between py-2">
                 <div>
                   <div className="font-medium">{row.address}</div>
-                  <div className="text-xs text-muted-foreground">{row.months} months × €{row.rent.toLocaleString()}/mo</div>
+                  <div className="text-xs text-muted-foreground">{row.months} months × £{row.rent.toLocaleString()}/mo</div>
                 </div>
-                <span className="font-semibold text-primary">€{row.income.toLocaleString()}</span>
+                <span className="font-semibold text-primary">£{row.income.toLocaleString()}</span>
               </div>
             ))}
             <div className="flex justify-between py-2 font-bold">
               <span>Total gross income</span>
-              <span>€{Math.round(grossIncome).toLocaleString()}</span>
+              <span>£{Math.round(grossIncome).toLocaleString()}</span>
             </div>
           </div>
         </Card>
@@ -741,7 +742,7 @@ export default function LandlordTaxesPage() {
               </SelectContent>
             </Select>
             <Input
-              placeholder="€ amount"
+              placeholder="£ amount"
               type="number"
               min="0"
               value={newAmount}
@@ -772,7 +773,7 @@ export default function LandlordTaxesPage() {
                 <span>{d.label}</span>
                 <span className="text-right w-32 text-xs text-muted-foreground">{d.category}</span>
                 <div className="flex items-center gap-2 justify-end w-24">
-                  <span className="text-green-400 font-medium">−€{d.amount.toLocaleString()}</span>
+                  <span className="text-green-400 font-medium">-£{d.amount.toLocaleString()}</span>
                   {!demoMode && (
                     <button onClick={() => removeDeduction(d.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -783,7 +784,7 @@ export default function LandlordTaxesPage() {
             ))}
             <div className="flex justify-between text-sm pt-2 font-bold">
               <span>Total deductions</span>
-              <span className="text-green-400">−€{Math.round(totalDeductions).toLocaleString()}</span>
+              <span className="text-green-400">-£{Math.round(totalDeductions).toLocaleString()}</span>
             </div>
           </div>
         )}

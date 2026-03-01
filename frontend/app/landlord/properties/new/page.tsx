@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Building2, MapPin, Home, Sparkles,
-  Eye, Mail, Plus, X, ChevronDown,
+  Eye, Mail, Plus, X, Camera, Upload, ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import useLandlordStore from '@/lib/store/landlord';
 import { createPropertyInvite } from '@/lib/property/invites';
 import { getCurrentUser } from '@/lib/auth/client';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 // ─── Country list ─────────────────────────────────────────────────────────────
@@ -106,6 +107,9 @@ export default function NewPropertyPage() {
   const [previewMode, setPreviewMode] = useState(false);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [currentEmail, setCurrentEmail] = useState('');
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     // Identity
@@ -138,6 +142,22 @@ export default function NewPropertyPage() {
 
   const set = (patch: Partial<typeof formData>) => setFormData(prev => ({ ...prev, ...patch }));
   const currency = currencyFor(formData.country);
+
+  // ─── Image handling ────────────────────────────────────────────────────────
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const remaining = 10 - selectedImages.length;
+    const toAdd = files.slice(0, remaining);
+    setSelectedImages(prev => [...prev, ...toAdd]);
+    setImagePreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))]);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  const handleRemoveImage = (index: number) => {
+    URL.revokeObjectURL(imagePreviews[index]);
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
 
   // ─── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,6 +198,32 @@ export default function NewPropertyPage() {
         available_date:     formData.available_date     || null,
         listing_created_at: formData.listing_status !== 'not_listed' ? new Date().toISOString() : null,
       } as any);
+
+      // Upload images if any were selected
+      if (selectedImages.length > 0 && createdUnit?.id) {
+        try {
+          const supabase = createClient();
+          const uploadedUrls: string[] = [];
+          for (const file of selectedImages) {
+            const ext = file.name.split('.').pop();
+            const path = `${createdUnit.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            const { error: uploadErr } = await supabase.storage
+              .from('property-images')
+              .upload(path, file);
+            if (!uploadErr) {
+              const { data: { publicUrl } } = supabase.storage
+                .from('property-images')
+                .getPublicUrl(path);
+              uploadedUrls.push(publicUrl);
+            }
+          }
+          if (uploadedUrls.length > 0) {
+            await supabase.from('units').update({ images: uploadedUrls }).eq('id', createdUnit.id);
+          }
+        } catch (imgErr) {
+          console.warn('Image upload failed (property still created):', imgErr);
+        }
+      }
 
       // Private listing invites
       if (formData.listing_status === 'private' && inviteEmails.length > 0 && createdUnit?.id) {
@@ -680,6 +726,80 @@ Contact us today to arrange a viewing.`;
                   </div>
                 )}
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Property Photos (optional) ────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <SectionTitle icon={Camera}>Property Photos</SectionTitle>
+            </CardTitle>
+            <CardDescription className="flex items-start gap-2">
+              <span className="flex-1">
+                Optional — but listings with photos receive up to{' '}
+                <span className="font-semibold text-primary">3× more applications</span>.
+                Add at least 3 photos to make your listing stand out.
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={selectedImages.length >= 10}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Add Photos
+              </Button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+              <span className="text-sm text-muted-foreground">
+                {selectedImages.length}/10 photos selected
+              </span>
+            </div>
+
+            {imagePreviews.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {imagePreviews.map((src, i) => (
+                  <div key={i} className="relative group aspect-video">
+                    <img
+                      src={src}
+                      alt={`Preview ${i + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {i === 0 && (
+                      <Badge className="absolute bottom-1.5 left-1.5 text-xs py-0">
+                        Main
+                      </Badge>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(i)}
+                      className="absolute top-1.5 right-1.5 p-0.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                <ImageIcon className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No photos added yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  JPEG, PNG or WebP · Max 10 photos
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

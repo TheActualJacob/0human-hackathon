@@ -355,8 +355,9 @@ Contact us today to arrange a viewing!`;
       try {
         updateData.postcode = formData.postcode;
         updateData.unit_type = formData.unit_type;
-        updateData.bedrooms = formData.bedrooms;
-        updateData.bathrooms = formData.bathrooms;
+        updateData.bedrooms = formData.bedrooms ? Math.round(formData.bedrooms) : null;
+        // units.bathrooms is an integer column — floor decimal values (e.g. 2.5 → 2)
+        updateData.bathrooms = formData.bathrooms ? Math.floor(formData.bathrooms) : null;
         updateData.square_footage = formData.square_footage || null;
         updateData.images = formData.images;
         updateData.updated_at = new Date().toISOString();
@@ -380,8 +381,8 @@ Contact us today to arrange a viewing!`;
         .from('unit_attributes')
         .upsert({
           unit_id: propertyId,
-          bedrooms: formData.bedrooms,
-          bathrooms: formData.bathrooms,
+          bedrooms: formData.bedrooms ? Math.round(formData.bedrooms) : null,
+          bathrooms: formData.bathrooms ? Math.floor(formData.bathrooms) : null,
           square_footage: formData.square_footage || null,
           has_parking: formData.features.has_parking,
           has_garden_access: formData.features.has_garden_access,

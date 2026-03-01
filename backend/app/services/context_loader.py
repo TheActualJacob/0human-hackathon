@@ -126,6 +126,7 @@ class TenantContext:
     open_legal_actions: list[LegalAction] = field(default_factory=list)
     open_disputes: list[Dispute] = field(default_factory=list)
     escalation_level: int = 1
+    pending_media_urls: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

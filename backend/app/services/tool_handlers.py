@@ -54,6 +54,10 @@ AGENT_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Short title for the maintenance issue, max 10 words (e.g. 'Boiler not working – no heating').",
+                },
                 "category": {
                     "type": "string",
                     "enum": ["plumbing", "electrical", "structural", "appliance", "heating", "pest", "damp", "access", "other"],
@@ -72,7 +76,7 @@ AGENT_TOOLS = [
                     ),
                 },
             },
-            "required": ["category", "description", "urgency"],
+            "required": ["title", "category", "description", "urgency"],
         },
     },
     {
@@ -221,6 +225,7 @@ async def _get_rent_status(inp: dict[str, Any], ctx: TenantContext) -> ToolResul
 async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> ToolResult:
     sb = _sb()
     lease_id = ctx.lease.id  # always use context — never trust Claude's lease_id input
+    title = inp.get("title", "")
     category = inp["category"]
     description = inp["description"]
     urgency = inp["urgency"]
@@ -242,11 +247,13 @@ async def _schedule_maintenance(inp: dict[str, Any], ctx: TenantContext) -> Tool
 
     insert_payload = {
         "lease_id": lease_id,
+        "title": title,
         "category": category,
         "description": description,
         "urgency": urgency,
         "status": "assigned" if selected else "open",
         "contractor_id": selected["id"] if selected else None,
+        "photos": ctx.pending_media_urls if ctx.pending_media_urls else [],
     }
     import sys
     sys.stderr.write(f"[schedule_maintenance] PAYLOAD: {insert_payload}\n")

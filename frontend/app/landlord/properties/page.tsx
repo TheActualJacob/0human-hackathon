@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { 
-  Plus, Key, MapPin, Home, FileText, Wrench, AlertCircle, 
+import {
+  Plus, Key, MapPin, Home, FileText, Wrench, AlertCircle,
   CheckCircle, Clock, Filter, ChevronRight, Calendar, Shield,
-  Zap, Flame, FileCheck, Building2, DollarSign, Edit, Trash2
+  Zap, Flame, FileCheck, Building2, DollarSign, Edit, Trash2,
+  Brain, Loader2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import useLandlordStore from '@/lib/store/landlord';
@@ -33,6 +34,21 @@ export default function PropertiesPage() {
   } = useStore();
 
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const [aiSelectState, setAiSelectState] = useState<
+    Record<string, { selecting: boolean; result: { tenant_name: string; summary: string } | null; error: string | null }>
+  >({});
+
+  const handleAiSelectTenant = async (unitId: string) => {
+    setAiSelectState(prev => ({ ...prev, [unitId]: { selecting: true, result: null, error: null } }));
+    try {
+      const res = await fetch(`http://localhost:8000/api/property-applications/select-best/${unitId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Selection failed');
+      setAiSelectState(prev => ({ ...prev, [unitId]: { selecting: false, result: data, error: null } }));
+    } catch (err: any) {
+      setAiSelectState(prev => ({ ...prev, [unitId]: { selecting: false, result: null, error: err.message || 'Failed' } }));
+    }
+  };
   // const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'appliances'>('details');
   
@@ -259,6 +275,17 @@ export default function PropertiesPage() {
                         Edit
                       </Link>
                       <button
+                        onClick={(e) => { e.stopPropagation(); handleAiSelectTenant(unit.id); }}
+                        disabled={aiSelectState[unit.id]?.selecting}
+                        className="flex-1 flex items-center justify-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                      >
+                        {aiSelectState[unit.id]?.selecting ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" />Selecting...</>
+                        ) : (
+                          <><Brain className="h-3 w-3" />AI Select</>
+                        )}
+                      </button>
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm('Are you sure you want to delete this property?')) {
@@ -271,6 +298,17 @@ export default function PropertiesPage() {
                         Delete
                       </button>
                     </div>
+                    {aiSelectState[unit.id]?.result && (
+                      <div className="flex items-center gap-1 pt-2 mt-2 border-t border-border text-xs text-green-400">
+                        <CheckCircle className="h-3 w-3 shrink-0" />
+                        <span>Selected: <span className="font-semibold">{aiSelectState[unit.id].result!.tenant_name}</span> · lease sent via WhatsApp</span>
+                      </div>
+                    )}
+                    {aiSelectState[unit.id]?.error && (
+                      <div className="pt-2 mt-2 border-t border-border text-xs text-red-400">
+                        {aiSelectState[unit.id].error}
+                      </div>
+                    )}
                   </div>
                 );
               })}

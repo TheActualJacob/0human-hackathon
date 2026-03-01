@@ -123,72 +123,178 @@ async def submit_signature(token: str, body: SignRequest):
 
 
 def _generate_signed_lease_pdf(token_row: dict, signature_data_url: str) -> bytes:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image
-
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
-    styles = getSampleStyleSheet()
-
-    header_style = ParagraphStyle("header", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#666666"), alignment=2)
-    title_style = ParagraphStyle("title", parent=styles["Normal"], fontSize=16, fontName="Helvetica-Bold", textColor=colors.black, alignment=1, spaceAfter=8)
-    body_style = ParagraphStyle("body", parent=styles["Normal"], fontSize=11, leading=16, spaceAfter=6)
-    label_style = ParagraphStyle("label", parent=styles["Normal"], fontSize=10, fontName="Helvetica-Bold", spaceAfter=2)
-    footer_style = ParagraphStyle("footer", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#888888"), alignment=1)
-
     today_str = datetime.now(timezone.utc).strftime("%d %B %Y at %H:%M UTC")
     prospect_name = token_row.get("prospect_name", "Tenant")
     unit_address = token_row.get("unit_address", "")
     monthly_rent = token_row.get("monthly_rent")
     lease_content = token_row.get("lease_content", "")
-
-    story = [
-        Paragraph("PropAI Property Management — Signed Tenancy Agreement", header_style),
-        Paragraph(today_str, header_style),
-        Spacer(1, 8*mm),
-        Paragraph("TENANCY AGREEMENT", title_style),
-        Spacer(1, 2*mm),
-        Paragraph(f"Tenant: {prospect_name}", body_style),
-    ]
-    if unit_address:
-        story.append(Paragraph(f"Property: {unit_address}", body_style))
-    if monthly_rent:
-        story.append(Paragraph(f"Monthly Rent: £{float(monthly_rent):.2f}", body_style))
-    story += [Spacer(1, 4*mm), HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")), Spacer(1, 4*mm)]
-
-    for para in lease_content.split("\n\n"):
-        text = para.replace("\n", "<br/>").strip()
-        if text:
-            story.append(Paragraph(text, body_style))
-            story.append(Spacer(1, 2*mm))
-
-    story += [
-        Spacer(1, 8*mm),
-        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
-        Spacer(1, 4*mm),
-        Paragraph("SIGNATURES", title_style),
-        Spacer(1, 4*mm),
-        Paragraph(f"Tenant: {prospect_name}", label_style),
-        Paragraph(f"Signed digitally on: {today_str}", body_style),
-    ]
+    token_id = token_row.get("id", "")
 
     sig_image = _decode_signature_image(signature_data_url)
-    if sig_image:
-        story.append(Image(sig_image, width=60*mm, height=20*mm))
 
-    story += [
-        Spacer(1, 8*mm),
-        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
-        Spacer(1, 3*mm),
-        Paragraph("This tenancy agreement has been digitally signed via PropAI. The digital signature is legally binding under the Electronic Communications Act 2000.", footer_style),
-        Paragraph(f"Document token: {token_row.get('id', '')[:8]}", footer_style),
-    ]
-
-    doc.build(story)
+    buf = io.BytesIO()
+    story = _build_pdf_story(
+        lease_content=lease_content,
+        prospect_name=prospect_name,
+        unit_address=unit_address,
+        monthly_rent=monthly_rent,
+        signed_at=today_str,
+        token_id=token_id,
+        sig_image=sig_image,
+    )
+    _render_pdf(buf, story)
     return buf.getvalue()
+
+
+def _build_pdf_story(
+    lease_content: str,
+    prospect_name: str,
+    unit_address: str,
+    monthly_rent,
+    signed_at: str | None = None,
+    token_id: str = "",
+    sig_image: io.BytesIO | None = None,
+) -> list:
+    import re
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
+    from reportlab.platypus import Paragraph, Spacer, HRFlowable, Table, TableStyle, Image
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("title", parent=styles["Normal"], fontSize=15, fontName="Helvetica-Bold", textColor=colors.black, alignment=TA_CENTER, spaceAfter=4)
+    section_style = ParagraphStyle("section", parent=styles["Normal"], fontSize=11, fontName="Helvetica-Bold", textColor=colors.black, alignment=TA_LEFT, spaceBefore=8, spaceAfter=3)
+    body_style = ParagraphStyle("body", parent=styles["Normal"], fontSize=10, leading=15, alignment=TA_JUSTIFY, spaceAfter=4)
+    meta_label_style = ParagraphStyle("meta_label", parent=styles["Normal"], fontSize=10, fontName="Helvetica-Bold", textColor=colors.HexColor("#333333"))
+    meta_value_style = ParagraphStyle("meta_value", parent=styles["Normal"], fontSize=10, textColor=colors.black)
+    header_left_style = ParagraphStyle("hdr_left", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#555555"), alignment=TA_LEFT)
+    header_right_style = ParagraphStyle("hdr_right", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#555555"), alignment=TA_RIGHT)
+    footer_style = ParagraphStyle("footer", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#888888"), alignment=TA_CENTER)
+    sig_note_style = ParagraphStyle("sig_note", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#666666"), alignment=TA_CENTER)
+
+    PAGE_W = 170 * mm  # usable width (210mm A4 minus 20mm margins each side)
+
+    story = []
+
+    # ── Header: company left, date right ──
+    date_str = signed_at or datetime.now(timezone.utc).strftime("%d %B %Y")
+    header_table = Table(
+        [[Paragraph("PropAI Property Management", header_left_style),
+          Paragraph(date_str, header_right_style)]],
+        colWidths=[PAGE_W * 0.6, PAGE_W * 0.4],
+    )
+    header_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story.append(header_table)
+    story.append(Spacer(1, 5 * mm))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#222222")))
+    story.append(Spacer(1, 5 * mm))
+
+    # ── Document title ──
+    story.append(Paragraph("TENANCY AGREEMENT", title_style))
+    story.append(Spacer(1, 5 * mm))
+
+    # ── Key-info table ──
+    rent_str = f"£{float(monthly_rent):.2f}" if monthly_rent else "As agreed"
+    info_rows = [
+        [Paragraph("TENANT", meta_label_style), Paragraph(prospect_name, meta_value_style)],
+        [Paragraph("PROPERTY", meta_label_style), Paragraph(unit_address or "—", meta_value_style)],
+        [Paragraph("MONTHLY RENT", meta_label_style), Paragraph(rent_str, meta_value_style)],
+    ]
+    info_table = Table(info_rows, colWidths=[PAGE_W * 0.28, PAGE_W * 0.72])
+    info_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("LINEABOVE", (0, 0), (-1, 0), 0.5, colors.HexColor("#cccccc")),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 6 * mm))
+
+    # ── Lease body: detect numbered section headers ──
+    section_header_re = re.compile(r"^\d+[\.\)]\s+[A-Z]")
+    for block in lease_content.split("\n\n"):
+        block = block.strip()
+        if not block:
+            continue
+        lines = block.splitlines()
+        first_line = lines[0].strip()
+        if section_header_re.match(first_line):
+            # Bold header line, then body for the rest
+            story.append(Paragraph(first_line, section_style))
+            rest = "\n".join(lines[1:]).strip()
+            if rest:
+                story.append(Paragraph(rest.replace("\n", "<br/>"), body_style))
+        else:
+            story.append(Paragraph(block.replace("\n", "<br/>"), body_style))
+        story.append(Spacer(1, 1 * mm))
+
+    story.append(Spacer(1, 8 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+    story.append(Spacer(1, 5 * mm))
+
+    # ── Signatures ──
+    story.append(Paragraph("SIGNATURES", title_style))
+    story.append(Spacer(1, 5 * mm))
+
+    LINE = "_" * 42
+
+    if sig_image:
+        tenant_sig_content = Image(sig_image, width=55 * mm, height=18 * mm)
+    else:
+        tenant_sig_content = Paragraph("<i>AWAITING TENANT SIGNATURE</i>", sig_note_style)
+
+    tenant_label = Paragraph(
+        f"<b>Tenant:</b> {prospect_name}" + (f"<br/>Signed: {signed_at}" if signed_at else ""),
+        sig_note_style,
+    )
+    landlord_label = Paragraph("<b>Landlord / Agent</b><br/>Signature: " + LINE, sig_note_style)
+
+    sig_table = Table(
+        [[tenant_sig_content, landlord_label]],
+        colWidths=[PAGE_W * 0.5, PAGE_W * 0.5],
+    )
+    sig_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("BOX", (0, 0), (0, 0), 0.5, colors.HexColor("#aaaaaa")),
+        ("BOX", (1, 0), (1, 0), 0.5, colors.HexColor("#aaaaaa")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(sig_table)
+    story.append(Spacer(1, 4 * mm))
+    story.append(tenant_label)
+
+    story.append(Spacer(1, 8 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+    story.append(Spacer(1, 3 * mm))
+    story.append(Paragraph(
+        "This tenancy agreement has been digitally signed via PropAI. "
+        "The digital signature is legally binding under the Electronic Communications Act 2000.",
+        footer_style,
+    ))
+    if token_id:
+        story.append(Paragraph(f"Document ref: {token_id[:8]}", footer_style))
+
+    return story
+
+
+def _render_pdf(buf: io.BytesIO, story: list) -> None:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate
+
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20 * mm, rightMargin=20 * mm,
+        topMargin=20 * mm, bottomMargin=20 * mm,
+    )
+    doc.build(story)
 
 
 def _decode_signature_image(data_url: str) -> io.BytesIO | None:
@@ -254,57 +360,15 @@ def generate_lease_preview_pdf(
     lease_content: str,
 ) -> bytes:
     """Generate an unsigned lease agreement PDF for sending as a preview."""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import mm
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf, pagesize=A4,
-        leftMargin=20 * mm, rightMargin=20 * mm,
-        topMargin=20 * mm, bottomMargin=20 * mm,
+    story = _build_pdf_story(
+        lease_content=lease_content,
+        prospect_name=applicant_name,
+        unit_address=unit_address,
+        monthly_rent=monthly_rent,
+        signed_at=None,
+        token_id="",
+        sig_image=None,
     )
-    styles = getSampleStyleSheet()
-
-    header_style = ParagraphStyle("header", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#666666"), alignment=2)
-    title_style = ParagraphStyle("title", parent=styles["Normal"], fontSize=16, fontName="Helvetica-Bold", textColor=colors.black, alignment=1, spaceAfter=8)
-    body_style = ParagraphStyle("body", parent=styles["Normal"], fontSize=11, leading=16, spaceAfter=6)
-    note_style = ParagraphStyle("note", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=4)
-
-    story = [
-        Paragraph("PropAI Property Management — Tenancy Agreement (For Review)", header_style),
-        Spacer(1, 8 * mm),
-        Paragraph("TENANCY AGREEMENT", title_style),
-        Paragraph("Please review this agreement carefully before signing.", note_style),
-        Spacer(1, 2 * mm),
-        Paragraph(f"Tenant: {applicant_name}", body_style),
-    ]
-    if unit_address:
-        story.append(Paragraph(f"Property: {unit_address}", body_style))
-    if monthly_rent:
-        story.append(Paragraph(f"Monthly Rent: £{float(monthly_rent):.2f}", body_style))
-
-    story += [
-        Spacer(1, 4 * mm),
-        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
-        Spacer(1, 4 * mm),
-    ]
-
-    for para in lease_content.split("\n\n"):
-        text = para.replace("\n", "<br/>").strip()
-        if text:
-            story.append(Paragraph(text, body_style))
-            story.append(Spacer(1, 2 * mm))
-
-    story += [
-        Spacer(1, 8 * mm),
-        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")),
-        Spacer(1, 4 * mm),
-        Paragraph("AWAITING SIGNATURE", title_style),
-        Paragraph("This document has not yet been signed. Please use the signing link sent to you to review and sign digitally.", note_style),
-    ]
-
-    doc.build(story)
+    _render_pdf(buf, story)
     return buf.getvalue()

@@ -222,26 +222,26 @@ const useStore = create<AppState>((set, get) => ({
       ] = await Promise.all([
         supabase.from('landlords').select('*').order('full_name'),
         supabase.from('units').select('*').order('unit_identifier'),
-        supabase.from('unit_attributes').select('*'),
-        supabase.from('unit_status').select('*'),
-        supabase.from('unit_documents').select('*').order('expiry_date'),
-        supabase.from('unit_appliances').select('*'),
-        supabase.from('leases').select('*').order('start_date', { ascending: false }),
-        supabase.from('tenants').select('*').order('full_name'),
-        supabase.from('payments').select('*').order('due_date', { ascending: false }),
-        supabase.from('payment_plans').select('*').order('start_date', { ascending: false }),
-        supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }),
-        supabase.from('maintenance_issues').select('*').order('last_reported_at', { ascending: false }),
-        supabase.from('contractors').select('*').order('name'),
+        supabase.from('unit_attributes').select('*').limit(500),
+        supabase.from('unit_status').select('*').limit(200),
+        supabase.from('unit_documents').select('*').order('expiry_date').limit(200),
+        supabase.from('unit_appliances').select('*').limit(200),
+        supabase.from('leases').select('*').order('start_date', { ascending: false }).limit(200),
+        supabase.from('tenants').select('*').order('full_name').limit(200),
+        supabase.from('payments').select('*').order('due_date', { ascending: false }).limit(200),
+        supabase.from('payment_plans').select('*').order('start_date', { ascending: false }).limit(100),
+        supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('maintenance_issues').select('*').order('last_reported_at', { ascending: false }).limit(100),
+        supabase.from('contractors').select('*').order('name').limit(100),
         supabase.from('conversations').select('*').order('timestamp', { ascending: false }).limit(100),
-        supabase.from('conversation_context').select('*'),
-        supabase.from('disputes').select('*').order('opened_at', { ascending: false }),
-        supabase.from('legal_actions').select('*').order('issued_at', { ascending: false }),
+        supabase.from('conversation_context').select('*').limit(100),
+        supabase.from('disputes').select('*').order('opened_at', { ascending: false }).limit(100),
+        supabase.from('legal_actions').select('*').order('issued_at', { ascending: false }).limit(100),
         supabase.from('landlord_notifications').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('agent_actions').select('*').order('timestamp', { ascending: false }).limit(50),
-        supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }),
-        supabase.from('workflow_communications').select('*').order('created_at', { ascending: false }),
-        supabase.from('vendor_bids').select('*').order('created_at', { ascending: false }),
+        supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('workflow_communications').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('vendor_bids').select('*').order('created_at', { ascending: false }).limit(100),
       ]);
 
       // Check for errors and log them
@@ -732,11 +732,12 @@ const useStore = create<AppState>((set, get) => ({
     // Subscribe to maintenance requests
     const maintenanceChannel = supabase
       .channel('maintenance-requests-changes')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'maintenance_requests' },
-        (payload) => {
+        async (payload) => {
           console.log('Maintenance request change:', payload);
-          get().fetchData();
+          const { data } = await supabase.from('maintenance_requests').select('*').order('created_at', { ascending: false }).limit(100);
+          if (data) set({ maintenanceRequests: data });
         }
       )
       .subscribe();
@@ -764,9 +765,10 @@ const useStore = create<AppState>((set, get) => ({
       .channel('payments-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'payments' },
-        (payload) => {
+        async (payload) => {
           console.log('Payment change:', payload);
-          get().fetchData();
+          const { data } = await supabase.from('payments').select('*').order('due_date', { ascending: false }).limit(200);
+          if (data) set({ payments: data });
         }
       )
       .subscribe();
@@ -794,9 +796,10 @@ const useStore = create<AppState>((set, get) => ({
       .channel('disputes-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'disputes' },
-        (payload) => {
+        async (payload) => {
           console.log('Dispute change:', payload);
-          get().fetchData();
+          const { data } = await supabase.from('disputes').select('*').order('opened_at', { ascending: false }).limit(100);
+          if (data) set({ disputes: data });
         }
       )
       .subscribe();
@@ -807,9 +810,10 @@ const useStore = create<AppState>((set, get) => ({
       .channel('workflows-changes')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'maintenance_workflows' },
-        (payload) => {
+        async (payload) => {
           console.log('Workflow change:', payload);
-          get().fetchData();
+          const { data } = await supabase.from('maintenance_workflows').select('*').order('created_at', { ascending: false }).limit(100);
+          if (data) set({ maintenanceWorkflows: data });
         }
       )
       .subscribe();
